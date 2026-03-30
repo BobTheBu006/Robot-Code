@@ -4,12 +4,32 @@ FastAPI backend for the local robot-control app.
 
 ## Run locally
 
+On Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-backend.sh
+```
+
+On Windows 11:
+
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code"
 start-backend.bat
 ```
 
 Or run it directly:
+
+Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code/backend"
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
+./.venv/bin/python -m uvicorn app.main:app --reload
+```
+
+Windows 11:
 
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code\backend"

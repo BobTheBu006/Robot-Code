@@ -25,6 +25,15 @@ This repository is intentionally minimal: it gives you a clean React frontend, a
 
 ### 1. Start the backend
 
+On Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-backend.sh
+```
+
+On Windows 11:
+
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code"
 start-backend.bat
@@ -36,12 +45,37 @@ Backend runs at `http://127.0.0.1:8000`.
 
 Open a second terminal:
 
+On Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-frontend.sh
+```
+
+On Windows 11:
+
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code"
 start-frontend.bat
 ```
 
 Frontend runs at `http://127.0.0.1:5173`.
+
+### Optional: start both
+
+On Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-all.sh
+```
+
+On Windows 11:
+
+```powershell
+cd "C:\BOB\masters\Thesis\Robot Code"
+start-all.bat
+```
 
 ## Available endpoints
 

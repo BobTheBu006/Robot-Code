@@ -4,12 +4,32 @@ Vite + React + TypeScript dashboard for the local robot-control app.
 
 ## Run locally
 
+On Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-frontend.sh
+```
+
+On Windows 11:
+
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code"
 start-frontend.bat
 ```
 
 Or run it directly:
+
+Raspberry Pi OS / Linux:
+
+```bash
+cd "/home/robot/robot control/Robot-Code/frontend"
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Windows 11:
 
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code\frontend"
