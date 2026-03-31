@@ -2,6 +2,8 @@
 
 Vite + React + TypeScript dashboard for the local robot-control app.
 
+Requires Node.js 20+ with `npm` available on your `PATH`.
+
 ## Run locally
 
 On Raspberry Pi OS / Linux:
@@ -43,6 +45,8 @@ npm.cmd run dev
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+Once the backend camera route is enabled, the dashboard camera panel will pull its live stream from `/api/camera/stream`.
 
 ## Available scripts
 

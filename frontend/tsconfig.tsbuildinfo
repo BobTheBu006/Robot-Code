@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/panel.tsx","./src/components/placeholderpanel.tsx","./src/components/robotstatecard.tsx","./src/components/statusbadge.tsx","./src/lib/api.ts","./src/types/robot.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/CameraFeedCard.tsx","./src/components/Panel.tsx","./src/components/PlaceholderPanel.tsx","./src/components/RobotStateCard.tsx","./src/components/StatusBadge.tsx","./src/lib/api.ts","./src/types/robot.ts"],"version":"5.9.3"}

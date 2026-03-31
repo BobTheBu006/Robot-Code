@@ -1,4 +1,4 @@
-﻿import type { HealthResponse, RobotState, RobotStateUpdate } from "../types/robot";
+﻿import type { CameraStatus, HealthResponse, RobotState, RobotStateUpdate } from "../types/robot";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
@@ -25,6 +25,10 @@ export function fetchHealth(): Promise<HealthResponse> {
   return request<HealthResponse>("/health");
 }
 
+export function fetchCameraStatus(): Promise<CameraStatus> {
+  return request<CameraStatus>("/api/camera/status");
+}
+
 export function fetchRobotState(): Promise<RobotState> {
   return request<RobotState>("/api/robot/state");
 }
@@ -34,4 +38,8 @@ export function updateMockRobotState(update: RobotStateUpdate): Promise<RobotSta
     method: "POST",
     body: JSON.stringify(update),
   });
+}
+
+export function getCameraStreamUrl(): string {
+  return `${API_BASE_URL}/api/camera/stream`;
 }

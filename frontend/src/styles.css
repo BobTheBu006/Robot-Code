@@ -204,6 +204,29 @@ body {
   color: #55766b;
 }
 
+.camera-feed {
+  display: grid;
+  gap: 14px;
+}
+
+.camera-feed__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff4f1 0%, #dfe9e5 100%);
+}
+
+.camera-feed__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #55766b;
+  font-size: 0.95rem;
+}
+
 .muted-text {
   color: #55766b;
 }

@@ -44,6 +44,56 @@ The API will be available at `http://127.0.0.1:8000`.
 - `GET /health`
 - `GET /api/robot/state`
 - `POST /api/robot/state/mock-update`
+- `GET /api/camera/status`
+- `GET /api/camera/frame`
+- `GET /api/camera/stream`
+- `GET /api/tools/syringe/status`
+- `POST /api/tools/syringe/dispense`
+
+## Camera feed
+
+The backend can expose a USB camera to the frontend as an MJPEG stream.
+
+Camera environment variables:
+
+- `CAMERA_DEVICE=0`
+- `CAMERA_FRAME_WIDTH=1280`
+- `CAMERA_FRAME_HEIGHT=720`
+- `CAMERA_FPS=15`
+
+If the camera feed reports that OpenCV is unavailable, reinstall backend dependencies:
+
+```bash
+cd "/home/robot/robot control/Robot-Code/backend"
+./.venv/bin/python -m pip install -r requirements.txt
+```
+
+## Syringe ESP32 control
+
+The backend can send a 7-head syringe dispense command to an ESP32 over serial.
+
+Defaults:
+
+- calibration file: `/home/robot/robot control/syringe control code/calibration.json`
+- serial port: first match from `/dev/ttyUSB*` or `/dev/ttyACM*`
+- baud rate: `115200`
+- command format: `json`
+
+Optional environment variables:
+
+- `SYRINGE_CALIBRATION_FILE`
+- `SYRINGE_SERIAL_PORT`
+- `SYRINGE_BAUD_RATE`
+- `SYRINGE_SERIAL_TIMEOUT_SECONDS`
+- `SYRINGE_COMMAND_FORMAT`
+
+Example request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/tools/syringe/dispense \
+  -H "Content-Type: application/json" \
+  -d '{"A":150,"B":25,"C":0,"D":100,"E":0,"F":10,"G":75}'
+```
 
 ## Mock update example
 

@@ -1,18 +1,22 @@
 ﻿import { useEffect, useState } from "react";
+import { CameraFeedCard } from "./components/CameraFeedCard";
 import { PlaceholderPanel } from "./components/PlaceholderPanel";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchHealth, fetchRobotState } from "./lib/api";
-import type { HealthResponse, RobotState } from "./types/robot";
+import { fetchCameraStatus, fetchHealth, fetchRobotState } from "./lib/api";
+import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
 
 type RequestStatus = "loading" | "success" | "error";
 
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [robotState, setRobotState] = useState<RobotState | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<RequestStatus>("loading");
+  const [cameraFeedStatus, setCameraFeedStatus] = useState<RequestStatus>("loading");
   const [robotStateStatus, setRobotStateStatus] = useState<RequestStatus>("loading");
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [cameraFeedError, setCameraFeedError] = useState<string | null>(null);
   const [robotStateError, setRobotStateError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -20,8 +24,9 @@ function App() {
     let isMounted = true;
 
     const loadDashboard = async () => {
-      const [healthResult, robotStateResult] = await Promise.allSettled([
+      const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
         fetchHealth(),
+        fetchCameraStatus(),
         fetchRobotState(),
       ]);
 
@@ -36,6 +41,15 @@ function App() {
       } else {
         setConnectionStatus("error");
         setConnectionError(healthResult.reason instanceof Error ? healthResult.reason.message : "Could not reach backend health endpoint");
+      }
+
+      if (cameraResult.status === "fulfilled") {
+        setCameraStatus(cameraResult.value);
+        setCameraFeedStatus(cameraResult.value.available ? "success" : "error");
+        setCameraFeedError(cameraResult.value.error);
+      } else {
+        setCameraFeedStatus("error");
+        setCameraFeedError(cameraResult.reason instanceof Error ? cameraResult.reason.message : "Could not load camera status");
       }
 
       if (robotStateResult.status === "fulfilled") {
@@ -93,9 +107,10 @@ function App() {
             lastUpdated={lastUpdated}
           />
 
-          <PlaceholderPanel
-            title="Camera Feed"
-            description="Reserved for future live camera monitoring from the Raspberry Pi."
+          <CameraFeedCard
+            cameraStatus={cameraStatus}
+            status={cameraFeedStatus}
+            error={cameraFeedError}
           />
 
           <PlaceholderPanel

@@ -7,6 +7,17 @@ export interface HealthResponse {
   version: string;
 }
 
+export interface CameraStatus {
+  available: boolean;
+  configured_device: string;
+  active_device: string | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  error: string | null;
+  stream_url: string | null;
+}
+
 export interface GantryState {
   x: number;
   y: number;

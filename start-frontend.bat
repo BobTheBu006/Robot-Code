@@ -1,6 +1,22 @@
 @echo off
 setlocal
 
+where node >nul 2>nul
+if errorlevel 1 (
+  echo Node.js is not installed or is not on PATH.
+  echo Install Node.js 20+ and npm, then run this script again.
+  pause
+  exit /b 1
+)
+
+where npm >nul 2>nul
+if errorlevel 1 (
+  echo npm is not installed or is not on PATH.
+  echo Install npm along with Node.js 20+, then run this script again.
+  pause
+  exit /b 1
+)
+
 cd /d "%~dp0frontend"
 
 if not exist ".env" if exist ".env.example" (

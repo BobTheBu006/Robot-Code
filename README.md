@@ -23,6 +23,11 @@ This repository is intentionally minimal: it gives you a clean React frontend, a
 
 ## Quick start
 
+Prerequisites:
+
+- Python 3.11+ for the backend
+- Node.js 20+ with `npm` for the frontend
+
 ### 1. Start the backend
 
 On Raspberry Pi OS / Linux:
@@ -82,6 +87,9 @@ start-all.bat
 - `GET /health`
 - `GET /api/robot/state`
 - `POST /api/robot/state/mock-update`
+- `GET /api/camera/status`
+- `GET /api/camera/frame`
+- `GET /api/camera/stream`
 
 ## Architecture notes
 
