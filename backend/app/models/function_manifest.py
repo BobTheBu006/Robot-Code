@@ -18,6 +18,7 @@ class FunctionInputDefinition(BaseModel):
     required: bool = True
     default: str | float | bool | None = None
     placeholder: str | None = None
+    advanced: bool = False
     options: list[FunctionInputOption] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -41,7 +42,13 @@ class FunctionManifest(BaseModel):
     description: str = Field(min_length=1)
     version: str = Field(min_length=1)
     inputs: list[FunctionInputDefinition] = Field(default_factory=list)
+    advanced_inputs: list[FunctionInputDefinition] = Field(default_factory=list)
     outputs: list[FunctionOutputDefinition] = Field(default_factory=list)
+    builder_board_id: str | None = None
+    builder_source_path: str | None = None
+    builder_workspace_path: str | None = None
+    builder_firmware_entry_file: str | None = None
+    builder_base_function_id: str | None = None
 
 
 class DiscoveredFunctionDefinition(BaseModel):

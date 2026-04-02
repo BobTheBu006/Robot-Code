@@ -20,6 +20,15 @@ functions/esp 32 code/
 - `firmware/main.ino`: the local Arduino source edited from the Robot Control UI.
 - `workflow-functions/*.json`: blueprint files that generate workflow block manifests for the canvas.
 
+## Build and flash flow
+
+1. Edit `firmware/main.ino` or one of the blueprint JSON files from the Function Builder UI.
+2. Save the file.
+3. Use `Build firmware` to compile the sketch on the Pi.
+4. Use `Build + Flash` to upload it to the connected ESP32 on the configured serial port.
+
+Most ESP32 dev boards can enter the bootloader automatically through the USB serial adapter's DTR/RTS lines. If upload ever fails to connect, hold the board's `BOOT` button as flashing starts and release it once the upload begins.
+
 ## Blueprint format
 
 Each blueprint file should contain:
@@ -53,3 +62,4 @@ Each blueprint file should contain:
 - Put runtime parameters in `manifest.inputs`.
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
 - Keep actual source code changes in `firmware/main.ino`.
+- Use `board.json` to override the active `fqbn` or firmware entry file for a specific board workspace if needed.

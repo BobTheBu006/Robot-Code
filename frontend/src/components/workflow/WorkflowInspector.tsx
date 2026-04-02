@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Edge, Node } from "@xyflow/react";
 
 import { formatWorkflowParameterValue } from "../../lib/workflow";
+import type { Esp32CustomBlockSaveResponse } from "../../types/esp32Builder";
 import type {
   FunctionTestResponse,
   WorkflowFailureMode,
@@ -50,6 +51,7 @@ interface WorkflowInspectorProps {
   onClose: () => void;
   onNavigateToNode: (nodeId: string) => void;
   onRunTest: () => void;
+  onSaveCustomBlock: (displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
   onUpdateParameter: (
     nodeId: string,
     input: WorkflowInputDefinition,
@@ -303,12 +305,17 @@ export function WorkflowInspector({
   onClose,
   onNavigateToNode,
   onRunTest,
+  onSaveCustomBlock,
   onUpdateParameter,
   onUpdateSettings,
 }: WorkflowInspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("parameters");
   const [inputSourceMode, setInputSourceMode] = useState<InputSourceMode>("previous");
   const [focusedInputKey, setFocusedInputKey] = useState<string | null>(null);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [customBlockName, setCustomBlockName] = useState(`${selectedNode.data.block.displayName} Preset`);
+  const [customBlockSaveState, setCustomBlockSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [customBlockSaveMessage, setCustomBlockSaveMessage] = useState<string | null>(null);
   const { block, parameters, settings } = selectedNode.data;
   const incomingEdges = edges.filter((edge) => edge.target === selectedNode.id);
   const outgoingEdges = edges.filter((edge) => edge.source === selectedNode.id);
@@ -353,7 +360,24 @@ export function WorkflowInspector({
     setActiveTab("parameters");
     setInputSourceMode("previous");
     setFocusedInputKey(null);
+    setAdvancedExpanded(false);
+    setCustomBlockName(`${selectedNode.data.block.displayName} Preset`);
+    setCustomBlockSaveState("idle");
+    setCustomBlockSaveMessage(null);
   }, [selectedNode.id]);
+
+  async function handleSaveCustomBlock() {
+    try {
+      setCustomBlockSaveState("saving");
+      setCustomBlockSaveMessage(null);
+      const response = await onSaveCustomBlock(customBlockName);
+      setCustomBlockSaveState("success");
+      setCustomBlockSaveMessage(`Saved '${response.display_name}' to the block library.`);
+    } catch (error) {
+      setCustomBlockSaveState("error");
+      setCustomBlockSaveMessage(error instanceof Error ? error.message : "Could not save custom block.");
+    }
+  }
 
   function handleParameterDrop(
     event: ReactDragEvent<HTMLInputElement>,
@@ -367,6 +391,78 @@ export function WorkflowInspector({
     }
 
     onUpdateParameter(selectedNode.id, input, expression);
+  }
+
+  function renderParameterField(input: WorkflowInputDefinition) {
+    return (
+      <label className="workflow-overlay__field" key={input.key}>
+        <div className="workflow-overlay__field-meta">
+          <span>{input.label}</span>
+          <small>{input.type}</small>
+        </div>
+
+        {input.type === "select" ? (
+          <select
+            value={String(parameters[input.key] ?? "")}
+            onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
+          >
+            {input.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : input.type === "boolean" ? (
+          <input
+            checked={Boolean(parameters[input.key])}
+            onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
+            type="checkbox"
+          />
+        ) : (
+          <>
+            <input
+              onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleParameterDrop(event, input)}
+              onFocus={() => setFocusedInputKey(input.key)}
+              onClick={() => setFocusedInputKey(input.key)}
+              placeholder={input.placeholder ?? "Drag a value here"}
+              type="text"
+              value={formatWorkflowParameterValue(parameters[input.key])}
+            />
+            {focusedInputKey === input.key ? (() => {
+              const preview = resolveExpressionPreview(
+                parameters[input.key],
+                previousPayload,
+                blockPayloadLookup,
+              );
+
+              if (!preview) {
+                return null;
+              }
+
+              return preview.multiline ? (
+                <textarea
+                  className="workflow-overlay__expression-preview"
+                  readOnly
+                  rows={Math.min(Math.max(preview.text.split("\n").length, 2), 8)}
+                  value={preview.text}
+                />
+              ) : (
+                <input
+                  className="workflow-overlay__expression-preview"
+                  readOnly
+                  type="text"
+                  value={preview.text}
+                />
+              );
+            })() : null}
+          </>
+        )}
+
+        <p>{input.description ?? "No additional description for this field."}</p>
+      </label>
+    );
   }
 
   return (
@@ -524,77 +620,61 @@ export function WorkflowInspector({
 
           <div className="workflow-overlay__editor-body">
             {activeTab === "parameters" ? (
-              block.inputs.length > 0 ? (
+              block.inputs.length > 0 || (block.advancedInputs?.length ?? 0) > 0 ? (
                 <div className="workflow-overlay__fields">
-                  {block.inputs.map((input) => (
-                    <label className="workflow-overlay__field" key={input.key}>
-                      <div className="workflow-overlay__field-meta">
-                        <span>{input.label}</span>
-                        <small>{input.type}</small>
-                      </div>
+                  {block.inputs.map(renderParameterField)}
 
-                      {input.type === "select" ? (
-                        <select
-                          value={String(parameters[input.key] ?? "")}
-                          onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
-                        >
-                          {input.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : input.type === "boolean" ? (
-                        <input
-                          checked={Boolean(parameters[input.key])}
-                          onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
-                          type="checkbox"
-                        />
-                      ) : (
-                        <>
-                          <input
-                            onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
-                            onDragOver={(event) => event.preventDefault()}
-                            onDrop={(event) => handleParameterDrop(event, input)}
-                            onFocus={() => setFocusedInputKey(input.key)}
-                            onClick={() => setFocusedInputKey(input.key)}
-                            placeholder={input.placeholder ?? (input.type === "number" ? "Drag a value here" : "Drag a value here")}
-                            type="text"
-                            value={formatWorkflowParameterValue(parameters[input.key])}
-                          />
-                          {focusedInputKey === input.key ? (() => {
-                            const preview = resolveExpressionPreview(
-                              parameters[input.key],
-                              previousPayload,
-                              blockPayloadLookup,
-                            );
+                  {(block.advancedInputs?.length ?? 0) > 0 ? (
+                    <div className="workflow-overlay__advanced">
+                      <button
+                        className="workflow-overlay__advanced-toggle"
+                        onClick={() => setAdvancedExpanded((currentValue) => !currentValue)}
+                        type="button"
+                      >
+                        <span>{advancedExpanded ? "Hide advanced inputs" : "Show advanced inputs"}</span>
+                        <span>{advancedExpanded ? "−" : "+"}</span>
+                      </button>
 
-                            if (!preview) {
-                              return null;
-                            }
+                      {advancedExpanded ? (
+                        <div className="workflow-overlay__advanced-body">
+                          <div className="workflow-overlay__fields">
+                            {(block.advancedInputs ?? []).map(renderParameterField)}
+                          </div>
 
-                            return preview.multiline ? (
-                              <textarea
-                                className="workflow-overlay__expression-preview"
-                                readOnly
-                                rows={Math.min(Math.max(preview.text.split("\n").length, 2), 8)}
-                                value={preview.text}
-                              />
-                            ) : (
-                              <input
-                                className="workflow-overlay__expression-preview"
-                                readOnly
-                                type="text"
-                                value={preview.text}
-                              />
-                            );
-                          })() : null}
-                        </>
-                      )}
-
-                      <p>{input.description ?? "No additional description for this field."}</p>
-                    </label>
-                  ))}
+                          {block.kind === "robot-action" && block.builderBoardId ? (
+                            <div className="workflow-overlay__custom-block">
+                              <label className="workflow-overlay__field">
+                                <div className="workflow-overlay__field-meta">
+                                  <span>Custom block name</span>
+                                  <small>library</small>
+                                </div>
+                                <input
+                                  onChange={(event) => setCustomBlockName(event.target.value)}
+                                  placeholder="Name this reusable preset"
+                                  type="text"
+                                  value={customBlockName}
+                                />
+                                <p>Choose a unique name and save the current normal and advanced values as a reusable block in the palette.</p>
+                              </label>
+                              <button
+                                className="workflow-overlay__save-block"
+                                disabled={customBlockSaveState === "saving"}
+                                onClick={() => void handleSaveCustomBlock()}
+                                type="button"
+                              >
+                                {customBlockSaveState === "saving" ? "Saving..." : "Save as custom block"}
+                              </button>
+                              {customBlockSaveMessage ? (
+                                <p className={customBlockSaveState === "error" ? "error-text" : "workflow-overlay__success-text"}>
+                                  {customBlockSaveMessage}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <p className="workflow-overlay__empty-text">This block has no editable parameters.</p>

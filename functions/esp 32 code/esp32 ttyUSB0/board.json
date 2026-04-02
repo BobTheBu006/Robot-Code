@@ -5,5 +5,6 @@
   "description": "CP2102N USB to UART Bridge Controller",
   "hardware_id": "USB VID:PID=10C4:EA60 SER=76ae3066e071f0119f56049f1045c30f LOCATION=3-1",
   "serial_number": "76ae3066e071f0119f56049f1045c30f",
-  "firmware_entry_file": "firmware/main.ino"
+  "firmware_entry_file": "firmware/main.ino",
+  "fqbn": "esp32:esp32:esp32"
 }

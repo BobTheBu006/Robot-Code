@@ -30,6 +30,18 @@ AUTO_SPEED_COMMAND_FORMATS: tuple[str, ...] = (
     "set_speed_csv",
     "set_speed_space",
 )
+AUTO_INTAKE_SPEED_COMMAND_FORMATS: tuple[str, ...] = (
+    "intake_speed_csv",
+    "intake_speed_space",
+    "set_intake_speed_csv",
+    "set_intake_speed_space",
+)
+AUTO_OUTTAKE_SPEED_COMMAND_FORMATS: tuple[str, ...] = (
+    "outtake_speed_csv",
+    "outtake_speed_space",
+    "set_outtake_speed_csv",
+    "set_outtake_speed_space",
+)
 
 
 class SyringeControllerError(RuntimeError):
@@ -177,6 +189,30 @@ class SyringeControllerService:
         if command_format == "set_speed_space":
             return f"SET SPEED {speed}"
 
+        if command_format == "intake_speed_csv":
+            return f"INTAKE_SPEED,{speed}"
+
+        if command_format == "intake_speed_space":
+            return f"INTAKE_SPEED {speed}"
+
+        if command_format == "set_intake_speed_csv":
+            return f"SET_INTAKE_SPEED,{speed}"
+
+        if command_format == "set_intake_speed_space":
+            return f"SET INTAKE SPEED {speed}"
+
+        if command_format == "outtake_speed_csv":
+            return f"OUTTAKE_SPEED,{speed}"
+
+        if command_format == "outtake_speed_space":
+            return f"OUTTAKE_SPEED {speed}"
+
+        if command_format == "set_outtake_speed_csv":
+            return f"SET_OUTTAKE_SPEED,{speed}"
+
+        if command_format == "set_outtake_speed_space":
+            return f"SET OUTTAKE SPEED {speed}"
+
         raise SyringeControllerError(
             f"Unsupported syringe speed command format '{command_format}'."
         )
@@ -186,8 +222,27 @@ class SyringeControllerService:
         serial_port.reset_output_buffer()
         serial_port.write((command + "\n").encode("utf-8"))
         serial_port.flush()
-        reply_bytes = serial_port.readline()
-        return reply_bytes.decode("utf-8", errors="replace").strip() or None
+        replies: list[str] = []
+
+        while True:
+            reply_bytes = serial_port.readline()
+            reply_line = reply_bytes.decode("utf-8", errors="replace").strip()
+            if not reply_line:
+                break
+
+            replies.append(reply_line)
+
+            normalized = reply_line.upper()
+            if normalized.startswith("OK ") or normalized.startswith("ERR "):
+                break
+
+            if normalized in {"PONG", "READY"}:
+                break
+
+        if not replies:
+            return None
+
+        return "\n".join(replies)
 
     def _try_apply_speed(self, serial_port, speed: int) -> tuple[str | None, str | None, bool]:
         for command_format in AUTO_SPEED_COMMAND_FORMATS:
@@ -197,6 +252,75 @@ class SyringeControllerService:
                 return command, reply, True
 
         return None, None, False
+
+    def _try_apply_speed_with_formats(
+        self,
+        serial_port,
+        speed: int,
+        command_formats: tuple[str, ...],
+    ) -> tuple[str | None, str | None, bool]:
+        for command_format in command_formats:
+            command = self._build_speed_command(speed, command_format)
+            reply = self._send_command(serial_port, command)
+            if not self._is_unknown_command_reply(reply):
+                return command, reply, True
+
+        return None, None, False
+
+    def _apply_speed_profile(
+        self,
+        serial_port,
+        speed: int | None,
+        intake_speed: int | None,
+        outtake_speed: int | None,
+    ) -> dict[str, str | bool | None | int]:
+        effective_intake_speed = intake_speed or speed
+        effective_outtake_speed = outtake_speed or speed
+
+        speed_command = None
+        speed_reply = None
+        speed_applied = False
+        intake_speed_command = None
+        intake_speed_reply = None
+        intake_speed_applied = False
+        outtake_speed_command = None
+        outtake_speed_reply = None
+        outtake_speed_applied = False
+
+        if effective_intake_speed and effective_outtake_speed and effective_intake_speed == effective_outtake_speed:
+            speed_command, speed_reply, speed_applied = self._try_apply_speed(
+                serial_port,
+                effective_intake_speed,
+            )
+        else:
+            if effective_intake_speed:
+                intake_speed_command, intake_speed_reply, intake_speed_applied = self._try_apply_speed_with_formats(
+                    serial_port,
+                    effective_intake_speed,
+                    AUTO_INTAKE_SPEED_COMMAND_FORMATS,
+                )
+
+            if effective_outtake_speed:
+                outtake_speed_command, outtake_speed_reply, outtake_speed_applied = self._try_apply_speed_with_formats(
+                    serial_port,
+                    effective_outtake_speed,
+                    AUTO_OUTTAKE_SPEED_COMMAND_FORMATS,
+                )
+
+        return {
+            "speed": speed,
+            "intake_speed": effective_intake_speed,
+            "outtake_speed": effective_outtake_speed,
+            "speed_command_sent": speed_command,
+            "speed_reply": speed_reply,
+            "speed_applied": speed_applied,
+            "intake_speed_command_sent": intake_speed_command,
+            "intake_speed_reply": intake_speed_reply,
+            "intake_speed_applied": intake_speed_applied,
+            "outtake_speed_command_sent": outtake_speed_command,
+            "outtake_speed_reply": outtake_speed_reply,
+            "outtake_speed_applied": outtake_speed_applied,
+        }
 
     def _is_unknown_command_reply(self, reply: str | None) -> bool:
         if not reply:
@@ -245,14 +369,27 @@ class SyringeControllerService:
                 selected_format = None
                 command = None
                 reply = None
-                speed_command = None
-                speed_reply = None
-                speed_applied = False
+                speed_result: dict[str, str | bool | None | int] = {
+                    "speed": request.speed,
+                    "intake_speed": request.intake_speed,
+                    "outtake_speed": request.outtake_speed,
+                    "speed_command_sent": None,
+                    "speed_reply": None,
+                    "speed_applied": False,
+                    "intake_speed_command_sent": None,
+                    "intake_speed_reply": None,
+                    "intake_speed_applied": False,
+                    "outtake_speed_command_sent": None,
+                    "outtake_speed_reply": None,
+                    "outtake_speed_applied": False,
+                }
 
-                if request.speed:
-                    speed_command, speed_reply, speed_applied = self._try_apply_speed(
+                if request.speed or request.intake_speed or request.outtake_speed:
+                    speed_result = self._apply_speed_profile(
                         serial_port,
                         request.speed,
+                        request.intake_speed,
+                        request.outtake_speed,
                     )
 
                 for command_format in self._command_formats_to_try():
@@ -277,10 +414,18 @@ class SyringeControllerService:
             baud_rate=baud_rate,
             calibration_file=str(calibration_path),
             command_format=selected_format,
-            speed=request.speed,
-            speed_command_sent=speed_command,
-            speed_reply=speed_reply,
-            speed_applied=speed_applied,
+            speed=speed_result["speed"],
+            intake_speed=speed_result["intake_speed"],
+            outtake_speed=speed_result["outtake_speed"],
+            speed_command_sent=speed_result["speed_command_sent"],
+            speed_reply=speed_result["speed_reply"],
+            speed_applied=bool(speed_result["speed_applied"]),
+            intake_speed_command_sent=speed_result["intake_speed_command_sent"],
+            intake_speed_reply=speed_result["intake_speed_reply"],
+            intake_speed_applied=bool(speed_result["intake_speed_applied"]),
+            outtake_speed_command_sent=speed_result["outtake_speed_command_sent"],
+            outtake_speed_reply=speed_result["outtake_speed_reply"],
+            outtake_speed_applied=bool(speed_result["outtake_speed_applied"]),
             requested_amounts=requested_amounts,
             calculated_steps=steps,
             command_sent=command,

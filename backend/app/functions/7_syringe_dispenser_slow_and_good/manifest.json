@@ -1,8 +1,8 @@
 {
-  "id": "dispense",
-  "display_name": "7 Syringe Dispenser",
+  "id": "7_syringe_dispenser_slow_and_good",
+  "display_name": "7 Syringe Dispenser Slow and Good",
   "category": "Robot Actions",
-  "description": "Drive the 7-head syringe ESP32 with calibration-aware dispense amounts.",
+  "description": "7 Syringe Dispenser Slow and Good reusable preset.",
   "version": "0.3.0",
   "inputs": [
     {
@@ -22,7 +22,7 @@
       "type": "file/path",
       "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
       "required": true,
-      "default": "/home/robot/robot control/Robot-Code/functions/syringe control code/calibration.json",
+      "default": "/home/robot/robot control/syringe control code/calibration.json",
       "placeholder": "/path/to/calibration.json",
       "advanced": false,
       "options": []
@@ -33,7 +33,7 @@
       "type": "number",
       "description": "Shared fallback speed used when dedicated expelling and intake speeds are not set.",
       "required": false,
-      "default": 100.0,
+      "default": 50.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -44,7 +44,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head A.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -55,7 +55,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head B.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -66,7 +66,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head C.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -88,7 +88,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head E.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -99,7 +99,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head F.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -110,7 +110,7 @@
       "type": "number",
       "description": "Requested dispense amount for syringe head G.",
       "required": true,
-      "default": 0.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -123,7 +123,7 @@
       "type": "number",
       "description": "Overrides the shared dispense speed for the first part of the move where fluid is expelled.",
       "required": false,
-      "default": 100.0,
+      "default": 50.0,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -134,7 +134,7 @@
       "type": "number",
       "description": "Overrides the shared dispense speed for the return move where fluid is taken back in.",
       "required": false,
-      "default": 100.0,
+      "default": 200.0,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -309,8 +309,8 @@
     }
   ],
   "builder_board_id": "ttyUSB0",
-  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
+  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/7_syringe_dispenser_slow_and_good.json",
   "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
   "builder_firmware_entry_file": "firmware/main.ino",
-  "builder_base_function_id": null
+  "builder_base_function_id": "dispense"
 }

@@ -381,7 +381,7 @@ body {
 
 .function-builder__meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -420,6 +420,27 @@ body {
   color: #dce8df;
   font: 0.92rem/1.5 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   resize: vertical;
+}
+
+.function-builder__flash-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.function-builder__toolchain p {
+  margin: 8px 0 0;
+  color: #55766b;
+}
+
+.function-builder__log {
+  margin: 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: #10151a;
+  color: #dce8df;
+  overflow: auto;
+  font: 0.88rem/1.5 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 .function-builder__schema-grid {
@@ -608,6 +629,11 @@ body {
   gap: 10px;
 }
 
+.workflow-palette__item-shell {
+  display: grid;
+  gap: 8px;
+}
+
 .workflow-palette__item {
   display: grid;
   gap: 6px;
@@ -617,6 +643,24 @@ body {
   background: linear-gradient(135deg, #ffffff, #f4f8f6);
   text-align: left;
   cursor: grab;
+}
+
+.workflow-palette__delete {
+  justify-self: end;
+  padding: 6px 10px;
+  border: 1px solid rgba(150, 39, 39, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 244, 244, 0.96);
+  color: #932525;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-palette__delete:hover {
+  background: #fff0f0;
+  box-shadow: 0 8px 18px rgba(147, 37, 37, 0.12);
 }
 
 .workflow-palette__item strong {
@@ -1153,6 +1197,50 @@ body {
 .workflow-overlay__fields {
   display: grid;
   gap: 14px;
+}
+
+.workflow-overlay__advanced {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-overlay__advanced-toggle,
+.workflow-overlay__save-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #efe8f6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workflow-overlay__advanced-body,
+.workflow-overlay__custom-block {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-overlay__save-block {
+  justify-content: center;
+  background: rgba(255, 138, 117, 0.18);
+  border-color: rgba(255, 138, 117, 0.34);
+  color: #fff4ef;
+}
+
+.workflow-overlay__save-block:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.workflow-overlay__success-text {
+  margin: 0;
+  color: #b8f0c8;
+  font-size: 0.88rem;
 }
 
 .workflow-overlay__field {

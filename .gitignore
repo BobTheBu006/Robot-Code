@@ -10,6 +10,7 @@ __pycache__/
 .mypy_cache/
 backend/.venv/
 .venv/
+.arduino-cli/
 
 # Env files
 .env
@@ -21,3 +22,6 @@ backend/.env
 Thumbs.db
 .idea/
 .vscode/
+
+# Local tooling
+tools/arduino-cli/

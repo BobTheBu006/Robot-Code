@@ -6,9 +6,10 @@ import type { WorkflowBlockDefinition } from "../../types/workflow";
 interface WorkflowPaletteProps {
   blocks: WorkflowBlockDefinition[];
   discoveryErrors: string[];
+  onDeleteCustomBlock: (block: WorkflowBlockDefinition) => void;
 }
 
-export function WorkflowPalette({ blocks, discoveryErrors }: WorkflowPaletteProps) {
+export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock }: WorkflowPaletteProps) {
   const groupedBlocks = blocks.reduce<Record<string, WorkflowBlockDefinition[]>>((groups, block) => {
     groups[block.category] = [...(groups[block.category] ?? []), block];
     return groups;
@@ -32,16 +33,28 @@ export function WorkflowPalette({ blocks, discoveryErrors }: WorkflowPaletteProp
             <h4>{category}</h4>
             <div className="workflow-palette__list">
               {categoryBlocks.map((block) => (
-                <button
-                  className="workflow-palette__item"
-                  draggable
-                  key={block.id}
-                  onDragStart={(event) => handleDragStart(event, block)}
-                  type="button"
-                >
-                  <strong>{block.displayName}</strong>
-                  <span>{block.description}</span>
-                </button>
+                <div className="workflow-palette__item-shell" key={block.id}>
+                  <button
+                    className="workflow-palette__item"
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, block)}
+                    type="button"
+                  >
+                    <strong>{block.displayName}</strong>
+                    <span>{block.description}</span>
+                  </button>
+
+                  {block.kind === "robot-action" && block.builderBoardId && block.builderBaseFunctionId ? (
+                    <button
+                      className="workflow-palette__delete"
+                      onClick={() => onDeleteCustomBlock(block)}
+                      title={`Delete custom block ${block.displayName}`}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
           </section>

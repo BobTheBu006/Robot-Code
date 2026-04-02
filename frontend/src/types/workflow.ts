@@ -17,6 +17,7 @@ export interface WorkflowInputDefinition {
   required: boolean;
   default?: WorkflowParameterValue | null;
   placeholder?: string | null;
+  advanced?: boolean;
   options: WorkflowInputOption[];
 }
 
@@ -34,12 +35,18 @@ export interface FunctionManifest {
   description: string;
   version: string;
   inputs: WorkflowInputDefinition[];
+  advanced_inputs?: WorkflowInputDefinition[];
   outputs: Array<{
     key: string;
     label: string;
     type: string;
     description?: string | null;
   }>;
+  builder_board_id?: string | null;
+  builder_source_path?: string | null;
+  builder_workspace_path?: string | null;
+  builder_firmware_entry_file?: string | null;
+  builder_base_function_id?: string | null;
 }
 
 export interface DiscoveredFunctionDefinition {
@@ -86,7 +93,13 @@ export interface WorkflowBlockDefinition {
   acceptsInput: boolean;
   accent: string;
   inputs: WorkflowInputDefinition[];
+  advancedInputs?: WorkflowInputDefinition[];
   outputs: WorkflowOutputDefinition[];
+  builderBoardId?: string | null;
+  builderSourcePath?: string | null;
+  builderWorkspacePath?: string | null;
+  builderFirmwareEntryFile?: string | null;
+  builderBaseFunctionId?: string | null;
 }
 
 export interface WorkflowNodeSettings {

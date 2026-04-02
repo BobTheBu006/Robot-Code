@@ -348,6 +348,7 @@ export function mapDiscoveredFunctionToBlock(
     acceptsInput: true,
     accent: "#0e7490",
     inputs: discoveredFunction.manifest.inputs,
+    advancedInputs: discoveredFunction.manifest.advanced_inputs ?? [],
     outputs:
       discoveredFunction.manifest.outputs.length > 0
         ? discoveredFunction.manifest.outputs.map((output) => ({
@@ -357,7 +358,16 @@ export function mapDiscoveredFunctionToBlock(
             description: output.description,
           }))
         : [buildOutput("next", "Next", "flow", "Continue to the next workflow node.")],
+    builderBoardId: discoveredFunction.manifest.builder_board_id ?? null,
+    builderSourcePath: discoveredFunction.manifest.builder_source_path ?? null,
+    builderWorkspacePath: discoveredFunction.manifest.builder_workspace_path ?? null,
+    builderFirmwareEntryFile: discoveredFunction.manifest.builder_firmware_entry_file ?? null,
+    builderBaseFunctionId: discoveredFunction.manifest.builder_base_function_id ?? null,
   };
+}
+
+export function getAllBlockInputs(block: WorkflowBlockDefinition): WorkflowInputDefinition[] {
+  return [...block.inputs, ...(block.advancedInputs ?? [])];
 }
 
 export function createDefaultParameters(
@@ -434,7 +444,7 @@ export function createWorkflowNode(
     position,
     data: {
       block,
-      parameters: createDefaultParameters(block.inputs),
+      parameters: createDefaultParameters(getAllBlockInputs(block)),
       settings: createDefaultNodeSettings(),
       isActive: true,
       runCount: 0,

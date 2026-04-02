@@ -2,6 +2,9 @@
 import type {
   Esp32BoardDetail,
   Esp32BoardListResponse,
+  Esp32CustomBlockDeleteResponse,
+  Esp32CustomBlockSaveResponse,
+  Esp32FirmwareActionResponse,
   Esp32FileSaveResponse,
 } from "../types/esp32Builder";
 import type {
@@ -91,6 +94,48 @@ export function saveEsp32BoardFile(
       content,
     }),
   });
+}
+
+export function buildEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareActionResponse> {
+  return request<Esp32FirmwareActionResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/build`, {
+    method: "POST",
+  });
+}
+
+export function flashEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareActionResponse> {
+  return request<Esp32FirmwareActionResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/flash`, {
+    method: "POST",
+  });
+}
+
+export function saveEsp32CustomBlock(
+  boardId: string,
+  sourceFunctionId: string,
+  displayName: string,
+  description: string,
+  defaults: Record<string, WorkflowParameterValue>,
+): Promise<Esp32CustomBlockSaveResponse> {
+  return request<Esp32CustomBlockSaveResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/blocks`, {
+    method: "POST",
+    body: JSON.stringify({
+      source_function_id: sourceFunctionId,
+      display_name: displayName,
+      description,
+      defaults,
+    }),
+  });
+}
+
+export function deleteEsp32CustomBlock(
+  boardId: string,
+  functionId: string,
+): Promise<Esp32CustomBlockDeleteResponse> {
+  return request<Esp32CustomBlockDeleteResponse>(
+    `/api/esp32-builder/boards/${encodeURIComponent(boardId)}/blocks/${encodeURIComponent(functionId)}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export function fetchSavedWorkflow(): Promise<SavedWorkflowFile> {

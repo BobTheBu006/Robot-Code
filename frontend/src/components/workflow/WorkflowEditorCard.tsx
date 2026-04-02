@@ -18,15 +18,24 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 
-import { fetchFunctions, fetchSavedWorkflow, saveWorkflowToFile, testFunction } from "../../lib/api";
+import {
+  deleteEsp32CustomBlock,
+  fetchFunctions,
+  fetchSavedWorkflow,
+  saveEsp32CustomBlock,
+  saveWorkflowToFile,
+  testFunction,
+} from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   formatDurationShort,
   WORKFLOW_BLOCK_MIME,
   createBuiltInBlocks,
+  createDefaultParameters,
   createDefaultNodeSettings,
   createStarterWorkflow,
   createWorkflowNode,
+  getAllBlockInputs,
   resolveWorkflowParameters,
   normalizeFailureMode,
   normalizeRetryCount,
@@ -47,6 +56,7 @@ import type {
   WorkflowNodeData,
   WorkflowParameterValue,
 } from "../../types/workflow";
+import type { Esp32CustomBlockSaveResponse } from "../../types/esp32Builder";
 import { Panel } from "../Panel";
 import { StatusBadge } from "../StatusBadge";
 import { WorkflowEdge } from "./WorkflowEdge";
@@ -186,34 +196,33 @@ function WorkflowEditorSurface() {
     },
   }));
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadFunctions() {
-      try {
-        const response = await fetchFunctions();
-        if (cancelled) {
-          return;
-        }
-
-        setDiscoveredFunctions(response.functions);
-        setDiscoveryErrors(response.errors);
-        setFunctionsStatus("success");
-        setFunctionsError(null);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setFunctionsStatus("error");
-        setFunctionsError(error instanceof Error ? error.message : "Could not load robot functions.");
+  async function loadFunctions(cancellationToken?: { cancelled: boolean }) {
+    try {
+      const response = await fetchFunctions();
+      if (cancellationToken?.cancelled) {
+        return;
       }
-    }
 
-    void loadFunctions();
+      setDiscoveredFunctions(response.functions);
+      setDiscoveryErrors(response.errors);
+      setFunctionsStatus("success");
+      setFunctionsError(null);
+    } catch (error) {
+      if (cancellationToken?.cancelled) {
+        return;
+      }
+
+      setFunctionsStatus("error");
+      setFunctionsError(error instanceof Error ? error.message : "Could not load robot functions.");
+    }
+  }
+
+  useEffect(() => {
+    const cancellationToken = { cancelled: false };
+    void loadFunctions(cancellationToken);
 
     return () => {
-      cancelled = true;
+      cancellationToken.cancelled = true;
     };
   }, []);
 
@@ -277,6 +286,30 @@ function WorkflowEditorSurface() {
       const node = nodeLookup.get(nodeId);
       return total + (node ? estimateNodeDuration(node) : 0);
     }, 0);
+
+  useEffect(() => {
+    const blockLookup = new Map(availableBlocks.map((block) => [block.id, block]));
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        const latestBlock = blockLookup.get(node.data.block.id);
+        if (!latestBlock) {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            block: latestBlock,
+            parameters: {
+              ...createDefaultParameters(getAllBlockInputs(latestBlock)),
+              ...node.data.parameters,
+            },
+          },
+        };
+      }),
+    );
+  }, [discoveredFunctions, setNodes]);
 
   useEffect(() => {
     if (selectedNodeId && !nodes.some((node) => node.id === selectedNodeId)) {
@@ -515,7 +548,7 @@ function WorkflowEditorSurface() {
     blockResults: Record<string, Record<string, unknown> | null | undefined> = {},
   ): Promise<FunctionTestResponse> {
     const resolvedParameters = resolveWorkflowParameters(
-      node.data.block.inputs,
+      getAllBlockInputs(node.data.block),
       node.data.parameters,
       inputData,
       { blockResults },
@@ -663,6 +696,50 @@ function WorkflowEditorSurface() {
           error: message,
         },
       }));
+    }
+  }
+
+  async function handleSaveCustomBlock(
+    nodeId: string,
+    displayName: string,
+  ): Promise<Esp32CustomBlockSaveResponse> {
+    const node = nodeLookup.get(nodeId);
+    if (!node) {
+      throw new Error("Could not find the selected block.");
+    }
+
+    if (!node.data.block.builderBoardId) {
+      throw new Error("This block is not linked to an ESP32 workspace.");
+    }
+
+    const trimmedDisplayName = displayName.trim();
+    if (!trimmedDisplayName) {
+      throw new Error("Custom block name cannot be empty.");
+    }
+
+    const response = await saveEsp32CustomBlock(
+      node.data.block.builderBoardId,
+      node.data.block.id,
+      trimmedDisplayName,
+      `${trimmedDisplayName} reusable preset.`,
+      node.data.parameters,
+    );
+    await loadFunctions();
+    return response;
+  }
+
+  async function handleDeleteCustomBlock(block: WorkflowBlockDefinition) {
+    if (!block.builderBoardId || !block.builderBaseFunctionId) {
+      setFunctionsError("Only saved custom block presets can be deleted.");
+      return;
+    }
+
+    try {
+      const response = await deleteEsp32CustomBlock(block.builderBoardId, block.id);
+      await loadFunctions();
+      setFunctionsError(`Deleted custom block ${response.display_name}`);
+    } catch (error) {
+      setFunctionsError(error instanceof Error ? error.message : "Could not delete custom block.");
     }
   }
 
@@ -871,6 +948,7 @@ function WorkflowEditorSurface() {
                   setOpenedNodeId(nodeId);
                 }}
                 onRunTest={handleRunTest}
+                onSaveCustomBlock={(displayName) => handleSaveCustomBlock(openedNode.id, displayName)}
                 onUpdateParameter={handleUpdateParameter}
                 onUpdateSettings={handleUpdateNodeSettings}
                 previousNodeTestError={previousOpenedNodeTestState.error}
@@ -887,6 +965,7 @@ function WorkflowEditorSurface() {
           <WorkflowPalette
             blocks={availableBlocks}
             discoveryErrors={discoveryErrors.map((error) => `${error.folder_name}: ${error.message}`)}
+            onDeleteCustomBlock={(block) => void handleDeleteCustomBlock(block)}
           />
         </div>
 

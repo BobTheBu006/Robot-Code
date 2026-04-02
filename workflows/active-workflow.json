@@ -34,9 +34,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 6,
-        "benchmarkDurationMs": 36,
-        "lastDurationMs": 39
+        "runCount": 8,
+        "benchmarkDurationMs": 35,
+        "lastDurationMs": 30
       },
       "measured": {
         "width": 196,
@@ -89,9 +89,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 6,
-        "benchmarkDurationMs": 2009,
-        "lastDurationMs": 3015
+        "runCount": 8,
+        "benchmarkDurationMs": 2257,
+        "lastDurationMs": 3000
       },
       "measured": {
         "width": 196,
@@ -109,10 +109,10 @@
       "data": {
         "block": {
           "id": "dispense",
-          "displayName": "Dispense Syringe Batch",
+          "displayName": "7 Syringe Dispenser",
           "category": "Robot Actions",
-          "description": "High-level syringe dispense action for the 7-head ESP32 syringe tool.",
-          "version": "0.2.0",
+          "description": "Drive the 7-head syringe ESP32 with calibration-aware dispense amounts.",
+          "version": "0.3.0",
           "kind": "robot-action",
           "acceptsInput": true,
           "accent": "#0e7490",
@@ -125,6 +125,7 @@
               "required": false,
               "default": "/dev/ttyUSB0",
               "placeholder": "/dev/ttyUSB0",
+              "advanced": false,
               "options": []
             },
             {
@@ -133,18 +134,20 @@
               "type": "file/path",
               "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
               "required": true,
-              "default": "/home/robot/robot control/syringe control code/calibration.json",
+              "default": "/home/robot/robot control/Robot-Code/functions/syringe control code/calibration.json",
               "placeholder": "/path/to/calibration.json",
+              "advanced": false,
               "options": []
             },
             {
               "key": "speed",
               "label": "Dispense Speed",
               "type": "number",
-              "description": "Optional syringe speed to apply on the ESP32 before dispensing.",
+              "description": "Shared fallback speed used when dedicated expelling and intake speeds are not set.",
               "required": false,
               "default": 100,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -155,6 +158,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -165,6 +169,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -175,6 +180,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -185,6 +191,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -195,6 +202,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -205,6 +213,7 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
               "options": []
             },
             {
@@ -215,6 +224,185 @@
               "required": true,
               "default": 0,
               "placeholder": null,
+              "advanced": false,
+              "options": []
+            }
+          ],
+          "advancedInputs": [
+            {
+              "key": "intake_speed",
+              "label": "Expelling Speed",
+              "type": "number",
+              "description": "Overrides the shared dispense speed for the first part of the move where fluid is expelled.",
+              "required": false,
+              "default": 100,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "outtake_speed",
+              "label": "Intake Speed",
+              "type": "number",
+              "description": "Overrides the shared dispense speed for the return move where fluid is taken back in.",
+              "required": false,
+              "default": 100,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_a_step_pin",
+              "label": "Head A Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head A when saving a reusable hardware preset.",
+              "required": false,
+              "default": 33,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_a_dir_pin",
+              "label": "Head A Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head A when saving a reusable hardware preset.",
+              "required": false,
+              "default": 32,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_b_step_pin",
+              "label": "Head B Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head B when saving a reusable hardware preset.",
+              "required": false,
+              "default": 25,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_b_dir_pin",
+              "label": "Head B Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head B when saving a reusable hardware preset.",
+              "required": false,
+              "default": 4,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_c_step_pin",
+              "label": "Head C Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head C when saving a reusable hardware preset.",
+              "required": false,
+              "default": 26,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_c_dir_pin",
+              "label": "Head C Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head C when saving a reusable hardware preset.",
+              "required": false,
+              "default": 5,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_d_step_pin",
+              "label": "Head D Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head D when saving a reusable hardware preset.",
+              "required": false,
+              "default": 27,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_d_dir_pin",
+              "label": "Head D Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head D when saving a reusable hardware preset.",
+              "required": false,
+              "default": 18,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_e_step_pin",
+              "label": "Head E Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head E when saving a reusable hardware preset.",
+              "required": false,
+              "default": 14,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_e_dir_pin",
+              "label": "Head E Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head E when saving a reusable hardware preset.",
+              "required": false,
+              "default": 19,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_f_step_pin",
+              "label": "Head F Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head F when saving a reusable hardware preset.",
+              "required": false,
+              "default": 12,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_f_dir_pin",
+              "label": "Head F Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head F when saving a reusable hardware preset.",
+              "required": false,
+              "default": 21,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_g_step_pin",
+              "label": "Head G Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head G when saving a reusable hardware preset.",
+              "required": false,
+              "default": 13,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "head_g_dir_pin",
+              "label": "Head G Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head G when saving a reusable hardware preset.",
+              "required": false,
+              "default": 22,
+              "placeholder": null,
+              "advanced": true,
               "options": []
             }
           ],
@@ -231,34 +419,55 @@
               "type": "string",
               "description": "Raw serial reply returned by the ESP32 firmware."
             }
-          ]
+          ],
+          "builderBoardId": "ttyUSB0",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+          "builderFirmwareEntryFile": "firmware/main.ino",
+          "builderBaseFunctionId": null
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
           "calibration_file": "/home/robot/robot control/syringe control code/calibration.json",
-          "speed": 200,
+          "speed": 50,
           "A": 200,
           "B": 200,
           "C": 200,
           "D": 0,
           "E": 200,
           "F": 200,
-          "G": 200
+          "G": 200,
+          "intake_speed": 50,
+          "outtake_speed": 200,
+          "head_a_step_pin": 33,
+          "head_a_dir_pin": 32,
+          "head_b_step_pin": 25,
+          "head_b_dir_pin": 4,
+          "head_c_step_pin": 26,
+          "head_c_dir_pin": 5,
+          "head_d_step_pin": 27,
+          "head_d_dir_pin": 18,
+          "head_e_step_pin": 14,
+          "head_e_dir_pin": 19,
+          "head_f_step_pin": 12,
+          "head_f_dir_pin": 21,
+          "head_g_step_pin": 13,
+          "head_g_dir_pin": 22
         },
         "settings": {
           "failureMode": "stop_flow",
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 1,
-        "benchmarkDurationMs": 86,
-        "lastDurationMs": 86
+        "runCount": 5,
+        "benchmarkDurationMs": 3317,
+        "lastDurationMs": 4148
       },
       "measured": {
         "width": 196,
         "height": 185
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     }
   ],

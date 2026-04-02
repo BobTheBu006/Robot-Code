@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchEsp32Board, fetchEsp32Boards, saveEsp32BoardFile } from "../lib/api";
-import type { Esp32BoardDetail, Esp32BoardSummary } from "../types/esp32Builder";
+import {
+  buildEsp32BoardFirmware,
+  fetchEsp32Board,
+  fetchEsp32Boards,
+  flashEsp32BoardFirmware,
+  saveEsp32BoardFile,
+} from "../lib/api";
+import type {
+  Esp32BoardDetail,
+  Esp32BoardSummary,
+  Esp32FirmwareActionResponse,
+} from "../types/esp32Builder";
 import { Panel } from "./Panel";
 import { StatusBadge } from "./StatusBadge";
 
@@ -19,6 +29,9 @@ export function Esp32FunctionBuilderCard() {
   const [editorContent, setEditorContent] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [firmwareActionState, setFirmwareActionState] = useState<"idle" | "running" | "success" | "error">("idle");
+  const [firmwareActionLog, setFirmwareActionLog] = useState<string | null>(null);
+  const [firmwareActionTitle, setFirmwareActionTitle] = useState<string | null>(null);
 
   async function loadBoards() {
     setBoardsStatus("loading");
@@ -153,13 +166,47 @@ export function Esp32FunctionBuilderCard() {
     }
   }
 
+  async function handleFirmwareAction(action: "build" | "flash") {
+    if (!selectedBoardId) {
+      return;
+    }
+
+    setFirmwareActionState("running");
+    setFirmwareActionTitle(action === "build" ? "Build log" : "Flash log");
+    setFirmwareActionLog(null);
+
+    try {
+      const response: Esp32FirmwareActionResponse = action === "build"
+        ? await buildEsp32BoardFirmware(selectedBoardId)
+        : await flashEsp32BoardFirmware(selectedBoardId);
+
+      setFirmwareActionState(response.ok ? "success" : "error");
+      setFirmwareActionLog([
+        `Action: ${response.action}`,
+        `Board: ${response.board_id}`,
+        `FQBN: ${response.fqbn}`,
+        response.port ? `Port: ${response.port}` : null,
+        `Sketch: ${response.sketch_entry_file}`,
+        response.auto_reset_attempted ? `Auto reset: attempted` : null,
+        `Auto reset note: ${response.auto_reset_note}`,
+        "",
+        "$ " + response.command.join(" "),
+        "",
+        response.log,
+      ].filter(Boolean).join("\n"));
+    } catch (error) {
+      setFirmwareActionState("error");
+      setFirmwareActionLog(error instanceof Error ? error.message : `Could not ${action} firmware.`);
+    }
+  }
+
   const selectedBoard = boards.find((board) => board.board_id === selectedBoardId) ?? null;
   const isDirty = selectedFile ? editorContent !== selectedFile.content : false;
 
   return (
     <Panel
       title="Function Builder"
-      subtitle="Edit the local ESP32 firmware workspace tied to connected boards. This saves source and workflow-block blueprints on the Pi."
+      subtitle="Edit the ESP32 firmware workspace tied to connected boards, then build and flash it from the Pi. Workflow-block blueprints in this workspace drive the robot action blocks under the canvas."
       headerAction={(
         <div className="function-builder__header-actions">
           <button className="workflow-editor__action" onClick={() => void loadBoards()} type="button">
@@ -253,6 +300,49 @@ export function Esp32FunctionBuilderCard() {
               <strong>{selectedBoard?.generated_function_ids.join(", ") || "None yet"}</strong>
               <small>The workflow editor reads these through the normal function discovery path.</small>
             </div>
+            <div className="function-builder__meta-card">
+              <span>Firmware target</span>
+              <strong>{boardDetail?.fqbn ?? boardDetail?.toolchain?.fqbn_default ?? "Unknown"}</strong>
+              <small>{boardDetail?.firmware_entry_file ?? "No firmware entry file configured"}</small>
+            </div>
+          </div>
+
+          <div className="function-builder__flash-actions">
+            <button
+              className="workflow-editor__action"
+              disabled={!selectedBoardId || firmwareActionState === "running"}
+              onClick={() => void handleFirmwareAction("build")}
+              type="button"
+            >
+              {firmwareActionState === "running" && firmwareActionTitle === "Build log" ? "Building..." : "Build firmware"}
+            </button>
+            <button
+              className="workflow-editor__action workflow-editor__action--primary"
+              disabled={!selectedBoardId || firmwareActionState === "running"}
+              onClick={() => void handleFirmwareAction("flash")}
+              type="button"
+            >
+              {firmwareActionState === "running" && firmwareActionTitle === "Flash log" ? "Flashing..." : "Build + Flash"}
+            </button>
+          </div>
+
+          <div className="function-builder__toolchain">
+            <div className="function-builder__section-header">
+              <strong>Toolchain</strong>
+              <StatusBadge
+                label={boardDetail?.toolchain?.arduino_cli_available ? "Ready" : "Missing"}
+                tone={boardDetail?.toolchain?.arduino_cli_available ? "online" : "offline"}
+              />
+            </div>
+            <p>
+              {boardDetail?.toolchain?.arduino_cli_available
+                ? `arduino-cli: ${boardDetail.toolchain.arduino_cli_path}`
+                : "arduino-cli is not installed on this Pi yet, so build and flash will fail until the toolchain is installed."}
+            </p>
+            <p>{boardDetail?.toolchain?.auto_reset_note}</p>
+            {boardDetail?.toolchain?.config_file ? (
+              <p>Config: {boardDetail.toolchain.config_file}</p>
+            ) : null}
           </div>
 
           <div className="function-builder__editor-card">
@@ -277,6 +367,18 @@ export function Esp32FunctionBuilderCard() {
               value={editorContent}
             />
           </div>
+
+          {firmwareActionLog ? (
+            <div className="function-builder__editor-card">
+              <div className="function-builder__editor-header">
+                <div>
+                  <strong>{firmwareActionTitle ?? "Firmware log"}</strong>
+                  <span>{firmwareActionState === "error" ? "Last action failed" : "Latest tool output from the Pi"}</span>
+                </div>
+              </div>
+              <pre className="function-builder__log">{firmwareActionLog}</pre>
+            </div>
+          ) : null}
 
           <div className="function-builder__schema-grid">
             {(boardDetail?.blueprints ?? []).map((blueprint) => (
