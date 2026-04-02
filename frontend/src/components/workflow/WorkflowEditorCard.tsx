@@ -1,5 +1,5 @@
 import type { DragEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   addEdge,
@@ -27,6 +27,7 @@ import {
   createDefaultNodeSettings,
   createStarterWorkflow,
   createWorkflowNode,
+  resolveWorkflowParameters,
   normalizeFailureMode,
   normalizeRetryCount,
   mapDiscoveredFunctionToBlock,
@@ -108,6 +109,7 @@ function WorkflowEditorSurface() {
   const [openedNodeId, setOpenedNodeId] = useState<string | null>(null);
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
+  const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
   const [workflowJson, setWorkflowJson] = useState(() => serializeWorkflow(starterWorkflow.nodes, starterWorkflow.edges));
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
@@ -117,6 +119,30 @@ function WorkflowEditorSurface() {
   });
   const reactFlow = useReactFlow<WorkflowFlowNode, Edge>();
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
+
+  function updateTestState(
+    updater: (currentState: Record<string, NodeTestState>) => Record<string, NodeTestState>,
+  ) {
+    setTestStateByNodeId((currentState) => {
+      const nextState = updater(currentState);
+      testStateByNodeIdRef.current = nextState;
+      return nextState;
+    });
+  }
+
+  function buildBlockResultLookup(
+    overrides: Record<string, Record<string, unknown> | null | undefined> = {},
+  ): Record<string, Record<string, unknown> | null | undefined> {
+    return {
+      ...Object.fromEntries(
+        Object.entries(testStateByNodeIdRef.current).map(([nodeId, state]) => [
+          nodeId,
+          state.result?.result ?? null,
+        ]),
+      ),
+      ...overrides,
+    };
+  }
 
   function estimateNodeDuration(node: WorkflowFlowNode): number {
     if (typeof node.data.benchmarkDurationMs === "number" && node.data.benchmarkDurationMs > 0) {
@@ -192,6 +218,10 @@ function WorkflowEditorSurface() {
   }, []);
 
   useEffect(() => {
+    testStateByNodeIdRef.current = testStateByNodeId;
+  }, [testStateByNodeId]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadSavedWorkflowFile() {
@@ -232,6 +262,12 @@ function WorkflowEditorSurface() {
   const openedNode = nodes.find((node) => node.id === openedNodeId) ?? null;
   const openedNodeTestState = openedNodeId
     ? testStateByNodeId[openedNodeId] ?? { status: "idle", result: null, error: null }
+    : { status: "idle" as const, result: null, error: null };
+  const previousOpenedNode = openedNode
+    ? nodes.find((node) => node.id === edges.find((edge) => edge.target === openedNode.id)?.source) ?? null
+    : null;
+  const previousOpenedNodeTestState = previousOpenedNode
+    ? testStateByNodeId[previousOpenedNode.id] ?? { status: "idle", result: null, error: null }
     : { status: "idle" as const, result: null, error: null };
   const totalRunNodes = workflowRunState.orderedNodeIds.length;
   const completedRunNodes = workflowRunState.completedNodeIds.length;
@@ -279,7 +315,7 @@ function WorkflowEditorSurface() {
     setSelectedNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId));
     setOpenedNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId));
     setActiveEdgeId(null);
-    setTestStateByNodeId((currentState) => {
+    updateTestState((currentState) => {
       const nextState = { ...currentState };
       delete nextState[nodeId];
       return nextState;
@@ -476,19 +512,27 @@ function WorkflowEditorSurface() {
   async function runSingleNode(
     node: WorkflowFlowNode,
     inputData: Record<string, unknown> | null,
+    blockResults: Record<string, Record<string, unknown> | null | undefined> = {},
   ): Promise<FunctionTestResponse> {
+    const resolvedParameters = resolveWorkflowParameters(
+      node.data.block.inputs,
+      node.data.parameters,
+      inputData,
+      { blockResults },
+    );
+
     if (node.data.block.kind === "built-in" && node.data.block.id === "delay") {
-      const durationMs = Number(node.data.parameters.duration_ms ?? 0);
+      const durationMs = Number(resolvedParameters.duration_ms ?? 0);
       if (Number.isFinite(durationMs) && durationMs > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, durationMs));
       }
     }
 
     if (node.data.block.kind === "built-in") {
-      return runBuiltInBlockTest(node.data.block, node.data.parameters, inputData);
+      return runBuiltInBlockTest(node.data.block, resolvedParameters, inputData);
     }
 
-    return testFunction(node.data.block.id, node.data.parameters, inputData);
+    return testFunction(node.data.block.id, resolvedParameters, inputData);
   }
 
   async function executeNode(
@@ -513,7 +557,7 @@ function WorkflowEditorSurface() {
         error: null,
       };
 
-      setTestStateByNodeId((currentState) => ({
+      updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
           status: "success",
@@ -525,7 +569,7 @@ function WorkflowEditorSurface() {
       return inactiveResult;
     }
 
-    setTestStateByNodeId((currentState) => ({
+    updateTestState((currentState) => ({
       ...currentState,
       [nodeId]: {
         status: "running",
@@ -537,11 +581,12 @@ function WorkflowEditorSurface() {
     const startedAt = performance.now();
 
     try {
-      const result = await runSingleNode(node, inputData);
+      const blockResults = buildBlockResultLookup();
+      const result = await runSingleNode(node, inputData, blockResults);
       const durationMs = performance.now() - startedAt;
       recordNodeDuration(nodeId, durationMs);
 
-      setTestStateByNodeId((currentState) => ({
+      updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
           status: result.ok ? "success" : "error",
@@ -555,7 +600,7 @@ function WorkflowEditorSurface() {
       const durationMs = performance.now() - startedAt;
       recordNodeDuration(nodeId, durationMs);
       const message = error instanceof Error ? error.message : "Block test failed.";
-      setTestStateByNodeId((currentState) => ({
+      updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
           status: "error",
@@ -610,7 +655,7 @@ function WorkflowEditorSurface() {
       await runNodeTestRecursively(nodeId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Block test failed.";
-      setTestStateByNodeId((currentState) => ({
+      updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
           status: "error",
@@ -811,6 +856,13 @@ function WorkflowEditorSurface() {
 
             {openedNode ? (
               <WorkflowInspector
+                allNodeTestEntries={nodes.map((node) => ({
+                  nodeId: node.id,
+                  nodeName: node.data.block.displayName,
+                  status: testStateByNodeId[node.id]?.status ?? "idle",
+                  result: testStateByNodeId[node.id]?.result ?? null,
+                  error: testStateByNodeId[node.id]?.error ?? null,
+                }))}
                 edges={edges}
                 nodes={nodes}
                 onClose={() => setOpenedNodeId(null)}
@@ -821,6 +873,9 @@ function WorkflowEditorSurface() {
                 onRunTest={handleRunTest}
                 onUpdateParameter={handleUpdateParameter}
                 onUpdateSettings={handleUpdateNodeSettings}
+                previousNodeTestError={previousOpenedNodeTestState.error}
+                previousNodeTestResult={previousOpenedNodeTestState.result}
+                previousNodeTestStatus={previousOpenedNodeTestState.status}
                 selectedNode={openedNode}
                 testError={openedNodeTestState.error}
                 testResult={openedNodeTestState.result}

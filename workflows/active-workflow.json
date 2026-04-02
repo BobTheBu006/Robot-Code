@@ -258,7 +258,7 @@
         "width": 196,
         "height": 229
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     }
   ],
@@ -275,7 +275,6 @@
       "sourceHandle": "next",
       "target": "dispense-9d740",
       "targetHandle": "input",
-      "animated": true,
       "type": "workflowEdge",
       "id": "xy-edge__delay-seed-delaynext-dispense-9d740input"
     }

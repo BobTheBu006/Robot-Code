@@ -1,9 +1,9 @@
-import type { ChangeEvent } from "react";
-import { useEffect, useState } from "react";
+import type { ChangeEvent, DragEvent as ReactDragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
 
-import { formatWorkflowParameterValue, getWorkflowNodeOutputs } from "../../lib/workflow";
+import { formatWorkflowParameterValue } from "../../lib/workflow";
 import type {
   FunctionTestResponse,
   WorkflowFailureMode,
@@ -15,11 +15,35 @@ import type {
 type WorkflowFlowNode = Node<WorkflowNodeData>;
 type TestStatus = "idle" | "running" | "success" | "error";
 type InspectorTab = "parameters" | "settings";
+type InputSourceMode = "all_blocks" | "previous";
+
+interface WorkflowInspectorTestEntry {
+  nodeId: string;
+  nodeName: string;
+  status: TestStatus;
+  result: FunctionTestResponse | null;
+  error: string | null;
+}
+
+interface FlattenedOutputField {
+  label: string;
+  expression: string;
+  preview: string;
+}
+
+interface ExpressionPreview {
+  text: string;
+  multiline: boolean;
+}
 
 interface WorkflowInspectorProps {
+  allNodeTestEntries: WorkflowInspectorTestEntry[];
   selectedNode: WorkflowFlowNode;
   nodes: WorkflowFlowNode[];
   edges: Edge[];
+  previousNodeTestStatus: TestStatus;
+  previousNodeTestResult: FunctionTestResponse | null;
+  previousNodeTestError: string | null;
   testStatus: TestStatus;
   testResult: FunctionTestResponse | null;
   testError: string | null;
@@ -37,6 +61,8 @@ interface WorkflowInspectorProps {
   ) => void;
 }
 
+const WORKFLOW_EXPRESSION_MIME = "application/x-workflow-expression";
+
 function coerceInputValue(
   input: WorkflowInputDefinition,
   event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -46,16 +72,231 @@ function coerceInputValue(
   }
 
   if (input.type === "number") {
-    return Number(event.target.value);
+    const nextValue = event.target.value;
+    if (nextValue.includes("{{")) {
+      return nextValue;
+    }
+
+    const parsed = Number(nextValue);
+    return Number.isFinite(parsed) ? parsed : nextValue;
   }
 
   return event.target.value;
 }
 
+function getResultPayload(result: FunctionTestResponse | null): unknown {
+  return result?.result ?? null;
+}
+
+function formatPreviewValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  const json = JSON.stringify(value);
+  return json.length > 64 ? `${json.slice(0, 61)}...` : json;
+}
+
+function stringifyPreviewValue(value: unknown): ExpressionPreview | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return {
+      text: value,
+      multiline: value.includes("\n") || value.length > 80,
+    };
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return {
+      text: String(value),
+      multiline: false,
+    };
+  }
+
+  const json = JSON.stringify(value, null, 2);
+  return {
+    text: json,
+    multiline: true,
+  };
+}
+
+function resolveValueAtPath(source: unknown, path: string): unknown {
+  if (!path.trim()) {
+    return source;
+  }
+
+  const segments = path
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  let current = source;
+  for (const segment of segments) {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return null;
+    }
+
+    if (!(segment in (current as Record<string, unknown>))) {
+      return null;
+    }
+
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return current;
+}
+
+function resolveExpressionPreview(
+  rawValue: WorkflowParameterValue,
+  previousPayload: unknown,
+  blockPayloadLookup: Record<string, unknown>,
+): ExpressionPreview | null {
+  if (typeof rawValue !== "string" || !rawValue.includes("{{")) {
+    return null;
+  }
+
+  const trimmed = rawValue.trim();
+  const wholeExpressionMatch = trimmed.match(/^\{\{([^}]+)\}\}$/);
+
+  const resolveBody = (body: string): unknown => {
+    const normalized = body.trim()
+      .replace(/^\$json\./, "input.")
+      .replace(/^\$input\./, "input.")
+      .replace(/^json\./, "input.")
+      .replace(/^previous\./, "input.")
+      .replace(/^\$blocks\./, "blocks.");
+
+    if (
+      normalized === "input"
+      || normalized === "$json"
+      || normalized === "$input"
+      || normalized === "previous"
+      || normalized === "json"
+    ) {
+      return previousPayload;
+    }
+
+    if (normalized === "blocks" || normalized === "$blocks") {
+      return blockPayloadLookup;
+    }
+
+    if (normalized.startsWith("input.")) {
+      return resolveValueAtPath(previousPayload, normalized.slice("input.".length));
+    }
+
+    if (normalized.startsWith("blocks.")) {
+      return resolveValueAtPath(blockPayloadLookup, normalized.slice("blocks.".length));
+    }
+
+    return resolveValueAtPath(previousPayload, normalized);
+  };
+
+  if (wholeExpressionMatch) {
+    return stringifyPreviewValue(resolveBody(wholeExpressionMatch[1]));
+  }
+
+  const expressionMatches = [...rawValue.matchAll(/\{\{([^}]+)\}\}/g)];
+  if (expressionMatches.length === 0) {
+    return null;
+  }
+
+  let nextValue = rawValue;
+  for (const match of expressionMatches) {
+    const resolvedValue = resolveBody(match[1]);
+    if (resolvedValue === null || resolvedValue === undefined) {
+      return null;
+    }
+
+    nextValue = nextValue.replace(match[0], formatPreviewValue(resolvedValue));
+  }
+
+  return {
+    text: nextValue,
+    multiline: nextValue.includes("\n") || nextValue.length > 80,
+  };
+}
+
+function flattenOutputFields(
+  value: unknown,
+  expressionRoot: string,
+  path = "",
+  depth = 0,
+): FlattenedOutputField[] {
+  if (depth > 5) {
+    return [];
+  }
+
+  if (value === null || value === undefined) {
+    return path
+      ? [{ label: path, expression: `{{${expressionRoot}}}`, preview: "null" }]
+      : [];
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return [{
+      label: path || "$root",
+      expression: `{{${expressionRoot}}}`,
+      preview: formatPreviewValue(value),
+    }];
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return path
+        ? [{ label: path, expression: `{{${expressionRoot}}}`, preview: "[]" }]
+        : [];
+    }
+
+    return value.flatMap((item, index) => {
+      const nextPath = path ? `${path}.${index}` : String(index);
+      const nextExpressionRoot = `${expressionRoot}.${index}`;
+      return flattenOutputFields(item, nextExpressionRoot, nextPath, depth + 1);
+    });
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      return path
+        ? [{ label: path, expression: `{{${expressionRoot}}}`, preview: "{}" }]
+        : [];
+    }
+
+    return entries.flatMap(([key, nestedValue]) => {
+      const nextPath = path ? `${path}.${key}` : key;
+      const nextExpressionRoot = `${expressionRoot}.${key}`;
+      return flattenOutputFields(nestedValue, nextExpressionRoot, nextPath, depth + 1);
+    });
+  }
+
+  return [];
+}
+
+function handleDragStart(event: ReactDragEvent<HTMLButtonElement>, expression: string) {
+  event.dataTransfer.effectAllowed = "copy";
+  event.dataTransfer.setData(WORKFLOW_EXPRESSION_MIME, expression);
+  event.dataTransfer.setData("text/plain", expression);
+}
+
 export function WorkflowInspector({
+  allNodeTestEntries,
   selectedNode,
   nodes,
   edges,
+  previousNodeTestStatus,
+  previousNodeTestResult,
+  previousNodeTestError,
   testStatus,
   testResult,
   testError,
@@ -66,23 +307,96 @@ export function WorkflowInspector({
   onUpdateSettings,
 }: WorkflowInspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("parameters");
+  const [inputSourceMode, setInputSourceMode] = useState<InputSourceMode>("previous");
+  const [focusedInputKey, setFocusedInputKey] = useState<string | null>(null);
   const { block, parameters, settings } = selectedNode.data;
   const incomingEdges = edges.filter((edge) => edge.target === selectedNode.id);
   const outgoingEdges = edges.filter((edge) => edge.source === selectedNode.id);
-  const declaredOutputs = getWorkflowNodeOutputs(selectedNode.data).filter((output) => output.key !== "next");
   const previousNode = incomingEdges.length > 0
     ? nodes.find((node) => node.id === incomingEdges[0]?.source) ?? null
     : null;
   const nextNode = outgoingEdges.length > 0
     ? nodes.find((node) => node.id === outgoingEdges[0]?.target) ?? null
     : null;
+  const previousPayload = useMemo(() => getResultPayload(previousNodeTestResult), [previousNodeTestResult]);
+  const currentPayload = useMemo(() => getResultPayload(testResult), [testResult]);
+  const blockPayloadLookup = useMemo(
+    () =>
+      Object.fromEntries(
+        allNodeTestEntries
+          .filter((entry) => entry.nodeId !== selectedNode.id)
+          .map((entry) => [entry.nodeId, getResultPayload(entry.result)]),
+      ),
+    [allNodeTestEntries, selectedNode.id],
+  );
+  const previousOutputFields = useMemo(
+    () => flattenOutputFields(previousPayload, "input"),
+    [previousPayload],
+  );
+  const allBlockOutputs = useMemo(
+    () =>
+      allNodeTestEntries
+        .filter((entry) => entry.nodeId !== selectedNode.id)
+        .map((entry) => {
+          const payload = getResultPayload(entry.result);
+          return {
+            ...entry,
+            payload,
+            fields: flattenOutputFields(payload, `blocks.${entry.nodeId}`),
+          };
+        })
+        .filter((entry) => entry.payload !== null || entry.error || entry.status === "running"),
+    [allNodeTestEntries],
+  );
 
   useEffect(() => {
     setActiveTab("parameters");
+    setInputSourceMode("previous");
+    setFocusedInputKey(null);
   }, [selectedNode.id]);
+
+  function handleParameterDrop(
+    event: ReactDragEvent<HTMLInputElement>,
+    input: WorkflowInputDefinition,
+  ) {
+    event.preventDefault();
+    const expression = event.dataTransfer.getData(WORKFLOW_EXPRESSION_MIME)
+      || event.dataTransfer.getData("text/plain");
+    if (!expression) {
+      return;
+    }
+
+    onUpdateParameter(selectedNode.id, input, expression);
+  }
 
   return (
     <div className="workflow-overlay">
+      <div className="workflow-overlay__topbar">
+        <div className="workflow-overlay__topbar-side">
+          <span>Input</span>
+        </div>
+
+        <div className="workflow-overlay__topbar-center">
+          <div className="workflow-overlay__title">
+            <span className="workflow-overlay__eyebrow">
+              {block.kind === "robot-action" ? "Robot action" : block.category}
+            </span>
+            <strong>{block.displayName}</strong>
+          </div>
+
+          <button className="workflow-overlay__run" onClick={onRunTest} type="button">
+            {testStatus === "running" ? "Running..." : "Test step"}
+          </button>
+        </div>
+
+        <div className="workflow-overlay__topbar-side workflow-overlay__topbar-side--right">
+          <span>Output</span>
+          <button className="workflow-overlay__close" onClick={onClose} type="button">
+            x
+          </button>
+        </div>
+      </div>
+
       <div className="workflow-overlay__layout">
         <aside className="workflow-overlay__panel workflow-overlay__panel--side">
           {previousNode ? (
@@ -96,60 +410,101 @@ export function WorkflowInspector({
             </button>
           ) : null}
 
-          <div className="workflow-overlay__panel-header">
-            <span>Input</span>
+          <div className="workflow-overlay__input-switches">
+            <button
+              className={inputSourceMode === "all_blocks"
+                ? "workflow-overlay__input-switch workflow-overlay__input-switch--active"
+                : "workflow-overlay__input-switch"}
+              onClick={() => setInputSourceMode("all_blocks")}
+              type="button"
+            >
+              All blocks
+            </button>
+            <button
+              className={inputSourceMode === "previous"
+                ? "workflow-overlay__input-switch workflow-overlay__input-switch--active"
+                : "workflow-overlay__input-switch"}
+              onClick={() => setInputSourceMode("previous")}
+              type="button"
+            >
+              Previous block output
+            </button>
           </div>
 
-          <section className="workflow-overlay__section">
-            <h3>Connected inputs</h3>
-            {incomingEdges.length > 0 ? (
-              <div className="workflow-overlay__list">
-                {incomingEdges.map((edge) => (
-                  <div className="workflow-overlay__list-item" key={edge.id}>
-                    <strong>{edge.source}</strong>
-                    <span>{`${edge.sourceHandle ?? "next"} -> input`}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="workflow-overlay__empty-text">No upstream node is connected to this block yet.</p>
-            )}
-          </section>
-
-          <section className="workflow-overlay__section">
-            <h3>Input fields</h3>
-            {block.inputs.length > 0 ? (
-              <div className="workflow-overlay__list">
-                {block.inputs.map((input) => (
-                  <div className="workflow-overlay__list-item" key={input.key}>
-                    <strong>{input.label}</strong>
-                    <span>{input.type}</span>
-                    <p>{input.description ?? "No description provided."}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="workflow-overlay__empty-text">This block does not declare any input fields.</p>
-            )}
-          </section>
+          {inputSourceMode === "previous" ? (
+            <section className="workflow-overlay__section workflow-overlay__section--stretch">
+              {previousNodeTestStatus === "idle" ? (
+                <p className="workflow-overlay__empty-text">Run the previous block to preview its output here.</p>
+              ) : null}
+              {previousNodeTestStatus === "running" ? (
+                <p className="workflow-overlay__empty-text">Previous block is currently running...</p>
+              ) : null}
+              {previousNodeTestError ? <p className="error-text">{previousNodeTestError}</p> : null}
+              {previousOutputFields.length > 0 ? (
+                <div className="workflow-overlay__token-list">
+                  {previousOutputFields.map((field) => (
+                    <button
+                      className="workflow-overlay__token"
+                      draggable
+                      key={field.expression}
+                      onDragStart={(event) => handleDragStart(event, field.expression)}
+                      type="button"
+                    >
+                      <strong>{field.label}</strong>
+                      <span>{field.preview}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {previousNodeTestResult ? (
+                <pre className="workflow-overlay__result workflow-overlay__result--input">
+                  {JSON.stringify(previousPayload, null, 2)}
+                </pre>
+              ) : null}
+            </section>
+          ) : (
+            <section className="workflow-overlay__section workflow-overlay__section--stretch">
+              {allBlockOutputs.length === 0 ? (
+                <p className="workflow-overlay__empty-text">Run one or more blocks to see their outputs here.</p>
+              ) : (
+                <div className="workflow-overlay__all-blocks">
+                  {allBlockOutputs.map((entry) => (
+                    <div className="workflow-overlay__all-block" key={entry.nodeId}>
+                      <div className="workflow-overlay__all-block-header">
+                        <strong>{entry.nodeName}</strong>
+                        <span>{entry.status}</span>
+                      </div>
+                      {entry.error ? <p className="error-text">{entry.error}</p> : null}
+                      {entry.fields.length > 0 ? (
+                        <div className="workflow-overlay__token-list">
+                          {entry.fields.map((field) => (
+                            <button
+                              className="workflow-overlay__token"
+                              draggable
+                              key={`${entry.nodeId}-${field.expression}`}
+                              onDragStart={(event) => handleDragStart(event, field.expression)}
+                              type="button"
+                            >
+                              <strong>{field.label}</strong>
+                              <span>{field.preview}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      {entry.payload ? (
+                        <pre className="workflow-overlay__result workflow-overlay__result--input">
+                          {JSON.stringify(entry.payload, null, 2)}
+                        </pre>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </aside>
 
         <section className="workflow-overlay__editor">
-          <div className="workflow-overlay__editor-header">
-            <div>
-              <span className="workflow-overlay__eyebrow">
-                {block.kind === "robot-action" ? "Robot action" : block.category}
-              </span>
-              <h2>{block.displayName}</h2>
-            </div>
-
-            <div className="workflow-overlay__editor-actions">
-              <button className="workflow-overlay__run" onClick={onRunTest} type="button">
-                {testStatus === "running" ? "Running..." : "Test step"}
-              </button>
-            </div>
-          </div>
-
           <div className="workflow-overlay__tabs">
             <button
               className={activeTab === "parameters" ? "workflow-overlay__tab workflow-overlay__tab--active" : "workflow-overlay__tab"}
@@ -196,12 +551,45 @@ export function WorkflowInspector({
                           type="checkbox"
                         />
                       ) : (
-                        <input
-                          onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
-                          placeholder={input.placeholder ?? ""}
-                          type={input.type === "number" ? "number" : "text"}
-                          value={formatWorkflowParameterValue(parameters[input.key])}
-                        />
+                        <>
+                          <input
+                            onChange={(event) => onUpdateParameter(selectedNode.id, input, coerceInputValue(input, event))}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => handleParameterDrop(event, input)}
+                            onFocus={() => setFocusedInputKey(input.key)}
+                            onClick={() => setFocusedInputKey(input.key)}
+                            placeholder={input.placeholder ?? (input.type === "number" ? "Drag a value here" : "Drag a value here")}
+                            type="text"
+                            value={formatWorkflowParameterValue(parameters[input.key])}
+                          />
+                          {focusedInputKey === input.key ? (() => {
+                            const preview = resolveExpressionPreview(
+                              parameters[input.key],
+                              previousPayload,
+                              blockPayloadLookup,
+                            );
+
+                            if (!preview) {
+                              return null;
+                            }
+
+                            return preview.multiline ? (
+                              <textarea
+                                className="workflow-overlay__expression-preview"
+                                readOnly
+                                rows={Math.min(Math.max(preview.text.split("\n").length, 2), 8)}
+                                value={preview.text}
+                              />
+                            ) : (
+                              <input
+                                className="workflow-overlay__expression-preview"
+                                readOnly
+                                type="text"
+                                value={preview.text}
+                              />
+                            );
+                          })() : null}
+                        </>
                       )}
 
                       <p>{input.description ?? "No additional description for this field."}</p>
@@ -289,48 +677,7 @@ export function WorkflowInspector({
             </button>
           ) : null}
 
-          <div className="workflow-overlay__panel-header">
-            <span>Output</span>
-            <button className="workflow-overlay__close" onClick={onClose} type="button">
-              x
-            </button>
-          </div>
-
-          <section className="workflow-overlay__section">
-            <h3>Declared outputs</h3>
-            {declaredOutputs.length > 0 ? (
-              <div className="workflow-overlay__list">
-                {declaredOutputs.map((output) => (
-                  <div className="workflow-overlay__list-item" key={output.key}>
-                    <strong>{output.label}</strong>
-                    <span>{output.key}</span>
-                    <p>{output.description ?? `Output type: ${output.type ?? "unknown"}`}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="workflow-overlay__empty-text">No declared outputs for this block.</p>
-            )}
-          </section>
-
-          <section className="workflow-overlay__section">
-            <h3>Connected outputs</h3>
-            {outgoingEdges.length > 0 ? (
-              <div className="workflow-overlay__list">
-                {outgoingEdges.map((edge) => (
-                  <div className="workflow-overlay__list-item" key={edge.id}>
-                    <strong>{edge.sourceHandle ?? "next"}</strong>
-                    <span>{edge.target}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="workflow-overlay__empty-text">No downstream block is connected yet.</p>
-            )}
-          </section>
-
-          <section className="workflow-overlay__section">
-            <h3>Last test result</h3>
+          <section className="workflow-overlay__section workflow-overlay__section--stretch">
             {testStatus === "idle" ? (
               <p className="workflow-overlay__empty-text">Run this step to preview its output.</p>
             ) : null}
@@ -340,7 +687,7 @@ export function WorkflowInspector({
             {testError ? <p className="error-text">{testError}</p> : null}
             {testResult ? (
               <pre className="workflow-overlay__result">
-                {JSON.stringify(testResult, null, 2)}
+                {JSON.stringify(currentPayload, null, 2)}
               </pre>
             ) : null}
           </section>

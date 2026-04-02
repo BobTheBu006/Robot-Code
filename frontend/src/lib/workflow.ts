@@ -15,6 +15,10 @@ import type {
 export const WORKFLOW_STORAGE_KEY = "robot-control.workflow-editor";
 export const WORKFLOW_BLOCK_MIME = "application/x-robot-workflow-block";
 
+interface WorkflowResolutionContext {
+  blockResults?: Record<string, Record<string, unknown> | null | undefined>;
+}
+
 const ERROR_OUTPUT: WorkflowOutputDefinition = {
   key: "error",
   label: "Error",
@@ -83,6 +87,145 @@ function resolveInputPath(
   }
 
   return current;
+}
+
+function coerceResolvedValue(
+  value: unknown,
+  inputType: WorkflowInputDefinition["type"],
+): WorkflowParameterValue {
+  if (inputType === "number") {
+    if (typeof value === "number") {
+      return value;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`Expected a number-compatible value, received '${String(value)}'.`);
+    }
+
+    return parsed;
+  }
+
+  if (inputType === "boolean") {
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true") {
+        return true;
+      }
+
+      if (normalized === "false") {
+        return false;
+      }
+    }
+
+    throw new Error(`Expected a boolean-compatible value, received '${String(value)}'.`);
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
+}
+
+function stringifyResolvedValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
+}
+
+function resolveExpressionReference(
+  expressionBody: string,
+  inputData: Record<string, unknown> | null | undefined,
+  context: WorkflowResolutionContext = {},
+): unknown {
+  const trimmed = expressionBody.trim();
+  const normalized = trimmed
+    .replace(/^\$json\./, "input.")
+    .replace(/^\$input\./, "input.")
+    .replace(/^\$blocks\./, "blocks.")
+    .replace(/^previous\./, "input.")
+    .replace(/^json\./, "input.");
+
+  if (normalized === "input" || normalized === "$json" || normalized === "$input" || normalized === "previous" || normalized === "json") {
+    return inputData ?? null;
+  }
+
+  if (normalized === "blocks" || normalized === "$blocks") {
+    return context.blockResults ?? null;
+  }
+
+  if (normalized.startsWith("blocks.")) {
+    return resolveInputPath(context.blockResults ?? null, normalized.slice("blocks.".length));
+  }
+
+  const path = normalized.startsWith("input.") ? normalized.slice("input.".length) : normalized;
+  return resolveInputPath(inputData, path);
+}
+
+export function resolveWorkflowParameters(
+  inputs: WorkflowInputDefinition[],
+  parameters: Record<string, WorkflowParameterValue>,
+  inputData: Record<string, unknown> | null | undefined,
+  context: WorkflowResolutionContext = {},
+): Record<string, WorkflowParameterValue> {
+  const resolvedParameters: Record<string, WorkflowParameterValue> = {};
+
+  for (const input of inputs) {
+    const rawValue = parameters[input.key];
+
+    if (typeof rawValue !== "string") {
+      resolvedParameters[input.key] = rawValue;
+      continue;
+    }
+
+    const expressionMatches = [...rawValue.matchAll(/\{\{([^}]+)\}\}/g)];
+    if (expressionMatches.length === 0) {
+      resolvedParameters[input.key] = input.type === "number"
+        ? coerceResolvedValue(rawValue, input.type)
+        : input.type === "boolean"
+          ? coerceResolvedValue(rawValue, input.type)
+          : rawValue;
+      continue;
+    }
+
+    const wholeExpressionMatch = rawValue.trim().match(/^\{\{([^}]+)\}\}$/);
+    if (wholeExpressionMatch) {
+      const resolvedValue = resolveExpressionReference(wholeExpressionMatch[1], inputData, context);
+      if (resolvedValue === null || resolvedValue === undefined) {
+        throw new Error(`Could not resolve expression '${rawValue}' for '${input.label}'.`);
+      }
+
+      resolvedParameters[input.key] = coerceResolvedValue(resolvedValue, input.type);
+      continue;
+    }
+
+    let nextValue = rawValue;
+    for (const match of expressionMatches) {
+      const token = match[0];
+      const body = match[1];
+      const resolvedValue = resolveExpressionReference(body, inputData, context);
+      if (resolvedValue === null || resolvedValue === undefined) {
+        throw new Error(`Could not resolve expression '${token}' for '${input.label}'.`);
+      }
+
+      nextValue = nextValue.replace(token, stringifyResolvedValue(resolvedValue));
+    }
+
+    resolvedParameters[input.key] = coerceResolvedValue(nextValue, input.type);
+  }
+
+  return resolvedParameters;
 }
 
 export function createBuiltInBlocks(): WorkflowBlockDefinition[] {

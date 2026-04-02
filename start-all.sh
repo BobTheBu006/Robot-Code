@@ -2,23 +2,35 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PROJECT_DIR="/home/robot/robot control/Robot-Code"
+if [[ -f "$SCRIPT_DIR/start-backend.sh" && -f "$SCRIPT_DIR/start-frontend.sh" ]]; then
+  PROJECT_DIR="$SCRIPT_DIR"
+else
+  PROJECT_DIR="${ROBOT_CODE_DIR:-$DEFAULT_PROJECT_DIR}"
+fi
 FRONTEND_URL="http://127.0.0.1:5173"
 FRONTEND_HOST="127.0.0.1"
 FRONTEND_PORT="5173"
+
+if [[ ! -f "$PROJECT_DIR/start-backend.sh" || ! -f "$PROJECT_DIR/start-frontend.sh" ]]; then
+  echo "Could not find Robot-Code launch scripts."
+  echo "Checked project directory: $PROJECT_DIR"
+  exit 1
+fi
 
 open_terminal() {
   local title="$1"
   local script_name="$2"
 
   if command -v x-terminal-emulator >/dev/null 2>&1; then
-    x-terminal-emulator -T "$title" -e bash "$SCRIPT_DIR/$script_name"
+    x-terminal-emulator -T "$title" -e bash "$PROJECT_DIR/$script_name"
   elif command -v lxterminal >/dev/null 2>&1; then
-    lxterminal --title="$title" --command="bash '$SCRIPT_DIR/$script_name'"
+    lxterminal --title="$title" --command="bash '$PROJECT_DIR/$script_name'"
   elif command -v gnome-terminal >/dev/null 2>&1; then
-    gnome-terminal --title="$title" -- bash "$SCRIPT_DIR/$script_name"
+    gnome-terminal --title="$title" -- bash "$PROJECT_DIR/$script_name"
   else
     echo "Could not find a graphical terminal emulator."
-    echo "Run '$SCRIPT_DIR/start-backend.sh' and '$SCRIPT_DIR/start-frontend.sh' in separate terminals."
+    echo "Run '$PROJECT_DIR/start-backend.sh' and '$PROJECT_DIR/start-frontend.sh' in separate terminals."
     exit 1
   fi
 }

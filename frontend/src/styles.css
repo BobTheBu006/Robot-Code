@@ -29,11 +29,11 @@ body {
 
 .app-shell {
   min-height: 100vh;
-  padding: 32px 20px 48px;
+  padding: 28px 18px 48px;
 }
 
 .app-shell__inner {
-  max-width: 1440px;
+  width: min(98vw, 1840px);
   margin: 0 auto;
 }
 
@@ -428,8 +428,8 @@ body {
 }
 
 .workflow-editor__canvas {
-  height: 720px;
-  min-height: 720px;
+  height: 900px;
+  min-height: 900px;
   border: 1px solid rgba(23, 50, 42, 0.1);
   border-radius: 24px;
   overflow: hidden;
@@ -440,7 +440,7 @@ body {
 
 .workflow-editor__canvas-shell {
   position: relative;
-  min-height: 720px;
+  min-height: 900px;
 }
 
 .workflow-editor__canvas .react-flow__controls,
@@ -649,13 +649,26 @@ body {
 
 .workflow-editor__json textarea,
 .workflow-overlay__field input,
-.workflow-overlay__field select {
+.workflow-overlay__field select,
+.workflow-overlay__expression-preview {
   width: 100%;
   padding: 9px 11px;
   border: 1px solid rgba(23, 50, 42, 0.12);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.96);
   color: #17322a;
+}
+
+.workflow-overlay__expression-preview {
+  background: rgba(242, 245, 251, 0.98);
+  color: #31404d;
+}
+
+.workflow-overlay__field textarea.workflow-overlay__expression-preview {
+  resize: vertical;
+  min-height: 56px;
+  font: inherit;
+  line-height: 1.4;
 }
 
 .workflow-overlay__field input[type="checkbox"] {
@@ -666,73 +679,126 @@ body {
 
 .workflow-overlay {
   position: absolute;
-  inset: 12px;
+  inset: 2% 1.25%;
   z-index: 30;
-  display: block;
-  padding: 18px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
   border-radius: 24px;
-  background: rgba(34, 31, 43, 0.78);
+  background: rgba(34, 31, 43, 0.72);
   backdrop-filter: blur(6px);
+}
+
+.workflow-overlay__topbar {
+  display: grid;
+  grid-template-columns: minmax(280px, 31%) minmax(0, 38%) minmax(280px, 31%);
+  gap: 12px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.workflow-overlay__topbar-side,
+.workflow-overlay__topbar-center {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+}
+
+.workflow-overlay__topbar-side {
+  padding: 0 6px;
+}
+
+.workflow-overlay__topbar-side span {
+  color: #d5cde0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.workflow-overlay__topbar-center {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 10px;
+}
+
+.workflow-overlay__topbar-side--right {
+  justify-content: space-between;
+}
+
+.workflow-overlay__title {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.workflow-overlay__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workflow-overlay__layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 640px) 300px;
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: minmax(280px, 31%) minmax(0, 38%) minmax(280px, 31%);
+  gap: 12px;
+  align-items: stretch;
   justify-content: center;
   height: 100%;
 }
 
 .workflow-overlay__panel,
 .workflow-overlay__editor {
-  border-radius: 22px;
-  box-shadow: 0 24px 70px rgba(10, 7, 16, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 18px 48px rgba(10, 7, 16, 0.24);
+}
+
+.workflow-overlay__panel:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.workflow-overlay__editor {
+  border-radius: 0;
+}
+
+.workflow-overlay__panel:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 .workflow-overlay__panel {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
   position: relative;
-  padding: 16px;
+  padding: 14px;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
   overflow-x: visible;
-  background: rgba(24, 23, 30, 0.92);
+  background: rgba(27, 25, 35, 0.95);
   color: #f0eef5;
 }
 
 .workflow-overlay__editor {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   align-self: stretch;
   position: relative;
   min-height: 0;
-  background: #4a494f;
+  background: linear-gradient(180deg, rgba(69, 68, 76, 0.98), rgba(61, 60, 68, 0.98));
   color: #f4f0f8;
   overflow: hidden;
 }
 
-.workflow-overlay__panel-header,
-.workflow-overlay__editor-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
-.workflow-overlay__panel-header span {
-  color: #d5cde0;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .workflow-overlay__close {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
@@ -745,16 +811,12 @@ body {
 .workflow-overlay__section {
   display: grid;
   gap: 6px;
+  align-content: start;
 }
 
-.workflow-overlay__section h3,
-.workflow-overlay__editor-header h2 {
-  margin: 0;
-}
-
-.workflow-overlay__section h3 {
-  line-height: 1.1;
-  margin-bottom: 2px;
+.workflow-overlay__section--stretch {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .workflow-overlay__list {
@@ -783,35 +845,19 @@ body {
 }
 
 .workflow-overlay__list-item p,
-.workflow-overlay__empty-text,
-.workflow-overlay__editor-header p {
+.workflow-overlay__empty-text {
   color: #cbc7d1;
   font-size: 0.9rem;
 }
 
 .workflow-overlay__eyebrow {
   display: inline-block;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   color: #f59d52;
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.workflow-overlay__editor-header {
-  padding: 14px 24px 6px;
-}
-
-.workflow-overlay__editor-header h2 {
-  font-size: 1.15rem;
-  line-height: 1.2;
-}
-
-.workflow-overlay__editor-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
 }
 
 .workflow-overlay__nav {
@@ -848,7 +894,7 @@ body {
 }
 
 .workflow-overlay__run {
-  padding: 10px 16px;
+  padding: 8px 14px;
   border: 0;
   border-radius: 12px;
   background: #ff7c66;
@@ -861,7 +907,7 @@ body {
 .workflow-overlay__tabs {
   display: flex;
   gap: 18px;
-  padding: 0 24px;
+  padding: 10px 24px 0;
   align-items: end;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
@@ -885,7 +931,7 @@ body {
   display: grid;
   align-content: start;
   gap: 14px;
-  padding: 12px 24px 24px;
+  padding: 16px 24px 24px;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -925,6 +971,89 @@ body {
   gap: 10px;
 }
 
+.workflow-overlay__input-switches {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.workflow-overlay__input-switch {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d7d3df;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workflow-overlay__input-switch--active {
+  border-color: rgba(255, 138, 117, 0.42);
+  background: rgba(255, 138, 117, 0.16);
+  color: #fff0eb;
+}
+
+.workflow-overlay__token-list {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.workflow-overlay__token {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f0f8;
+  text-align: left;
+  font: inherit;
+  cursor: grab;
+}
+
+.workflow-overlay__token strong,
+.workflow-overlay__token span {
+  margin: 0;
+}
+
+.workflow-overlay__token span {
+  color: #c5b5ff;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-overlay__all-blocks {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.workflow-overlay__all-block {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.workflow-overlay__all-block-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.workflow-overlay__all-block-header span {
+  color: #c5b5ff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .workflow-overlay__setting-row {
   display: flex;
   justify-content: space-between;
@@ -947,6 +1076,10 @@ body {
   overflow: auto;
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.workflow-overlay__result--input {
+  max-height: 320px;
 }
 
 .workflow-editor__json {
@@ -995,8 +1128,8 @@ body {
   }
 
   .workflow-editor__canvas {
-    height: 560px;
-    min-height: 560px;
+    height: 700px;
+    min-height: 700px;
   }
 
   .workflow-overlay {
