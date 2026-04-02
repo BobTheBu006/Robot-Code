@@ -1,0 +1,160 @@
+{
+  "manifest": {
+    "id": "dispense",
+    "display_name": "Dispense Syringe Batch",
+    "category": "Robot Actions",
+    "description": "High-level syringe dispense action for the 7-head ESP32 syringe tool.",
+    "version": "0.2.0",
+    "inputs": [
+      {
+        "key": "tool_port",
+        "label": "ESP32 Port",
+        "type": "file/path",
+        "description": "Serial device path for the connected ESP32 syringe board.",
+        "required": false,
+        "default": "/dev/ttyUSB0",
+        "placeholder": "/dev/ttyUSB0"
+      },
+      {
+        "key": "calibration_file",
+        "label": "Calibration File",
+        "type": "file/path",
+        "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
+        "required": true,
+        "default": "/home/robot/robot control/Robot-Code/functions/syringe control code/calibration.json",
+        "placeholder": "/path/to/calibration.json"
+      },
+      {
+        "key": "speed",
+        "label": "Dispense Speed",
+        "type": "number",
+        "description": "Optional syringe speed to apply on the ESP32 before dispensing.",
+        "required": false,
+        "default": 100
+      },
+      {
+        "key": "A",
+        "label": "Head A",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head A.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "B",
+        "label": "Head B",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head B.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "C",
+        "label": "Head C",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head C.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "D",
+        "label": "Head D",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head D.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "E",
+        "label": "Head E",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head E.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "F",
+        "label": "Head F",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head F.",
+        "required": true,
+        "default": 0
+      },
+      {
+        "key": "G",
+        "label": "Head G",
+        "type": "number",
+        "description": "Requested dispense amount for syringe head G.",
+        "required": true,
+        "default": 0
+      }
+    ],
+    "outputs": [
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "string",
+        "description": "High-level status for the dispense request."
+      },
+      {
+        "key": "reply",
+        "label": "Controller Reply",
+        "type": "string",
+        "description": "Raw serial reply returned by the ESP32 firmware."
+      }
+    ]
+  },
+  "advanced_builder_inputs": [
+    {
+      "key": "spr",
+      "label": "Steps Per Revolution",
+      "type": "number",
+      "description": "Motor steps per full revolution used in the firmware.",
+      "required": false,
+      "default": 200
+    },
+    {
+      "key": "rpm_default",
+      "label": "Default RPM",
+      "type": "number",
+      "description": "Default RPM used when no speed override is sent from the workflow.",
+      "required": false,
+      "default": 100
+    },
+    {
+      "key": "microsteps",
+      "label": "Microsteps",
+      "type": "number",
+      "description": "Default microstep configuration passed to the A4988 driver.",
+      "required": false,
+      "default": 1
+    },
+    {
+      "key": "step_pins",
+      "label": "Step Pins",
+      "type": "string",
+      "description": "Comma-separated GPIO pins for the seven step pins.",
+      "required": false,
+      "default": "33,25,26,27,14,12,13"
+    },
+    {
+      "key": "dir_pins",
+      "label": "Direction Pins",
+      "type": "string",
+      "description": "Comma-separated GPIO pins for the seven direction pins.",
+      "required": false,
+      "default": "32,4,5,18,19,21,22"
+    },
+    {
+      "key": "dir_signs",
+      "label": "Direction Signs",
+      "type": "string",
+      "description": "Comma-separated direction multipliers for the seven syringes.",
+      "required": false,
+      "default": "-1,-1,-1,-1,-1,-1,-1"
+    }
+  ],
+  "firmware_entry_file": "firmware/main.ino",
+  "protocol": "serial-text",
+  "notes": "Basic runtime inputs are written to the workflow block. Advanced builder inputs describe firmware-level tuning and pin mapping."
+}

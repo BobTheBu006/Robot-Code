@@ -13,7 +13,9 @@ from app.models.syringe import (
 )
 
 HEADS: tuple[SyringeHead, ...] = ("A", "B", "C", "D", "E", "F", "G")
-DEFAULT_CALIBRATION_PATH = "/home/robot/robot control/syringe control code/calibration.json"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CALIBRATION_PATH = str(REPO_ROOT / "functions" / "syringe control code" / "calibration.json")
+LEGACY_CALIBRATION_PATH = "/home/robot/robot control/syringe control code/calibration.json"
 AUTO_COMMAND_FORMATS: tuple[str, ...] = (
     "json",
     "dispense_csv",
@@ -37,7 +39,17 @@ class SyringeControllerError(RuntimeError):
 class SyringeControllerService:
     def _calibration_path(self, requested_path: str | None = None) -> Path:
         if requested_path:
-            return Path(requested_path)
+            requested = Path(requested_path)
+            if requested.exists():
+                return requested
+
+            if str(requested) == LEGACY_CALIBRATION_PATH and Path(DEFAULT_CALIBRATION_PATH).exists():
+                return Path(DEFAULT_CALIBRATION_PATH)
+
+            if requested.name == "calibration.json" and Path(DEFAULT_CALIBRATION_PATH).exists():
+                return Path(DEFAULT_CALIBRATION_PATH)
+
+            return requested
 
         return Path(os.getenv("SYRINGE_CALIBRATION_FILE", DEFAULT_CALIBRATION_PATH))
 

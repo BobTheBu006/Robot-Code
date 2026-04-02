@@ -12,6 +12,7 @@ from app.models.function_manifest import (
     FunctionManifest,
     FunctionTestResponse,
 )
+from app.services.esp32_builder import esp32_builder_service
 
 
 class FunctionDiscoveryService:
@@ -19,6 +20,8 @@ class FunctionDiscoveryService:
         self._functions_dir = functions_dir
 
     def discover(self) -> FunctionDiscoveryResponse:
+        esp32_builder_service.sync_generated_functions()
+
         discovered_functions: list[DiscoveredFunctionDefinition] = []
         errors: list[FunctionDiscoveryError] = []
 

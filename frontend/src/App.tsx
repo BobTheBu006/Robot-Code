@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { CameraFeedCard } from "./components/CameraFeedCard";
+import { Esp32FunctionBuilderCard } from "./components/Esp32FunctionBuilderCard";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { StatusBadge } from "./components/StatusBadge";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
@@ -138,6 +139,8 @@ function App() {
         </div>
 
         <WorkflowEditorCard />
+
+        <Esp32FunctionBuilderCard />
       </div>
     </main>
   );

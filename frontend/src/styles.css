@@ -33,7 +33,7 @@ body {
 }
 
 .app-shell__inner {
-  width: min(98vw, 1840px);
+  width: min(88vw, 1660px);
   margin: 0 auto;
 }
 
@@ -263,6 +263,219 @@ body {
   gap: 18px;
 }
 
+.function-builder__header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.function-builder {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.function-builder__sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.function-builder__sidebar-section,
+.function-builder__editor-card,
+.function-builder__schema-card,
+.function-builder__warnings {
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(248, 250, 249, 0.92);
+}
+
+.function-builder__section-header,
+.function-builder__editor-header,
+.function-builder__schema-header,
+.function-builder__all-block-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.function-builder__section-header strong,
+.function-builder__editor-header strong,
+.function-builder__schema-header strong {
+  display: block;
+}
+
+.function-builder__section-header span,
+.function-builder__editor-header span,
+.function-builder__editor-header small,
+.function-builder__meta-card small,
+.function-builder__schema-header p,
+.function-builder__schema-footer span {
+  color: #55766b;
+}
+
+.function-builder__section-header span {
+  font-size: 0.88rem;
+}
+
+.function-builder__board-list,
+.function-builder__file-list,
+.function-builder__schema-list,
+.function-builder__warnings ul {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.function-builder__board,
+.function-builder__file {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 50, 42, 0.09);
+  border-radius: 14px;
+  background: #ffffff;
+  color: #17322a;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.function-builder__board div,
+.function-builder__file {
+  min-width: 0;
+}
+
+.function-builder__board strong,
+.function-builder__file strong {
+  display: block;
+}
+
+.function-builder__board span,
+.function-builder__file span {
+  display: block;
+  color: #55766b;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.function-builder__board--active,
+.function-builder__file--active {
+  border-color: rgba(14, 116, 144, 0.28);
+  box-shadow: 0 10px 26px rgba(14, 116, 144, 0.12);
+}
+
+.function-builder__main {
+  display: grid;
+  gap: 16px;
+}
+
+.function-builder__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.function-builder__meta-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f4f8f6;
+}
+
+.function-builder__meta-card span {
+  color: #55766b;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.function-builder__editor-header {
+  margin-bottom: 12px;
+}
+
+.function-builder__editor-status {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.function-builder__editor {
+  width: 100%;
+  min-height: 520px;
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 16px;
+  background: #10151a;
+  color: #dce8df;
+  font: 0.92rem/1.5 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  resize: vertical;
+}
+
+.function-builder__schema-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.function-builder__schema-header p {
+  margin: 6px 0 0;
+}
+
+.function-builder__schema-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.function-builder__schema-columns h3 {
+  margin: 0 0 12px;
+  font-size: 0.98rem;
+}
+
+.function-builder__schema-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.function-builder__schema-list span {
+  color: #4a6b61;
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.function-builder__schema-list p {
+  margin: 0;
+  color: #55766b;
+  font-size: 0.9rem;
+}
+
+.function-builder__schema-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 0.9rem;
+}
+
+.function-builder__warnings ul {
+  margin-top: 10px;
+  padding-left: 18px;
+}
+
 .workflow-editor__toolbar {
   display: flex;
   justify-content: space-between;
@@ -428,8 +641,8 @@ body {
 }
 
 .workflow-editor__canvas {
-  height: 900px;
-  min-height: 900px;
+  height: 810px;
+  min-height: 810px;
   border: 1px solid rgba(23, 50, 42, 0.1);
   border-radius: 24px;
   overflow: hidden;
@@ -440,7 +653,7 @@ body {
 
 .workflow-editor__canvas-shell {
   position: relative;
-  min-height: 900px;
+  min-height: 810px;
 }
 
 .workflow-editor__canvas .react-flow__controls,
@@ -1127,9 +1340,18 @@ body {
     flex-direction: column;
   }
 
+  .function-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .function-builder__meta,
+  .function-builder__schema-columns {
+    grid-template-columns: 1fr;
+  }
+
   .workflow-editor__canvas {
-    height: 700px;
-    min-height: 700px;
+    height: 630px;
+    min-height: 630px;
   }
 
   .workflow-overlay {

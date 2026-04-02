@@ -1,5 +1,10 @@
 ﻿import type { CameraStatus, HealthResponse, RobotState, RobotStateUpdate } from "../types/robot";
 import type {
+  Esp32BoardDetail,
+  Esp32BoardListResponse,
+  Esp32FileSaveResponse,
+} from "../types/esp32Builder";
+import type {
   FunctionDiscoveryResponse,
   FunctionTestResponse,
   SavedWorkflowFile,
@@ -24,7 +29,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const error = new Error(`Request failed: ${response.status}`) as Error & { status?: number };
+    let message = `Request failed: ${response.status}`;
+    try {
+      const responseText = await response.text();
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText) as { detail?: string };
+          message = parsed.detail ?? responseText;
+        } catch {
+          message = responseText;
+        }
+      }
+    } catch {
+      // fall back to status-only message
+    }
+
+    const error = new Error(message) as Error & { status?: number };
     error.status = response.status;
     throw error;
   }
@@ -49,6 +69,28 @@ export function setCameraPower(enabled: boolean): Promise<CameraStatus> {
 
 export function fetchFunctions(): Promise<FunctionDiscoveryResponse> {
   return request<FunctionDiscoveryResponse>("/api/functions");
+}
+
+export function fetchEsp32Boards(): Promise<Esp32BoardListResponse> {
+  return request<Esp32BoardListResponse>("/api/esp32-builder/boards");
+}
+
+export function fetchEsp32Board(boardId: string): Promise<Esp32BoardDetail> {
+  return request<Esp32BoardDetail>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}`);
+}
+
+export function saveEsp32BoardFile(
+  boardId: string,
+  relativePath: string,
+  content: string,
+): Promise<Esp32FileSaveResponse> {
+  return request<Esp32FileSaveResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/files`, {
+    method: "PUT",
+    body: JSON.stringify({
+      relative_path: relativePath,
+      content,
+    }),
+  });
 }
 
 export function fetchSavedWorkflow(): Promise<SavedWorkflowFile> {
