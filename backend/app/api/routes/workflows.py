@@ -33,6 +33,13 @@ def load_default_workflow() -> WorkflowFileResponse:
 @router.put("/default", response_model=WorkflowSaveResponse)
 def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
     try:
+        if request.filename or request.path:
+            return workflow_storage_service.save_workflow(
+                filename=request.filename or workflow_storage_service._default_filename(),
+                workflow=request.workflow,
+                directory=request.path,
+            )
+
         return workflow_storage_service.save_default_workflow(request.workflow)
     except WorkflowStorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

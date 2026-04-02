@@ -20,6 +20,7 @@ import {
 
 import {
   deleteEsp32CustomBlock,
+  fetchEsp32Boards,
   fetchFunctions,
   fetchSavedWorkflow,
   saveEsp32CustomBlock,
@@ -57,6 +58,7 @@ import type {
   WorkflowParameterValue,
 } from "../../types/workflow";
 import type { Esp32CustomBlockSaveResponse } from "../../types/esp32Builder";
+import type { Esp32BoardSummary } from "../../types/esp32Builder";
 import { Panel } from "../Panel";
 import { StatusBadge } from "../StatusBadge";
 import { WorkflowEdge } from "./WorkflowEdge";
@@ -112,6 +114,7 @@ function WorkflowEditorSurface() {
   const [nodes, setNodes, onNodesChange] = useNodesState<WorkflowFlowNode>(starterWorkflow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(starterWorkflow.edges);
   const [discoveredFunctions, setDiscoveredFunctions] = useState<DiscoveredFunctionDefinition[]>([]);
+  const [esp32Boards, setEsp32Boards] = useState<Esp32BoardSummary[]>([]);
   const [discoveryErrors, setDiscoveryErrors] = useState<FunctionDiscoveryError[]>([]);
   const [functionsStatus, setFunctionsStatus] = useState<"loading" | "success" | "error">("loading");
   const [functionsError, setFunctionsError] = useState<string | null>(null);
@@ -121,6 +124,9 @@ function WorkflowEditorSurface() {
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
   const [workflowJson, setWorkflowJson] = useState(() => serializeWorkflow(starterWorkflow.nodes, starterWorkflow.edges));
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsPath, setSaveAsPath] = useState("");
+  const [saveAsName, setSaveAsName] = useState("active-workflow");
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
     orderedNodeIds: [],
@@ -217,9 +223,27 @@ function WorkflowEditorSurface() {
     }
   }
 
+  async function loadBoards(cancellationToken?: { cancelled: boolean }) {
+    try {
+      const response = await fetchEsp32Boards();
+      if (cancellationToken?.cancelled) {
+        return;
+      }
+
+      setEsp32Boards(response.boards);
+    } catch (error) {
+      if (cancellationToken?.cancelled) {
+        return;
+      }
+
+      setFunctionsError(error instanceof Error ? error.message : "Could not load connected ESP32 boards.");
+    }
+  }
+
   useEffect(() => {
     const cancellationToken = { cancelled: false };
     void loadFunctions(cancellationToken);
+    void loadBoards(cancellationToken);
 
     return () => {
       cancellationToken.cancelled = true;
@@ -266,7 +290,9 @@ function WorkflowEditorSurface() {
     };
   }, [setEdges, setNodes]);
 
-  const robotActionBlocks = discoveredFunctions.map(mapDiscoveredFunctionToBlock);
+  const robotActionBlocks = discoveredFunctions.map((discoveredFunction) =>
+    mapDiscoveredFunctionToBlock(discoveredFunction, esp32Boards),
+  );
   const availableBlocks = [...builtInBlocks, ...robotActionBlocks];
   const openedNode = nodes.find((node) => node.id === openedNodeId) ?? null;
   const openedNodeTestState = openedNodeId
@@ -442,7 +468,10 @@ function WorkflowEditorSurface() {
       const saveResult = await saveWorkflowToFile(
         nodes as WorkflowCanvasNode[],
         edges as WorkflowCanvasEdge[],
+        saveAsPath,
+        saveAsName,
       );
+      setSaveAsOpen(false);
       setFunctionsError(`Saved workflow to ${saveResult.path}`);
     } catch (error) {
       setFunctionsError(error instanceof Error ? error.message : "Could not save workflow file.");
@@ -724,7 +753,7 @@ function WorkflowEditorSurface() {
       `${trimmedDisplayName} reusable preset.`,
       node.data.parameters,
     );
-    await loadFunctions();
+    await Promise.all([loadFunctions(), loadBoards()]);
     return response;
   }
 
@@ -736,7 +765,7 @@ function WorkflowEditorSurface() {
 
     try {
       const response = await deleteEsp32CustomBlock(block.builderBoardId, block.id);
-      await loadFunctions();
+      await Promise.all([loadFunctions(), loadBoards()]);
       setFunctionsError(`Deleted custom block ${response.display_name}`);
     } catch (error) {
       setFunctionsError(error instanceof Error ? error.message : "Could not delete custom block.");
@@ -877,13 +906,50 @@ function WorkflowEditorSurface() {
             >
               {workflowRunState.isRunning ? "Running flow..." : "Run all"}
             </button>
-            <button className="workflow-editor__action" onClick={() => void handleSaveWorkflow()} type="button">Save locally</button>
+            <button
+              className="workflow-editor__action"
+              onClick={() => setSaveAsOpen((currentValue) => !currentValue)}
+              type="button"
+            >
+              Save as
+            </button>
             <button className="workflow-editor__action" onClick={() => void handleLoadSavedWorkflow()} type="button">Load saved</button>
             <button className="workflow-editor__action" onClick={handleRefreshJson} type="button">Refresh JSON</button>
             <button className="workflow-editor__action" onClick={handleLoadJson} type="button">Load JSON</button>
             <button className="workflow-editor__action" onClick={handleResetWorkflow} type="button">Reset canvas</button>
           </div>
         </div>
+
+        {saveAsOpen ? (
+          <div className="workflow-editor__save-as">
+            <label className="workflow-editor__save-field">
+              <span>Path</span>
+              <input
+                onChange={(event) => setSaveAsPath(event.target.value)}
+                placeholder="optional/subfolder"
+                type="text"
+                value={saveAsPath}
+              />
+            </label>
+            <label className="workflow-editor__save-field">
+              <span>Name</span>
+              <input
+                onChange={(event) => setSaveAsName(event.target.value)}
+                placeholder="workflow-name"
+                type="text"
+                value={saveAsName}
+              />
+            </label>
+            <div className="workflow-editor__save-actions">
+              <button className="workflow-editor__action" onClick={() => void handleSaveWorkflow()} type="button">
+                Save
+              </button>
+              <button className="workflow-editor__action" onClick={() => setSaveAsOpen(false)} type="button">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="workflow-editor__surface">
           <div

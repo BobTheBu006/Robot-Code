@@ -13,6 +13,7 @@ from app.models.workflows import (
 
 DEFAULT_WORKFLOW_FILENAME = "active-workflow.json"
 FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+DIRECTORY_SEGMENT_PATTERN = re.compile(r"^[A-Za-z0-9._ -]+$")
 
 
 class WorkflowStorageError(RuntimeError):
@@ -50,15 +51,44 @@ class WorkflowStorageService:
         self._workflows_dir.mkdir(parents=True, exist_ok=True)
         return self._workflows_dir
 
-    def _workflow_path(self, filename: str) -> Path:
+    def _normalize_directory(self, directory: str | None) -> str:
+        if directory is None:
+            return ""
+
+        candidate = directory.strip().replace("\\", "/").strip("/")
+        if not candidate:
+            return ""
+
+        segments = [segment.strip() for segment in candidate.split("/") if segment.strip()]
+        if not segments:
+            return ""
+
+        for segment in segments:
+            if segment in {".", ".."} or not DIRECTORY_SEGMENT_PATTERN.fullmatch(segment):
+                raise WorkflowStorageError(
+                    "Workflow path may only contain folder names with letters, numbers, spaces, dots, dashes, and underscores."
+                )
+
+        return "/".join(segments)
+
+    def _workflow_path(self, filename: str, directory: str | None = None) -> Path:
         normalized_filename = self._normalize_filename(filename)
-        return self._ensure_workflows_dir() / normalized_filename
+        normalized_directory = self._normalize_directory(directory)
+        base_dir = self._ensure_workflows_dir()
+        target_dir = base_dir / normalized_directory if normalized_directory else base_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        workflow_path = (target_dir / normalized_filename).resolve()
+
+        if base_dir.resolve() not in workflow_path.parents:
+            raise WorkflowStorageError("Workflow path must stay inside the workflows folder.")
+
+        return workflow_path
 
     def list_workflows(self) -> WorkflowListResponse:
         workflows_dir = self._ensure_workflows_dir()
         summaries: list[WorkflowFileSummary] = []
 
-        for path in sorted(workflows_dir.glob("*.json")):
+        for path in sorted(workflows_dir.rglob("*.json")):
             stat = path.stat()
             summaries.append(
                 WorkflowFileSummary(
@@ -102,10 +132,15 @@ class WorkflowStorageService:
         )
 
     def save_default_workflow(self, workflow: dict[str, object]) -> WorkflowSaveResponse:
-        return self.save_workflow(self._default_filename(), workflow)
+        return self.save_workflow(self._default_filename(), workflow, directory=None)
 
-    def save_workflow(self, filename: str, workflow: dict[str, object]) -> WorkflowSaveResponse:
-        workflow_path = self._workflow_path(filename)
+    def save_workflow(
+        self,
+        filename: str,
+        workflow: dict[str, object],
+        directory: str | None = None,
+    ) -> WorkflowSaveResponse:
+        workflow_path = self._workflow_path(filename, directory)
 
         try:
             payload = json.dumps(workflow, indent=2)

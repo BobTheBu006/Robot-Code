@@ -23,6 +23,8 @@ class WorkflowFileResponse(BaseModel):
 
 class WorkflowSaveRequest(BaseModel):
     workflow: dict[str, object]
+    path: str | None = None
+    filename: str | None = None
 
 
 class WorkflowSaveResponse(BaseModel):

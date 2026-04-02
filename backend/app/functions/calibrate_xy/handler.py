@@ -1,14 +1,13 @@
 def execute(context: dict, inputs: dict) -> dict:
     return {
-        "accepted": False,
+        "calibrated": False,
         "status": "not_implemented",
-        "message": "XY gantry execution is not implemented yet. This block currently defines the contract and configuration shape.",
+        "message": "XY calibration is not implemented yet. This block currently defines the calibration contract.",
         "tool_port": inputs.get("tool_port"),
-        "target": {
-            "x_cm": inputs.get("x_cm"),
-            "y_cm": inputs.get("y_cm"),
+        "workspace": {
+            "x_track_length_cm": inputs.get("x_track_length_cm"),
+            "y_track_length_cm": inputs.get("y_track_length_cm"),
         },
-        "speed_profile": inputs.get("speed_profile"),
         "advanced": {
             "x_step_pin": inputs.get("x_step_pin"),
             "x_dir_pin": inputs.get("x_dir_pin"),

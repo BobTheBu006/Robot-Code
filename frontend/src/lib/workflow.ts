@@ -11,6 +11,7 @@ import type {
   WorkflowOutputDefinition,
   WorkflowParameterValue,
 } from "../types/workflow";
+import type { Esp32BoardSummary } from "../types/esp32Builder";
 
 export const WORKFLOW_STORAGE_KEY = "robot-control.workflow-editor";
 export const WORKFLOW_BLOCK_MIME = "application/x-robot-workflow-block";
@@ -337,7 +338,32 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
 
 export function mapDiscoveredFunctionToBlock(
   discoveredFunction: DiscoveredFunctionDefinition,
+  esp32Boards: Esp32BoardSummary[] = [],
 ): WorkflowBlockDefinition {
+  const toolPortOptions = esp32Boards
+    .filter((board) => Boolean(board.port))
+    .map((board) => ({
+      label: `${board.display_name}${board.port ? ` (${board.port})` : ""}`,
+      value: board.port as string,
+    }));
+
+  const mapInput = (input: WorkflowInputDefinition): WorkflowInputDefinition => {
+    if (input.key !== "tool_port" || toolPortOptions.length === 0) {
+      return input;
+    }
+
+    const defaultValue = String(input.default ?? toolPortOptions[0]?.value ?? "");
+    return {
+      ...input,
+      label: "Selected ESP32",
+      type: "select",
+      options: toolPortOptions,
+      default: toolPortOptions.some((option) => option.value === defaultValue)
+        ? defaultValue
+        : toolPortOptions[0]?.value ?? defaultValue,
+    };
+  };
+
   return {
     id: discoveredFunction.manifest.id,
     displayName: discoveredFunction.manifest.display_name,
@@ -347,8 +373,8 @@ export function mapDiscoveredFunctionToBlock(
     kind: "robot-action",
     acceptsInput: true,
     accent: "#0e7490",
-    inputs: discoveredFunction.manifest.inputs,
-    advancedInputs: discoveredFunction.manifest.advanced_inputs ?? [],
+    inputs: discoveredFunction.manifest.inputs.map(mapInput),
+    advancedInputs: (discoveredFunction.manifest.advanced_inputs ?? []).map(mapInput),
     outputs:
       discoveredFunction.manifest.outputs.length > 0
         ? discoveredFunction.manifest.outputs.map((output) => ({

@@ -1,45 +1,44 @@
 {
-  "id": "move_gantry",
-  "display_name": "Move Gantry XY",
+  "id": "calibrate_xy",
+  "display_name": "Calibrate Gantry XY",
   "category": "Robot Actions",
-  "description": "High-level XY gantry move action for the ESP32 gantry controller.",
-  "version": "0.2.0",
+  "description": "Home the XY gantry against its limit switches and register the track lengths in centimeters.",
+  "version": "0.1.0",
   "inputs": [
     {
       "key": "tool_port",
       "label": "Selected ESP32",
       "type": "file/path",
-      "description": "Connected ESP32 board that should receive the XY gantry command.",
+      "description": "Connected ESP32 board that should run the XY calibration routine.",
       "required": true,
       "default": "/dev/ttyUSB0"
     },
     {
-      "key": "x_cm",
-      "label": "X Position (cm)",
+      "key": "x_track_length_cm",
+      "label": "X Track Length (cm)",
       "type": "number",
-      "description": "Target X position measured from the calibrated origin.",
+      "description": "Physical usable X travel from origin to max limit in centimeters.",
       "required": true,
-      "default": 0
+      "default": 100
     },
     {
-      "key": "y_cm",
-      "label": "Y Position (cm)",
+      "key": "y_track_length_cm",
+      "label": "Y Track Length (cm)",
       "type": "number",
-      "description": "Target Y position measured from the calibrated origin.",
+      "description": "Physical usable Y travel from origin to max limit in centimeters.",
       "required": true,
-      "default": 0
+      "default": 100
     },
     {
-      "key": "speed_profile",
-      "label": "Speed Profile",
+      "key": "calibration_speed_profile",
+      "label": "Calibration Speed",
       "type": "select",
-      "description": "Named speed preset for the future XY motion controller.",
+      "description": "Speed preset used while probing the XY limits.",
       "required": true,
-      "default": "normal",
+      "default": "safe",
       "options": [
-        { "label": "Slow", "value": "slow" },
-        { "label": "Normal", "value": "normal" },
-        { "label": "Fast", "value": "fast" }
+        { "label": "Safe", "value": "safe" },
+        { "label": "Normal", "value": "normal" }
       ]
     }
   ],
@@ -132,16 +131,16 @@
   ],
   "outputs": [
     {
-      "key": "accepted",
-      "label": "Accepted",
+      "key": "calibrated",
+      "label": "Calibrated",
       "type": "boolean",
-      "description": "Whether the future gantry runner accepted the XY move."
+      "description": "Whether the XY calibration routine completed."
     },
     {
-      "key": "target",
-      "label": "Target",
+      "key": "workspace",
+      "label": "Workspace",
       "type": "object",
-      "description": "Echo of the requested XY target in centimeters."
+      "description": "Registered XY workspace dimensions in centimeters."
     }
   ]
 }

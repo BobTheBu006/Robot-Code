@@ -145,10 +145,14 @@ export function fetchSavedWorkflow(): Promise<SavedWorkflowFile> {
 export function saveWorkflowToFile(
   nodes: WorkflowCanvasNode[],
   edges: WorkflowCanvasEdge[],
+  path?: string,
+  filename?: string,
 ): Promise<WorkflowSaveResponse> {
   return request<WorkflowSaveResponse>("/api/workflows/default", {
     method: "PUT",
     body: JSON.stringify({
+      path: path ?? null,
+      filename: filename ?? null,
       workflow: {
         version: 1,
         nodes,

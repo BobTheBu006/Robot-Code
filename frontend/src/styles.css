@@ -591,6 +591,38 @@ body {
   align-items: stretch;
 }
 
+.workflow-editor__save-as {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 14px 18px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.workflow-editor__save-field {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.workflow-editor__save-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #47675c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.workflow-editor__save-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .workflow-palette {
   display: grid;
   gap: 16px;

@@ -44,67 +44,11 @@
       }
     },
     {
-      "id": "delay-seed-delay",
-      "type": "workflowBlock",
-      "position": {
-        "x": 350,
-        "y": 120
-      },
-      "data": {
-        "block": {
-          "id": "delay",
-          "displayName": "Delay / Wait",
-          "category": "Logic",
-          "description": "Pause execution for a number of milliseconds.",
-          "version": "1.0.0",
-          "kind": "built-in",
-          "acceptsInput": true,
-          "accent": "#48711f",
-          "inputs": [
-            {
-              "key": "duration_ms",
-              "label": "Duration (ms)",
-              "type": "number",
-              "description": "How long to wait before continuing.",
-              "required": true,
-              "default": 1000,
-              "placeholder": null,
-              "options": []
-            }
-          ],
-          "outputs": [
-            {
-              "key": "next",
-              "label": "Next",
-              "type": "flow",
-              "description": "Continue when the wait period completes."
-            }
-          ]
-        },
-        "parameters": {
-          "duration_ms": 3000
-        },
-        "settings": {
-          "failureMode": "stop_flow",
-          "retryCount": 0
-        },
-        "isActive": true,
-        "runCount": 8,
-        "benchmarkDurationMs": 2257,
-        "lastDurationMs": 3000
-      },
-      "measured": {
-        "width": 196,
-        "height": 148
-      },
-      "selected": false
-    },
-    {
       "id": "dispense-zk5jm",
       "type": "workflowBlock",
       "position": {
-        "x": 623.4821793380769,
-        "y": 143.93880012327133
+        "x": 998.9183842912006,
+        "y": 94.56665759902455
       },
       "data": {
         "block": {
@@ -119,14 +63,23 @@
           "inputs": [
             {
               "key": "tool_port",
-              "label": "ESP32 Port",
-              "type": "file/path",
+              "label": "Selected ESP32",
+              "type": "select",
               "description": "Serial device path for the connected ESP32 syringe board.",
               "required": false,
               "default": "/dev/ttyUSB0",
               "placeholder": "/dev/ttyUSB0",
               "advanced": false,
-              "options": []
+              "options": [
+                {
+                  "label": "ESP32 ttyUSB0 (/dev/ttyUSB0)",
+                  "value": "/dev/ttyUSB0"
+                },
+                {
+                  "label": "ESP32 ttyUSB1 (/dev/ttyUSB1)",
+                  "value": "/dev/ttyUSB1"
+                }
+              ]
             },
             {
               "key": "calibration_file",
@@ -467,25 +420,260 @@
         "width": 196,
         "height": 185
       },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "calibrate_xy-rymf4",
+      "type": "workflowBlock",
+      "position": {
+        "x": 389.60617680030725,
+        "y": 129.04162740504384
+      },
+      "data": {
+        "block": {
+          "id": "calibrate_xy",
+          "displayName": "Calibrate Gantry XY",
+          "category": "Robot Actions",
+          "description": "Home the XY gantry against its limit switches and register the track lengths in centimeters.",
+          "version": "0.1.0",
+          "kind": "robot-action",
+          "acceptsInput": true,
+          "accent": "#0e7490",
+          "inputs": [
+            {
+              "key": "tool_port",
+              "label": "Selected ESP32",
+              "type": "select",
+              "description": "Connected ESP32 board that should run the XY calibration routine.",
+              "required": true,
+              "default": "/dev/ttyUSB0",
+              "placeholder": null,
+              "advanced": false,
+              "options": [
+                {
+                  "label": "ESP32 ttyUSB0 (/dev/ttyUSB0)",
+                  "value": "/dev/ttyUSB0"
+                },
+                {
+                  "label": "ESP32 ttyUSB1 (/dev/ttyUSB1)",
+                  "value": "/dev/ttyUSB1"
+                }
+              ]
+            },
+            {
+              "key": "x_track_length_cm",
+              "label": "X Track Length (cm)",
+              "type": "number",
+              "description": "Physical usable X travel from origin to max limit in centimeters.",
+              "required": true,
+              "default": 100,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "y_track_length_cm",
+              "label": "Y Track Length (cm)",
+              "type": "number",
+              "description": "Physical usable Y travel from origin to max limit in centimeters.",
+              "required": true,
+              "default": 100,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "calibration_speed_profile",
+              "label": "Calibration Speed",
+              "type": "select",
+              "description": "Speed preset used while probing the XY limits.",
+              "required": true,
+              "default": "safe",
+              "placeholder": null,
+              "advanced": false,
+              "options": [
+                {
+                  "label": "Safe",
+                  "value": "safe"
+                },
+                {
+                  "label": "Normal",
+                  "value": "normal"
+                }
+              ]
+            }
+          ],
+          "advancedInputs": [
+            {
+              "key": "x_step_pin",
+              "label": "X Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO step pin for the X axis driver.",
+              "required": false,
+              "default": 16,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "x_dir_pin",
+              "label": "X Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO direction pin for the X axis driver.",
+              "required": false,
+              "default": 17,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_step_pin",
+              "label": "Y Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO step pin for the Y axis driver.",
+              "required": false,
+              "default": 18,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_dir_pin",
+              "label": "Y Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO direction pin for the Y axis driver.",
+              "required": false,
+              "default": 19,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "limit_switch_mode",
+              "label": "Limit Switch Layout",
+              "type": "select",
+              "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
+              "required": false,
+              "default": "4",
+              "placeholder": null,
+              "advanced": true,
+              "options": [
+                {
+                  "label": "2 Limit Switches",
+                  "value": "2"
+                },
+                {
+                  "label": "4 Limit Switches",
+                  "value": "4"
+                }
+              ]
+            },
+            {
+              "key": "x_min_limit_pin",
+              "label": "X Min Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the X minimum/home limit switch.",
+              "required": false,
+              "default": 21,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "x_max_limit_pin",
+              "label": "X Max Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the X maximum limit switch.",
+              "required": false,
+              "default": 22,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_min_limit_pin",
+              "label": "Y Min Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the Y minimum/home limit switch.",
+              "required": false,
+              "default": 23,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_max_limit_pin",
+              "label": "Y Max Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the Y maximum limit switch.",
+              "required": false,
+              "default": 25,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            }
+          ],
+          "outputs": [
+            {
+              "key": "calibrated",
+              "label": "Calibrated",
+              "type": "boolean",
+              "description": "Whether the XY calibration routine completed."
+            },
+            {
+              "key": "workspace",
+              "label": "Workspace",
+              "type": "object",
+              "description": "Registered XY workspace dimensions in centimeters."
+            }
+          ],
+          "builderBoardId": null,
+          "builderSourcePath": null,
+          "builderWorkspacePath": null,
+          "builderFirmwareEntryFile": null,
+          "builderBaseFunctionId": null
+        },
+        "parameters": {
+          "tool_port": "/dev/ttyUSB1",
+          "x_track_length_cm": 100,
+          "y_track_length_cm": 100,
+          "calibration_speed_profile": "safe",
+          "x_step_pin": 16,
+          "x_dir_pin": 17,
+          "y_step_pin": 18,
+          "y_dir_pin": 19,
+          "limit_switch_mode": "4",
+          "x_min_limit_pin": 21,
+          "x_max_limit_pin": 22,
+          "y_min_limit_pin": 23,
+          "y_max_limit_pin": 25
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 2,
+        "benchmarkDurationMs": 90,
+        "lastDurationMs": 50
+      },
+      "measured": {
+        "width": 196,
+        "height": 185
+      },
       "selected": true,
       "dragging": false
     }
   ],
   "edges": [
     {
-      "id": "edge-start-delay",
       "source": "start-seed-start",
-      "target": "delay-seed-delay",
       "sourceHandle": "next",
-      "type": "workflowEdge"
-    },
-    {
-      "source": "delay-seed-delay",
-      "sourceHandle": "next",
-      "target": "dispense-zk5jm",
+      "target": "calibrate_xy-rymf4",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__delay-seed-delaynext-dispense-zk5jminput"
+      "id": "xy-edge__start-seed-startnext-calibrate_xy-rymf4input"
     }
   ]
 }

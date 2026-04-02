@@ -4,16 +4,16 @@
     "display_name": "7 Syringe Dispenser",
     "category": "Robot Actions",
     "description": "Drive the 7-head syringe ESP32 with calibration-aware dispense amounts.",
-    "version": "0.4.0",
+    "version": "0.3.0",
     "inputs": [
       {
         "key": "tool_port",
-        "label": "Selected ESP32",
+        "label": "ESP32 Port",
         "type": "file/path",
         "description": "Serial device path for the connected ESP32 syringe board.",
         "required": false,
-        "default": "/dev/ttyUSB0",
-        "placeholder": "/dev/ttyUSB0"
+        "default": "/dev/ttyUSB1",
+        "placeholder": "/dev/ttyUSB1"
       },
       {
         "key": "calibration_file",
@@ -28,7 +28,7 @@
         "key": "speed",
         "label": "Dispense Speed",
         "type": "number",
-        "description": "Shared fallback speed used when dedicated expelling and intake speeds are not set.",
+        "description": "Shared fallback speed used when dedicated intake and outtake speeds are not set.",
         "required": false,
         "default": 100
       },
@@ -92,18 +92,18 @@
     "advanced_inputs": [
       {
         "key": "intake_speed",
-        "label": "Expelling Speed",
+        "label": "Intake Speed",
         "type": "number",
-        "description": "Overrides the shared dispense speed for the first part of the move where fluid is expelled.",
+        "description": "Overrides the shared dispense speed for the first part of the move.",
         "required": false,
         "default": 100,
         "advanced": true
       },
       {
         "key": "outtake_speed",
-        "label": "Intake Speed",
+        "label": "Outtake Speed",
         "type": "number",
-        "description": "Overrides the shared dispense speed for the return move where fluid is taken back in.",
+        "description": "Overrides the shared dispense speed for the return move in the opposite direction.",
         "required": false,
         "default": 100,
         "advanced": true
@@ -112,7 +112,7 @@
         "key": "head_a_step_pin",
         "label": "Head A Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head A.",
+        "description": "GPIO step pin for syringe head A when saving a reusable hardware preset.",
         "required": false,
         "default": 33,
         "advanced": true
@@ -121,7 +121,7 @@
         "key": "head_a_dir_pin",
         "label": "Head A Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head A.",
+        "description": "GPIO direction pin for syringe head A when saving a reusable hardware preset.",
         "required": false,
         "default": 32,
         "advanced": true
@@ -130,7 +130,7 @@
         "key": "head_b_step_pin",
         "label": "Head B Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head B.",
+        "description": "GPIO step pin for syringe head B when saving a reusable hardware preset.",
         "required": false,
         "default": 25,
         "advanced": true
@@ -139,7 +139,7 @@
         "key": "head_b_dir_pin",
         "label": "Head B Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head B.",
+        "description": "GPIO direction pin for syringe head B when saving a reusable hardware preset.",
         "required": false,
         "default": 4,
         "advanced": true
@@ -148,7 +148,7 @@
         "key": "head_c_step_pin",
         "label": "Head C Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head C.",
+        "description": "GPIO step pin for syringe head C when saving a reusable hardware preset.",
         "required": false,
         "default": 26,
         "advanced": true
@@ -157,7 +157,7 @@
         "key": "head_c_dir_pin",
         "label": "Head C Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head C.",
+        "description": "GPIO direction pin for syringe head C when saving a reusable hardware preset.",
         "required": false,
         "default": 5,
         "advanced": true
@@ -166,7 +166,7 @@
         "key": "head_d_step_pin",
         "label": "Head D Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head D.",
+        "description": "GPIO step pin for syringe head D when saving a reusable hardware preset.",
         "required": false,
         "default": 27,
         "advanced": true
@@ -175,7 +175,7 @@
         "key": "head_d_dir_pin",
         "label": "Head D Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head D.",
+        "description": "GPIO direction pin for syringe head D when saving a reusable hardware preset.",
         "required": false,
         "default": 18,
         "advanced": true
@@ -184,7 +184,7 @@
         "key": "head_e_step_pin",
         "label": "Head E Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head E.",
+        "description": "GPIO step pin for syringe head E when saving a reusable hardware preset.",
         "required": false,
         "default": 14,
         "advanced": true
@@ -193,7 +193,7 @@
         "key": "head_e_dir_pin",
         "label": "Head E Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head E.",
+        "description": "GPIO direction pin for syringe head E when saving a reusable hardware preset.",
         "required": false,
         "default": 19,
         "advanced": true
@@ -202,7 +202,7 @@
         "key": "head_f_step_pin",
         "label": "Head F Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head F.",
+        "description": "GPIO step pin for syringe head F when saving a reusable hardware preset.",
         "required": false,
         "default": 12,
         "advanced": true
@@ -211,7 +211,7 @@
         "key": "head_f_dir_pin",
         "label": "Head F Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head F.",
+        "description": "GPIO direction pin for syringe head F when saving a reusable hardware preset.",
         "required": false,
         "default": 21,
         "advanced": true
@@ -220,7 +220,7 @@
         "key": "head_g_step_pin",
         "label": "Head G Step Pin",
         "type": "number",
-        "description": "GPIO step pin to use at runtime for syringe head G.",
+        "description": "GPIO step pin for syringe head G when saving a reusable hardware preset.",
         "required": false,
         "default": 13,
         "advanced": true
@@ -229,7 +229,7 @@
         "key": "head_g_dir_pin",
         "label": "Head G Dir Pin",
         "type": "number",
-        "description": "GPIO direction pin to use at runtime for syringe head G.",
+        "description": "GPIO direction pin for syringe head G when saving a reusable hardware preset.",
         "required": false,
         "default": 22,
         "advanced": true
