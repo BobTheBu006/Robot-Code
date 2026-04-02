@@ -47,6 +47,8 @@ The API will be available at `http://127.0.0.1:8000`.
 - `GET /api/camera/status`
 - `GET /api/camera/frame`
 - `GET /api/camera/stream`
+- `GET /api/functions`
+- `POST /api/functions/{function_id}/test`
 - `GET /api/tools/syringe/status`
 - `POST /api/tools/syringe/dispense`
 
@@ -94,6 +96,30 @@ curl -X POST http://127.0.0.1:8000/api/tools/syringe/dispense \
   -H "Content-Type: application/json" \
   -d '{"A":150,"B":25,"C":0,"D":100,"E":0,"F":10,"G":75}'
 ```
+
+## Function discovery
+
+Robot execution blocks are discovered from subfolders in `backend/app/functions/`.
+
+Each function folder must contain:
+
+- `manifest.json`
+- `handler.py`
+- `requirements.txt`
+
+Example structure:
+
+```text
+app/functions/
+  dispense/
+    manifest.json
+    handler.py
+    requirements.txt
+```
+
+The `GET /api/functions` endpoint scans those folders, validates their manifests, and returns the block metadata the workflow editor uses to build robot-action nodes.
+
+`POST /api/functions/{function_id}/test` loads the function folder's `handler.py` and calls `execute(context, inputs)` in test mode so the workflow editor can preview block behavior without introducing a full execution engine yet.
 
 ## Mock update example
 

@@ -1,0 +1,37 @@
+{
+  "id": "set_vacuum",
+  "display_name": "Set Vacuum",
+  "category": "Robot Actions",
+  "description": "High-level vacuum control action for future end-effector hardware integration.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "enabled",
+      "label": "Enabled",
+      "type": "boolean",
+      "description": "Turn the vacuum line on or off.",
+      "required": true,
+      "default": true
+    },
+    {
+      "key": "channel",
+      "label": "Channel",
+      "type": "select",
+      "description": "Vacuum channel to control.",
+      "required": true,
+      "default": "tool_1",
+      "options": [
+        { "label": "Tool 1", "value": "tool_1" },
+        { "label": "Tool 2", "value": "tool_2" }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "key": "status",
+      "label": "Status",
+      "type": "string",
+      "description": "Future confirmation returned by the hardware adapter."
+    }
+  ]
+}

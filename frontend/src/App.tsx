@@ -1,9 +1,9 @@
 ﻿import { useEffect, useState } from "react";
 import { CameraFeedCard } from "./components/CameraFeedCard";
-import { PlaceholderPanel } from "./components/PlaceholderPanel";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchCameraStatus, fetchHealth, fetchRobotState } from "./lib/api";
+import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
+import { fetchCameraStatus, fetchHealth, fetchRobotState, setCameraPower } from "./lib/api";
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
 
 type RequestStatus = "loading" | "success" | "error";
@@ -17,55 +17,59 @@ function App() {
   const [robotStateStatus, setRobotStateStatus] = useState<RequestStatus>("loading");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [cameraFeedError, setCameraFeedError] = useState<string | null>(null);
+  const [isCameraToggling, setIsCameraToggling] = useState(false);
   const [robotStateError, setRobotStateError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  async function loadDashboard() {
+    const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
+      fetchHealth(),
+      fetchCameraStatus(),
+      fetchRobotState(),
+    ]);
+
+    if (healthResult.status === "fulfilled") {
+      setHealth(healthResult.value);
+      setConnectionStatus("success");
+      setConnectionError(null);
+    } else {
+      setConnectionStatus("error");
+      setConnectionError(healthResult.reason instanceof Error ? healthResult.reason.message : "Could not reach backend health endpoint");
+    }
+
+    if (cameraResult.status === "fulfilled") {
+      setCameraStatus(cameraResult.value);
+      setCameraFeedStatus("success");
+      setCameraFeedError(cameraResult.value.error);
+    } else {
+      setCameraFeedStatus("error");
+      setCameraFeedError(cameraResult.reason instanceof Error ? cameraResult.reason.message : "Could not load camera status");
+    }
+
+    if (robotStateResult.status === "fulfilled") {
+      setRobotState(robotStateResult.value);
+      setRobotStateStatus("success");
+      setRobotStateError(null);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } else {
+      setRobotStateStatus("error");
+      setRobotStateError(robotStateResult.reason instanceof Error ? robotStateResult.reason.message : "Could not load robot state");
+    }
+  }
 
   useEffect(() => {
     let isMounted = true;
 
-    const loadDashboard = async () => {
-      const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
-        fetchHealth(),
-        fetchCameraStatus(),
-        fetchRobotState(),
-      ]);
-
+    const refreshDashboard = async () => {
+      await loadDashboard();
       if (!isMounted) {
         return;
       }
-
-      if (healthResult.status === "fulfilled") {
-        setHealth(healthResult.value);
-        setConnectionStatus("success");
-        setConnectionError(null);
-      } else {
-        setConnectionStatus("error");
-        setConnectionError(healthResult.reason instanceof Error ? healthResult.reason.message : "Could not reach backend health endpoint");
-      }
-
-      if (cameraResult.status === "fulfilled") {
-        setCameraStatus(cameraResult.value);
-        setCameraFeedStatus(cameraResult.value.available ? "success" : "error");
-        setCameraFeedError(cameraResult.value.error);
-      } else {
-        setCameraFeedStatus("error");
-        setCameraFeedError(cameraResult.reason instanceof Error ? cameraResult.reason.message : "Could not load camera status");
-      }
-
-      if (robotStateResult.status === "fulfilled") {
-        setRobotState(robotStateResult.value);
-        setRobotStateStatus("success");
-        setRobotStateError(null);
-        setLastUpdated(new Date().toLocaleTimeString());
-      } else {
-        setRobotStateStatus("error");
-        setRobotStateError(robotStateResult.reason instanceof Error ? robotStateResult.reason.message : "Could not load robot state");
-      }
     };
 
-    void loadDashboard();
+    void refreshDashboard();
     const intervalId = window.setInterval(() => {
-      void loadDashboard();
+      void refreshDashboard();
     }, 1000);
 
     return () => {
@@ -73,6 +77,23 @@ function App() {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  async function handleToggleCameraPower() {
+    const nextEnabled = !(cameraStatus?.enabled ?? false);
+    setIsCameraToggling(true);
+
+    try {
+      const nextStatus = await setCameraPower(nextEnabled);
+      setCameraStatus(nextStatus);
+      setCameraFeedStatus("success");
+      setCameraFeedError(nextStatus.error);
+    } catch (error) {
+      setCameraFeedStatus("error");
+      setCameraFeedError(error instanceof Error ? error.message : "Could not change camera power state");
+    } finally {
+      setIsCameraToggling(false);
+    }
+  }
 
   const isConnected = connectionStatus === "success";
 
@@ -99,7 +120,7 @@ function App() {
           </div>
         </header>
 
-        <div className="dashboard-grid">
+        <div className="overview-grid">
           <RobotStateCard
             robotState={robotState}
             status={robotStateStatus}
@@ -111,13 +132,12 @@ function App() {
             cameraStatus={cameraStatus}
             status={cameraFeedStatus}
             error={cameraFeedError}
-          />
-
-          <PlaceholderPanel
-            title="Workflow Editor"
-            description="Reserved for future workflow creation, scheduling, and job execution."
+            isToggling={isCameraToggling}
+            onTogglePower={handleToggleCameraPower}
           />
         </div>
+
+        <WorkflowEditorCard />
       </div>
     </main>
   );

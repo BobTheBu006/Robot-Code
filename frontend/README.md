@@ -59,5 +59,5 @@ Once the backend camera route is enabled, the dashboard camera panel will pull i
 - backend connection status
 - robot state polling every second
 - robot state card with loading, success, and error feedback
-- camera placeholder panel
-- workflow editor placeholder panel
+- camera status and feed placeholder/live stream support
+- first-pass workflow editor with block palette, canvas, JSON save/load, backend-discovered robot action nodes, per-block inspector editing, and block test actions

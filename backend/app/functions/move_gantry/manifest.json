@@ -1,0 +1,54 @@
+{
+  "id": "move_gantry",
+  "display_name": "Move Gantry",
+  "category": "Robot Actions",
+  "description": "High-level gantry move action that describes a destination point for a later motion controller.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "x",
+      "label": "X",
+      "type": "number",
+      "description": "Target X coordinate.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "y",
+      "label": "Y",
+      "type": "number",
+      "description": "Target Y coordinate.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "z",
+      "label": "Z",
+      "type": "number",
+      "description": "Target Z coordinate.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "speed_profile",
+      "label": "Speed Profile",
+      "type": "select",
+      "description": "Named profile for the future motion planner.",
+      "required": true,
+      "default": "normal",
+      "options": [
+        { "label": "Slow", "value": "slow" },
+        { "label": "Normal", "value": "normal" },
+        { "label": "Fast", "value": "fast" }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "key": "accepted",
+      "label": "Accepted",
+      "type": "boolean",
+      "description": "Whether the planner accepted the move request."
+    }
+  ]
+}

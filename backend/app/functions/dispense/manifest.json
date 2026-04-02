@@ -1,0 +1,105 @@
+{
+  "id": "dispense",
+  "display_name": "Dispense Syringe Batch",
+  "category": "Robot Actions",
+  "description": "High-level syringe dispense action for the 7-head dispense tool. This step exposes calibrated dispense inputs and leaves low-level board execution for a later stage.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "Tool Port",
+      "type": "file/path",
+      "description": "Serial device path for the ESP32-controlled syringe board.",
+      "required": false,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0"
+    },
+    {
+      "key": "calibration_file",
+      "label": "Calibration File",
+      "type": "file/path",
+      "description": "Calibration file used to convert dispense amounts into board-specific motor steps.",
+      "required": true,
+      "default": "/home/robot/robot control/syringe control code/calibration.json",
+      "placeholder": "/path/to/calibration.json"
+    },
+    {
+      "key": "speed",
+      "label": "Dispense Speed",
+      "type": "number",
+      "description": "Optional controller speed value. The backend will try to apply it before sending the dispense command.",
+      "required": false,
+      "default": 0
+    },
+    {
+      "key": "A",
+      "label": "Head A",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head A.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "B",
+      "label": "Head B",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head B.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "C",
+      "label": "Head C",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head C.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "D",
+      "label": "Head D",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head D.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "E",
+      "label": "Head E",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head E.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "F",
+      "label": "Head F",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head F.",
+      "required": true,
+      "default": 0
+    },
+    {
+      "key": "G",
+      "label": "Head G",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head G.",
+      "required": true,
+      "default": 0
+    }
+  ],
+  "outputs": [
+    {
+      "key": "status",
+      "label": "Status",
+      "type": "string",
+      "description": "High-level status for the dispense request."
+    },
+    {
+      "key": "reply",
+      "label": "Controller Reply",
+      "type": "string",
+      "description": "Placeholder response payload from the future runner."
+    }
+  ]
+}

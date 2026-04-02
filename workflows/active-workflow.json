@@ -1,0 +1,283 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "start-seed-start",
+      "type": "workflowBlock",
+      "position": {
+        "x": 80,
+        "y": 160
+      },
+      "data": {
+        "block": {
+          "id": "start",
+          "displayName": "Start",
+          "category": "Trigger",
+          "description": "Entry point for a workflow.",
+          "version": "1.0.0",
+          "kind": "built-in",
+          "acceptsInput": false,
+          "accent": "#1b7f5c",
+          "inputs": [],
+          "outputs": [
+            {
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue to the next block in the workflow."
+            }
+          ]
+        },
+        "parameters": {},
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 5,
+        "benchmarkDurationMs": 36,
+        "lastDurationMs": 36
+      },
+      "measured": {
+        "width": 196,
+        "height": 134
+      }
+    },
+    {
+      "id": "delay-seed-delay",
+      "type": "workflowBlock",
+      "position": {
+        "x": 350,
+        "y": 120
+      },
+      "data": {
+        "block": {
+          "id": "delay",
+          "displayName": "Delay / Wait",
+          "category": "Logic",
+          "description": "Pause execution for a number of milliseconds.",
+          "version": "1.0.0",
+          "kind": "built-in",
+          "acceptsInput": true,
+          "accent": "#48711f",
+          "inputs": [
+            {
+              "key": "duration_ms",
+              "label": "Duration (ms)",
+              "type": "number",
+              "description": "How long to wait before continuing.",
+              "required": true,
+              "default": 1000,
+              "placeholder": null,
+              "options": []
+            }
+          ],
+          "outputs": [
+            {
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue when the wait period completes."
+            }
+          ]
+        },
+        "parameters": {
+          "duration_ms": 3000
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 5,
+        "benchmarkDurationMs": 1808,
+        "lastDurationMs": 3003
+      },
+      "measured": {
+        "width": 196,
+        "height": 148
+      },
+      "selected": false
+    },
+    {
+      "id": "dispense-9d740",
+      "type": "workflowBlock",
+      "position": {
+        "x": 667.0545454545455,
+        "y": 61.724243164062486
+      },
+      "data": {
+        "block": {
+          "id": "dispense",
+          "displayName": "Dispense Syringe Batch",
+          "category": "Robot Actions",
+          "description": "High-level syringe dispense action for the 7-head dispense tool. This step exposes calibrated dispense inputs and leaves low-level board execution for a later stage.",
+          "version": "0.1.0",
+          "kind": "robot-action",
+          "acceptsInput": true,
+          "accent": "#0e7490",
+          "inputs": [
+            {
+              "key": "tool_port",
+              "label": "Tool Port",
+              "type": "file/path",
+              "description": "Serial device path for the ESP32-controlled syringe board.",
+              "required": false,
+              "default": "/dev/ttyUSB0",
+              "placeholder": "/dev/ttyUSB0",
+              "options": []
+            },
+            {
+              "key": "calibration_file",
+              "label": "Calibration File",
+              "type": "file/path",
+              "description": "Calibration file used to convert dispense amounts into board-specific motor steps.",
+              "required": true,
+              "default": "/home/robot/robot control/syringe control code/calibration.json",
+              "placeholder": "/path/to/calibration.json",
+              "options": []
+            },
+            {
+              "key": "speed",
+              "label": "Dispense Speed",
+              "type": "number",
+              "description": "Optional controller speed value. The backend will try to apply it before sending the dispense command.",
+              "required": false,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "A",
+              "label": "Head A",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head A.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "B",
+              "label": "Head B",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head B.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "C",
+              "label": "Head C",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head C.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "D",
+              "label": "Head D",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head D.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "E",
+              "label": "Head E",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head E.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "F",
+              "label": "Head F",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head F.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            },
+            {
+              "key": "G",
+              "label": "Head G",
+              "type": "number",
+              "description": "Requested dispense amount for syringe head G.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "options": []
+            }
+          ],
+          "outputs": [
+            {
+              "key": "status",
+              "label": "Status",
+              "type": "string",
+              "description": "High-level status for the dispense request."
+            },
+            {
+              "key": "reply",
+              "label": "Controller Reply",
+              "type": "string",
+              "description": "Placeholder response payload from the future runner."
+            }
+          ]
+        },
+        "parameters": {
+          "tool_port": "/dev/ttyUSB0",
+          "calibration_file": "/home/robot/robot control/syringe control code/calibration.json",
+          "speed": 200,
+          "A": 200,
+          "B": 200,
+          "C": 200,
+          "D": 200,
+          "E": 200,
+          "F": 200,
+          "G": 2000
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 13,
+        "benchmarkDurationMs": 9470,
+        "lastDurationMs": 11177
+      },
+      "measured": {
+        "width": 196,
+        "height": 229
+      },
+      "selected": true,
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-delay",
+      "source": "start-seed-start",
+      "target": "delay-seed-delay",
+      "sourceHandle": "next",
+      "type": "workflowEdge"
+    },
+    {
+      "source": "delay-seed-delay",
+      "sourceHandle": "next",
+      "target": "dispense-9d740",
+      "targetHandle": "input",
+      "animated": true,
+      "type": "workflowEdge",
+      "id": "xy-edge__delay-seed-delaynext-dispense-9d740input"
+    }
+  ]
+}

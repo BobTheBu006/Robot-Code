@@ -8,6 +8,7 @@ export interface HealthResponse {
 }
 
 export interface CameraStatus {
+  enabled: boolean;
   available: boolean;
   configured_device: string;
   active_device: string | null;

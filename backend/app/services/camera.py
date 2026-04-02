@@ -16,6 +16,8 @@ class CameraService:
         self._capture = None
         self._cv2 = None
         self._active_device: str | None = None
+        self._enabled = False
+        self._enabled_at: float | None = None
 
     def _configured_device(self) -> str:
         return os.getenv("CAMERA_DEVICE", "0")
@@ -28,6 +30,43 @@ class CameraService:
 
     def _configured_fps(self) -> int:
         return int(os.getenv("CAMERA_FPS", "15"))
+
+    def _auto_off_seconds(self) -> float:
+        return float(os.getenv("CAMERA_AUTO_OFF_SECONDS", "300"))
+
+    def _sync_power_state_locked(self) -> None:
+        if not self._enabled:
+            return
+
+        auto_off_seconds = self._auto_off_seconds()
+        if auto_off_seconds <= 0 or self._enabled_at is None:
+            return
+
+        if (time.monotonic() - self._enabled_at) >= auto_off_seconds:
+            self._enabled = False
+            self._enabled_at = None
+            self._release_capture()
+
+    def _release_capture(self) -> None:
+        if self._capture is not None:
+            self._capture.release()
+            self._capture = None
+
+        self._active_device = None
+
+    def is_enabled(self) -> bool:
+        with self._lock:
+            self._sync_power_state_locked()
+            return self._enabled
+
+    def set_enabled(self, enabled: bool) -> CameraStatusResponse:
+        with self._lock:
+            self._enabled = enabled
+            self._enabled_at = time.monotonic() if enabled else None
+            if not enabled:
+                self._release_capture()
+
+        return self.get_status()
 
     def _load_cv2(self):
         if self._cv2 is not None:
@@ -49,6 +88,10 @@ class CameraService:
 
     def _ensure_capture(self):
         cv2 = self._load_cv2()
+        self._sync_power_state_locked()
+
+        if not self._enabled:
+            raise CameraUnavailableError("Camera is turned off.")
 
         if self._capture is not None and self._capture.isOpened():
             return self._capture
@@ -89,10 +132,19 @@ class CameraService:
             return encoded_frame.tobytes()
 
     def get_status(self) -> CameraStatusResponse:
+        if not self.is_enabled():
+            return CameraStatusResponse(
+                enabled=False,
+                available=False,
+                configured_device=self._configured_device(),
+                error="Camera is turned off.",
+            )
+
         try:
             self._read_frame_bytes()
         except CameraUnavailableError as exc:
             return CameraStatusResponse(
+                enabled=True,
                 available=False,
                 configured_device=self._configured_device(),
                 error=str(exc),
@@ -106,6 +158,7 @@ class CameraService:
             height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) if capture is not None else None
 
         return CameraStatusResponse(
+            enabled=True,
             available=True,
             configured_device=self._configured_device(),
             active_device=self._active_device,

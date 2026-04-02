@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class CameraStatusResponse(BaseModel):
+    enabled: bool
     available: bool
     configured_device: str
     active_device: str | None = None
@@ -10,3 +11,7 @@ class CameraStatusResponse(BaseModel):
     fps: float | None = None
     error: str | None = None
     stream_url: str | None = None
+
+
+class CameraPowerRequest(BaseModel):
+    enabled: bool

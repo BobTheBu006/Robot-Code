@@ -18,6 +18,8 @@ class SyringeDispenseRequest(BaseModel):
     E: float = Field(default=0.0, ge=0)
     F: float = Field(default=0.0, ge=0)
     G: float = Field(default=0.0, ge=0)
+    speed: int | None = Field(default=None, gt=0)
+    calibration_file: str | None = None
     port: str | None = None
     baud_rate: int | None = Field(default=None, gt=0)
 
@@ -41,7 +43,12 @@ class SyringeStatusResponse(BaseModel):
 class SyringeDispenseResponse(BaseModel):
     port: str
     baud_rate: int
+    calibration_file: str
     command_format: str
+    speed: int | None = None
+    speed_command_sent: str | None = None
+    speed_reply: str | None = None
+    speed_applied: bool = False
     requested_amounts: dict[SyringeHead, float]
     calculated_steps: dict[SyringeHead, int]
     command_sent: str

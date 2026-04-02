@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response, StreamingResponse
 
-from app.models.camera import CameraStatusResponse
+from app.models.camera import CameraPowerRequest, CameraStatusResponse
 from app.services.camera import CameraUnavailableError, camera_service
 
 router = APIRouter(prefix="/api/camera", tags=["camera"])
@@ -10,6 +10,11 @@ router = APIRouter(prefix="/api/camera", tags=["camera"])
 @router.get("/status", response_model=CameraStatusResponse)
 def get_camera_status() -> CameraStatusResponse:
     return camera_service.get_status()
+
+
+@router.post("/power", response_model=CameraStatusResponse)
+def set_camera_power(request: CameraPowerRequest) -> CameraStatusResponse:
+    return camera_service.set_enabled(request.enabled)
 
 
 @router.get("/frame")

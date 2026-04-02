@@ -94,7 +94,8 @@ start-all.bat
 ## Architecture notes
 
 - `frontend/` is a small Vite + React + TypeScript app that polls the backend and renders a dashboard.
-- `backend/` is a FastAPI service with routers, models, and an in-memory robot-state store.
+- `frontend/` also includes a first-pass block-based workflow editor built with React Flow.
+- `backend/` is a FastAPI service with routers, models, an in-memory robot-state store, and folder-based robot function discovery.
 - `firmware/` is a placeholder for future ESP32 projects and shared protocol definitions.
 - `docs/` contains lightweight architecture notes so the project can grow without losing clarity.
 
