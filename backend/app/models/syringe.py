@@ -21,6 +21,20 @@ class SyringeDispenseRequest(BaseModel):
     speed: int | None = Field(default=None, gt=0)
     intake_speed: int | None = Field(default=None, gt=0)
     outtake_speed: int | None = Field(default=None, gt=0)
+    head_a_step_pin: int | None = Field(default=None, ge=0)
+    head_a_dir_pin: int | None = Field(default=None, ge=0)
+    head_b_step_pin: int | None = Field(default=None, ge=0)
+    head_b_dir_pin: int | None = Field(default=None, ge=0)
+    head_c_step_pin: int | None = Field(default=None, ge=0)
+    head_c_dir_pin: int | None = Field(default=None, ge=0)
+    head_d_step_pin: int | None = Field(default=None, ge=0)
+    head_d_dir_pin: int | None = Field(default=None, ge=0)
+    head_e_step_pin: int | None = Field(default=None, ge=0)
+    head_e_dir_pin: int | None = Field(default=None, ge=0)
+    head_f_step_pin: int | None = Field(default=None, ge=0)
+    head_f_dir_pin: int | None = Field(default=None, ge=0)
+    head_g_step_pin: int | None = Field(default=None, ge=0)
+    head_g_dir_pin: int | None = Field(default=None, ge=0)
     calibration_file: str | None = None
     port: str | None = None
     baud_rate: int | None = Field(default=None, gt=0)
@@ -59,6 +73,10 @@ class SyringeDispenseResponse(BaseModel):
     outtake_speed_command_sent: str | None = None
     outtake_speed_reply: str | None = None
     outtake_speed_applied: bool = False
+    pin_config_commands_sent: list[str] = Field(default_factory=list)
+    pin_config_replies: list[str] = Field(default_factory=list)
+    pin_config_applied: bool = False
+    configured_pins: dict[str, dict[str, int]]
     requested_amounts: dict[SyringeHead, float]
     calculated_steps: dict[SyringeHead, int]
     command_sent: str

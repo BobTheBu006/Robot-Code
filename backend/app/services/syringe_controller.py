@@ -3,6 +3,7 @@ import json
 import os
 import time
 from pathlib import Path
+from threading import Lock
 
 from app.models.syringe import (
     SyringeCalibrationEntry,
@@ -42,6 +43,19 @@ AUTO_OUTTAKE_SPEED_COMMAND_FORMATS: tuple[str, ...] = (
     "set_outtake_speed_csv",
     "set_outtake_speed_space",
 )
+AUTO_PIN_COMMAND_FORMATS: tuple[str, ...] = (
+    "set_head_pins_space",
+    "head_pins_space",
+)
+DEFAULT_HEAD_PINS: dict[SyringeHead, dict[str, int]] = {
+    "A": {"step": 33, "dir": 32},
+    "B": {"step": 25, "dir": 4},
+    "C": {"step": 26, "dir": 5},
+    "D": {"step": 27, "dir": 18},
+    "E": {"step": 14, "dir": 19},
+    "F": {"step": 12, "dir": 21},
+    "G": {"step": 13, "dir": 22},
+}
 
 
 class SyringeControllerError(RuntimeError):
@@ -49,6 +63,10 @@ class SyringeControllerError(RuntimeError):
 
 
 class SyringeControllerService:
+    def __init__(self) -> None:
+        self._port_locks: dict[str, Lock] = {}
+        self._port_locks_guard = Lock()
+
     def _calibration_path(self, requested_path: str | None = None) -> Path:
         if requested_path:
             requested = Path(requested_path)
@@ -76,6 +94,12 @@ class SyringeControllerService:
 
     def _command_format(self) -> str:
         return os.getenv("SYRINGE_COMMAND_FORMAT", "auto")
+
+    def _speed_command_deadline(self) -> float:
+        return float(os.getenv("SYRINGE_SPEED_COMMAND_DEADLINE_SECONDS", "6.0"))
+
+    def _dispense_command_deadline(self) -> float:
+        return float(os.getenv("SYRINGE_DISPENSE_COMMAND_DEADLINE_SECONDS", "120.0"))
 
     def _port_candidates(self) -> list[str]:
         configured_port = os.getenv("SYRINGE_SERIAL_PORT")
@@ -217,39 +241,103 @@ class SyringeControllerService:
             f"Unsupported syringe speed command format '{command_format}'."
         )
 
-    def _send_command(self, serial_port, command: str) -> str | None:
+    def _requested_head_pins(self, request: SyringeDispenseRequest) -> dict[SyringeHead, dict[str, int]]:
+        head_pins: dict[SyringeHead, dict[str, int]] = {}
+        for head in HEADS:
+            lower_head = head.lower()
+            step_pin = getattr(request, f"head_{lower_head}_step_pin", None)
+            dir_pin = getattr(request, f"head_{lower_head}_dir_pin", None)
+            defaults = DEFAULT_HEAD_PINS[head]
+            head_pins[head] = {
+                "step": int(step_pin) if step_pin is not None else defaults["step"],
+                "dir": int(dir_pin) if dir_pin is not None else defaults["dir"],
+            }
+
+        return head_pins
+
+    def _build_pin_command(
+        self,
+        head: SyringeHead,
+        step_pin: int,
+        dir_pin: int,
+        command_format: str,
+    ) -> str:
+        command_format = command_format.lower()
+
+        if command_format == "set_head_pins_space":
+            return f"SET HEAD PINS {head} {step_pin} {dir_pin}"
+
+        if command_format == "head_pins_space":
+            return f"HEAD PINS {head} {step_pin} {dir_pin}"
+
+        raise SyringeControllerError(
+            f"Unsupported syringe pin command format '{command_format}'."
+        )
+
+    def _port_lock(self, port: str) -> Lock:
+        with self._port_locks_guard:
+            if port not in self._port_locks:
+                self._port_locks[port] = Lock()
+            return self._port_locks[port]
+
+    def _reply_contains_prefix(self, reply: str | None, prefixes: tuple[str, ...]) -> bool:
+        if not reply:
+            return False
+
+        normalized_prefixes = tuple(prefix.upper() for prefix in prefixes)
+        for line in reply.splitlines():
+            normalized_line = line.strip().upper()
+            if any(normalized_line.startswith(prefix) for prefix in normalized_prefixes):
+                return True
+
+        return False
+
+    def _send_command(
+        self,
+        serial_port,
+        command: str,
+        *,
+        terminal_prefixes: tuple[str, ...],
+        deadline_seconds: float,
+    ) -> tuple[str | None, bool]:
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
         serial_port.write((command + "\n").encode("utf-8"))
         serial_port.flush()
         replies: list[str] = []
+        deadline = time.monotonic() + max(deadline_seconds, self._serial_timeout())
+        normalized_terminal_prefixes = tuple(prefix.upper() for prefix in terminal_prefixes)
 
-        while True:
+        while time.monotonic() < deadline:
             reply_bytes = serial_port.readline()
             reply_line = reply_bytes.decode("utf-8", errors="replace").strip()
             if not reply_line:
-                break
+                continue
 
             replies.append(reply_line)
 
             normalized = reply_line.upper()
-            if normalized.startswith("OK ") or normalized.startswith("ERR "):
-                break
-
-            if normalized in {"PONG", "READY"}:
-                break
+            if any(normalized.startswith(prefix) for prefix in normalized_terminal_prefixes):
+                return "\n".join(replies), True
 
         if not replies:
-            return None
+            return None, False
 
-        return "\n".join(replies)
+        return "\n".join(replies), False
 
     def _try_apply_speed(self, serial_port, speed: int) -> tuple[str | None, str | None, bool]:
         for command_format in AUTO_SPEED_COMMAND_FORMATS:
             command = self._build_speed_command(speed, command_format)
-            reply = self._send_command(serial_port, command)
-            if not self._is_unknown_command_reply(reply):
+            reply, completed = self._send_command(
+                serial_port,
+                command,
+                terminal_prefixes=("OK SPEED", "ERR "),
+                deadline_seconds=self._speed_command_deadline(),
+            )
+            if completed and self._reply_contains_prefix(reply, ("OK SPEED",)):
                 return command, reply, True
+            if completed and not self._is_unknown_command_reply(reply):
+                return command, reply, False
 
         return None, None, False
 
@@ -261,9 +349,22 @@ class SyringeControllerService:
     ) -> tuple[str | None, str | None, bool]:
         for command_format in command_formats:
             command = self._build_speed_command(speed, command_format)
-            reply = self._send_command(serial_port, command)
-            if not self._is_unknown_command_reply(reply):
+            expected_prefixes = ("OK SPEED",)
+            if "intake" in command_format:
+                expected_prefixes = ("OK INTAKE SPEED",)
+            elif "outtake" in command_format:
+                expected_prefixes = ("OK OUTTAKE SPEED",)
+
+            reply, completed = self._send_command(
+                serial_port,
+                command,
+                terminal_prefixes=(*expected_prefixes, "ERR "),
+                deadline_seconds=self._speed_command_deadline(),
+            )
+            if completed and self._reply_contains_prefix(reply, expected_prefixes):
                 return command, reply, True
+            if completed and not self._is_unknown_command_reply(reply):
+                return command, reply, False
 
         return None, None, False
 
@@ -322,6 +423,59 @@ class SyringeControllerService:
             "outtake_speed_applied": outtake_speed_applied,
         }
 
+    def _apply_head_pin_profile(
+        self,
+        serial_port,
+        configured_pins: dict[SyringeHead, dict[str, int]],
+    ) -> dict[str, object]:
+        commands_sent: list[str] = []
+        replies: list[str] = []
+
+        for head, pins in configured_pins.items():
+            expected_prefix = f"OK HEAD {head} PINS"
+            applied = False
+
+            for command_format in AUTO_PIN_COMMAND_FORMATS:
+                command = self._build_pin_command(
+                    head,
+                    pins["step"],
+                    pins["dir"],
+                    command_format,
+                )
+                reply, completed = self._send_command(
+                    serial_port,
+                    command,
+                    terminal_prefixes=(expected_prefix, "ERR "),
+                    deadline_seconds=self._speed_command_deadline(),
+                )
+
+                if command not in commands_sent:
+                    commands_sent.append(command)
+
+                if reply:
+                    replies.append(reply)
+
+                if completed and self._reply_contains_prefix(reply, (expected_prefix,)):
+                    applied = True
+                    break
+
+                if completed and not self._is_unknown_command_reply(reply):
+                    raise SyringeControllerError(
+                        f"ESP32 rejected head {head} pin configuration: {reply}"
+                    )
+
+            if not applied:
+                raise SyringeControllerError(
+                    f"ESP32 did not acknowledge head {head} pin configuration."
+                )
+
+        return {
+            "pin_config_commands_sent": commands_sent,
+            "pin_config_replies": replies,
+            "pin_config_applied": True,
+            "configured_pins": configured_pins,
+        }
+
     def _is_unknown_command_reply(self, reply: str | None) -> bool:
         if not reply:
             return False
@@ -357,48 +511,76 @@ class SyringeControllerService:
         calibration_path = self._calibration_path(request.calibration_file)
         calibration = self._load_calibration(request.calibration_file)
         steps = self._calculate_steps(request, calibration)
+        configured_pins = self._requested_head_pins(request)
         port = self._selected_port(request.port)
         baud_rate = request.baud_rate or self._baud_rate()
         serial = self._load_serial_module()
         try:
-            with serial.Serial(port, baud_rate, timeout=self._serial_timeout()) as serial_port:
-                boot_delay = self._boot_delay()
-                if boot_delay > 0:
-                    time.sleep(boot_delay)
+            with self._port_lock(port):
+                with serial.Serial(port, baud_rate, timeout=self._serial_timeout()) as serial_port:
+                    boot_delay = self._boot_delay()
+                    if boot_delay > 0:
+                        time.sleep(boot_delay)
 
-                selected_format = None
-                command = None
-                reply = None
-                speed_result: dict[str, str | bool | None | int] = {
-                    "speed": request.speed,
-                    "intake_speed": request.intake_speed,
-                    "outtake_speed": request.outtake_speed,
-                    "speed_command_sent": None,
-                    "speed_reply": None,
-                    "speed_applied": False,
-                    "intake_speed_command_sent": None,
-                    "intake_speed_reply": None,
-                    "intake_speed_applied": False,
-                    "outtake_speed_command_sent": None,
-                    "outtake_speed_reply": None,
-                    "outtake_speed_applied": False,
-                }
+                    selected_format = None
+                    command = None
+                    reply = None
+                    speed_result: dict[str, str | bool | None | int] = {
+                        "speed": request.speed,
+                        "intake_speed": request.intake_speed,
+                        "outtake_speed": request.outtake_speed,
+                        "speed_command_sent": None,
+                        "speed_reply": None,
+                        "speed_applied": False,
+                        "intake_speed_command_sent": None,
+                        "intake_speed_reply": None,
+                        "intake_speed_applied": False,
+                        "outtake_speed_command_sent": None,
+                        "outtake_speed_reply": None,
+                        "outtake_speed_applied": False,
+                    }
+                    pin_result: dict[str, object] = {
+                        "pin_config_commands_sent": [],
+                        "pin_config_replies": [],
+                        "pin_config_applied": False,
+                        "configured_pins": configured_pins,
+                    }
 
-                if request.speed or request.intake_speed or request.outtake_speed:
-                    speed_result = self._apply_speed_profile(
+                    pin_result = self._apply_head_pin_profile(
                         serial_port,
-                        request.speed,
-                        request.intake_speed,
-                        request.outtake_speed,
+                        configured_pins,
                     )
 
-                for command_format in self._command_formats_to_try():
-                    command = self._build_command(steps, command_format)
-                    reply = self._send_command(serial_port, command)
-                    selected_format = command_format
+                    if request.speed or request.intake_speed or request.outtake_speed:
+                        speed_result = self._apply_speed_profile(
+                            serial_port,
+                            request.speed,
+                            request.intake_speed,
+                            request.outtake_speed,
+                        )
 
-                    if not self._is_unknown_command_reply(reply):
-                        break
+                    for command_format in self._command_formats_to_try():
+                        command = self._build_command(steps, command_format)
+                        reply, completed = self._send_command(
+                            serial_port,
+                            command,
+                            terminal_prefixes=("OK DISPENSE", "ERR "),
+                            deadline_seconds=self._dispense_command_deadline(),
+                        )
+                        selected_format = command_format
+
+                        if not completed:
+                            raise SyringeControllerError(
+                                "Timed out while waiting for the ESP32 to finish dispensing."
+                            )
+
+                        if self._reply_contains_prefix(reply, ("OK DISPENSE",)):
+                            break
+
+                        if not self._is_unknown_command_reply(reply):
+                            raise SyringeControllerError(
+                                f"ESP32 rejected the dispense command: {reply}"
+                            )
         except Exception as exc:
             raise SyringeControllerError(
                 f"Failed to communicate with ESP32 on {port}: {exc}"
@@ -406,6 +588,11 @@ class SyringeControllerService:
 
         if command is None or selected_format is None:
             raise SyringeControllerError("No syringe command format was available to try.")
+
+        if not self._reply_contains_prefix(reply, ("OK DISPENSE",)):
+            raise SyringeControllerError(
+                f"ESP32 did not acknowledge a completed dispense command. Last reply: {reply}"
+            )
 
         requested_amounts = {head: float(getattr(request, head)) for head in HEADS}
 
@@ -426,6 +613,10 @@ class SyringeControllerService:
             outtake_speed_command_sent=speed_result["outtake_speed_command_sent"],
             outtake_speed_reply=speed_result["outtake_speed_reply"],
             outtake_speed_applied=bool(speed_result["outtake_speed_applied"]),
+            pin_config_commands_sent=list(pin_result["pin_config_commands_sent"]),
+            pin_config_replies=list(pin_result["pin_config_replies"]),
+            pin_config_applied=bool(pin_result["pin_config_applied"]),
+            configured_pins=dict(pin_result["configured_pins"]),
             requested_amounts=requested_amounts,
             calculated_steps=steps,
             command_sent=command,

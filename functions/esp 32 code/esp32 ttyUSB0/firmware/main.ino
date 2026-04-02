@@ -14,6 +14,29 @@ int dirPins[NUM_SYRINGES]  = {32, 4, 5, 18, 19, 21, 22};
 
 int dirSign[NUM_SYRINGES] = {-1, -1, -1, -1, -1, -1, -1};
 
+int headIndexFromName(char headName) {
+  char normalized = toupper(headName);
+  if (normalized < 'A' || normalized > 'G') {
+    return -1;
+  }
+
+  return normalized - 'A';
+}
+
+void applyHeadPins(int index, int stepPin, int dirPin) {
+  if (index < 0 || index >= NUM_SYRINGES) {
+    return;
+  }
+
+  stepPins[index] = stepPin;
+  dirPins[index] = dirPin;
+
+  pinMode(stepPins[index], OUTPUT);
+  pinMode(dirPins[index], OUTPUT);
+  digitalWrite(stepPins[index], LOW);
+  digitalWrite(dirPins[index], LOW);
+}
+
 void applyRPM(int nextRPM) {
   if (nextRPM <= 0) {
     return;
@@ -62,31 +85,53 @@ unsigned long stepIntervalMicrosForRPM(int rpm) {
   return interval;
 }
 
-void moveStepperBySteps(int index, long signedSteps, int rpm) {
-  long totalSteps = labs(signedSteps);
-  if (totalSteps == 0) {
-    return;
-  }
-
-  bool forward = signedSteps >= 0;
-  digitalWrite(dirPins[index], forward ? HIGH : LOW);
-  delayMicroseconds(20);
-
+void moveSteppersBySteps(const long signedSteps[NUM_SYRINGES], int rpm) {
   unsigned long intervalMicros = stepIntervalMicrosForRPM(rpm);
   unsigned long lowTimeMicros = intervalMicros > (unsigned long)StepPulseWidthMicros
     ? intervalMicros - (unsigned long)StepPulseWidthMicros
     : (unsigned long)StepPulseWidthMicros;
 
-  for (long step = 0; step < totalSteps; step++) {
-    digitalWrite(stepPins[index], HIGH);
+  long maxSteps = 0;
+  for (int i = 0; i < NUM_SYRINGES; i++) {
+    long totalSteps = labs(signedSteps[i]);
+    if (totalSteps > 0) {
+      bool forward = signedSteps[i] >= 0;
+      digitalWrite(dirPins[i], forward ? HIGH : LOW);
+      if (totalSteps > maxSteps) {
+        maxSteps = totalSteps;
+      }
+    }
+  }
+
+  if (maxSteps == 0) {
+    return;
+  }
+
+  delayMicroseconds(20);
+
+  for (long step = 0; step < maxSteps; step++) {
+    for (int i = 0; i < NUM_SYRINGES; i++) {
+      if (labs(signedSteps[i]) > step) {
+        digitalWrite(stepPins[i], HIGH);
+      }
+    }
+
     delayMicroseconds(StepPulseWidthMicros);
-    digitalWrite(stepPins[index], LOW);
+
+    for (int i = 0; i < NUM_SYRINGES; i++) {
+      if (labs(signedSteps[i]) > step) {
+        digitalWrite(stepPins[i], LOW);
+      }
+    }
+
     delayMicroseconds(lowTimeMicros);
   }
 }
 
 void dispenseSteps(long s0, long s1, long s2, long s3, long s4, long s5, long s6) {
   long steps[NUM_SYRINGES] = {s0, s1, s2, s3, s4, s5, s6};
+  long forwardSteps[NUM_SYRINGES] = {0, 0, 0, 0, 0, 0, 0};
+  long returnSteps[NUM_SYRINGES] = {0, 0, 0, 0, 0, 0, 0};
 
   Serial.print("ACTIVE INTAKE RPM ");
   Serial.println(IntakeRPM);
@@ -95,15 +140,21 @@ void dispenseSteps(long s0, long s1, long s2, long s3, long s4, long s5, long s6
 
   for (int i = 0; i < NUM_SYRINGES; i++) {
     if (steps[i] != 0) {
-      long signedSteps = dirSign[i] * steps[i];
-      moveStepperBySteps(i, signedSteps, IntakeRPM);
+      forwardSteps[i] = dirSign[i] * steps[i];
+      returnSteps[i] = -forwardSteps[i];
+    }
+  }
 
-      if (SettleDelayMs > 0) {
-        delay(SettleDelayMs);
-      }
+  moveSteppersBySteps(forwardSteps, IntakeRPM);
 
-      moveStepperBySteps(i, -signedSteps, OuttakeRPM);
+  if (SettleDelayMs > 0) {
+    delay(SettleDelayMs);
+  }
 
+  moveSteppersBySteps(returnSteps, OuttakeRPM);
+
+  for (int i = 0; i < NUM_SYRINGES; i++) {
+    if (steps[i] != 0) {
       Serial.print("SYRINGE ");
       Serial.print(i);
       Serial.println(" DONE");
@@ -215,14 +266,57 @@ bool handleSpeedCommand(const String& cmd) {
   return false;
 }
 
+bool handlePinCommand(const String& cmd) {
+  char headName = '\0';
+  long stepPin = 0;
+  long dirPin = 0;
+
+  if (cmd.startsWith("SET HEAD PINS ")) {
+    int parsed = sscanf(cmd.c_str(), "SET HEAD PINS %c %ld %ld", &headName, &stepPin, &dirPin);
+    if (parsed == 3) {
+      int headIndex = headIndexFromName(headName);
+      if (headIndex >= 0) {
+        applyHeadPins(headIndex, (int)stepPin, (int)dirPin);
+        Serial.print("OK HEAD ");
+        Serial.print((char)toupper(headName));
+        Serial.print(" PINS ");
+        Serial.print(stepPin);
+        Serial.print(" ");
+        Serial.println(dirPin);
+      } else {
+        Serial.println("ERR BAD HEAD");
+      }
+      return true;
+    }
+  }
+
+  if (cmd.startsWith("HEAD PINS ")) {
+    int parsed = sscanf(cmd.c_str(), "HEAD PINS %c %ld %ld", &headName, &stepPin, &dirPin);
+    if (parsed == 3) {
+      int headIndex = headIndexFromName(headName);
+      if (headIndex >= 0) {
+        applyHeadPins(headIndex, (int)stepPin, (int)dirPin);
+        Serial.print("OK HEAD ");
+        Serial.print((char)toupper(headName));
+        Serial.print(" PINS ");
+        Serial.print(stepPin);
+        Serial.print(" ");
+        Serial.println(dirPin);
+      } else {
+        Serial.println("ERR BAD HEAD");
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void setup() {
   Serial.begin(115200);
 
   for (int i = 0; i < NUM_SYRINGES; i++) {
-    pinMode(stepPins[i], OUTPUT);
-    pinMode(dirPins[i], OUTPUT);
-    digitalWrite(stepPins[i], LOW);
-    digitalWrite(dirPins[i], LOW);
+    applyHeadPins(i, stepPins[i], dirPins[i]);
   }
 
   Serial.println("READY");
@@ -247,6 +341,9 @@ void loop() {
       } else {
         Serial.println("ERR BAD DISPENSE CMD");
       }
+    }
+    else if (handlePinCommand(cmd)) {
+      // pin command handled above
     }
     else if (handleSpeedCommand(cmd)) {
       // speed command handled above
