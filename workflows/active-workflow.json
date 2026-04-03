@@ -34,9 +34,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 10,
+        "runCount": 11,
         "benchmarkDurationMs": 36,
-        "lastDurationMs": 41
+        "lastDurationMs": 34
       },
       "measured": {
         "width": 196,
@@ -405,9 +405,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 13,
-        "benchmarkDurationMs": 8090,
-        "lastDurationMs": 5767
+        "runCount": 14,
+        "benchmarkDurationMs": 8280,
+        "lastDurationMs": 10745
       },
       "measured": {
         "width": 196,
@@ -637,16 +637,16 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
-        "runCount": 5,
-        "benchmarkDurationMs": 79,
-        "lastDurationMs": 72
+        "isActive": false,
+        "runCount": 8,
+        "benchmarkDurationMs": 6188,
+        "lastDurationMs": 27253
       },
       "measured": {
         "width": 196,
         "height": 185
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     },
     {
@@ -857,33 +857,33 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB1",
-          "x_cm": 10,
-          "y_cm": 10,
+          "x_cm": 100,
+          "y_cm": 100,
           "speed_profile": "normal",
           "x_step_pin": 26,
           "x_dir_pin": 25,
           "y_step_pin": 18,
           "y_dir_pin": 19,
-          "limit_switch_mode": "4",
+          "limit_switch_mode": "2",
           "x_min_limit_pin": 21,
           "x_max_limit_pin": 22,
           "y_min_limit_pin": 23,
-          "y_max_limit_pin": 25
+          "y_max_limit_pin": 21
         },
         "settings": {
           "failureMode": "stop_flow",
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 10,
-        "benchmarkDurationMs": 59,
-        "lastDurationMs": 54
+        "runCount": 18,
+        "benchmarkDurationMs": 1093,
+        "lastDurationMs": 14437
       },
       "measured": {
         "width": 196,
         "height": 185
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     }
   ],
@@ -895,6 +895,22 @@
       "targetHandle": "input",
       "type": "workflowEdge",
       "id": "xy-edge__start-seed-startnext-calibrate_xy-rymf4input"
+    },
+    {
+      "source": "calibrate_xy-rymf4",
+      "sourceHandle": "calibrated",
+      "target": "move_gantry-qkmaz",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__calibrate_xy-rymf4calibrated-move_gantry-qkmazinput"
+    },
+    {
+      "source": "move_gantry-qkmaz",
+      "sourceHandle": "accepted",
+      "target": "dispense-zk5jm",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__move_gantry-qkmazaccepted-dispense-zk5jminput"
     }
   ]
 }
