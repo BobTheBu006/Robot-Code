@@ -507,7 +507,8 @@ class Esp32BuilderService:
             self._write_text_atomic(notes_path, self._default_workspace_notes(port))
 
         blueprint_path = blueprint_dir / "dispense.json"
-        if not blueprint_path.exists():
+        existing_blueprints = list(blueprint_dir.glob("*.json"))
+        if not existing_blueprints and not blueprint_path.exists():
             self._write_text_atomic(
                 blueprint_path,
                 json.dumps(self._default_dispense_blueprint(port.device), indent=2) + "\n",

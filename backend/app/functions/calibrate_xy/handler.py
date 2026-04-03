@@ -1,23 +1,37 @@
+from app.models.gantry import GantryXYCalibrationRequest
+from app.services.gantry_controller import gantry_controller_service
+
+
 def execute(context: dict, inputs: dict) -> dict:
+    request = GantryXYCalibrationRequest.model_validate(inputs)
+    response = gantry_controller_service.calibrate_xy(request)
+
     return {
-        "calibrated": False,
-        "status": "not_implemented",
-        "message": "XY calibration is not implemented yet. This block currently defines the calibration contract.",
-        "tool_port": inputs.get("tool_port"),
-        "workspace": {
-            "x_track_length_cm": inputs.get("x_track_length_cm"),
-            "y_track_length_cm": inputs.get("y_track_length_cm"),
-        },
-        "advanced": {
-            "x_step_pin": inputs.get("x_step_pin"),
-            "x_dir_pin": inputs.get("x_dir_pin"),
-            "y_step_pin": inputs.get("y_step_pin"),
-            "y_dir_pin": inputs.get("y_dir_pin"),
-            "limit_switch_mode": inputs.get("limit_switch_mode"),
-            "x_min_limit_pin": inputs.get("x_min_limit_pin"),
-            "x_max_limit_pin": inputs.get("x_max_limit_pin"),
-            "y_min_limit_pin": inputs.get("y_min_limit_pin"),
-            "y_max_limit_pin": inputs.get("y_max_limit_pin"),
-        },
+        "calibrated": response.calibrated,
+        "status": "completed",
+        "message": "XY gantry calibration completed.",
+        "tool_port": response.port,
+        "workspace": response.workspace,
+        "calibration_speed_profile": response.calibration_speed_profile,
+        "pin_command_sent": response.pin_command_sent,
+        "pin_reply": response.pin_reply,
+        "pins_applied": response.pins_applied,
+        "limit_command_sent": response.limit_command_sent,
+        "limit_reply": response.limit_reply,
+        "limits_applied": response.limits_applied,
+        "calibration_command_sent": response.calibration_command_sent,
+        "calibration_reply": response.calibration_reply,
+        "configured_pins": response.configured_pins,
+        "configured_limits": response.configured_limits,
+        "mode": context.get("mode"),
+    }
+
+
+def cancel(context: dict, inputs: dict) -> dict:
+    response = gantry_controller_service.cancel_operation(inputs.get("tool_port"))
+    return {
+        "ok": response["ok"],
+        "message": response["message"],
+        "tool_port": response.get("tool_port"),
         "mode": context.get("mode"),
     }

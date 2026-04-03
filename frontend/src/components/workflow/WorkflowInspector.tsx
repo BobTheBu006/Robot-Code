@@ -50,6 +50,7 @@ interface WorkflowInspectorProps {
   testError: string | null;
   onClose: () => void;
   onNavigateToNode: (nodeId: string) => void;
+  onCancel: () => void;
   onRunTest: () => void;
   onSaveCustomBlock: (displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
   onUpdateParameter: (
@@ -291,6 +292,14 @@ function handleDragStart(event: ReactDragEvent<HTMLButtonElement>, expression: s
   event.dataTransfer.setData("text/plain", expression);
 }
 
+async function copyTextToClipboard(text: string) {
+  if (!navigator.clipboard) {
+    return;
+  }
+
+  await navigator.clipboard.writeText(text);
+}
+
 export function WorkflowInspector({
   allNodeTestEntries,
   selectedNode,
@@ -304,6 +313,7 @@ export function WorkflowInspector({
   testError,
   onClose,
   onNavigateToNode,
+  onCancel,
   onRunTest,
   onSaveCustomBlock,
   onUpdateParameter,
@@ -465,6 +475,28 @@ export function WorkflowInspector({
     );
   }
 
+  function renderCopyableResult(label: string, value: unknown, variant?: "input") {
+    const serialized = JSON.stringify(value, null, 2);
+
+    return (
+      <div className="workflow-overlay__copyable-result">
+        <div className="workflow-overlay__result-header">
+          <strong>{label}</strong>
+          <button
+            className="workflow-overlay__copy-button"
+            onClick={() => void copyTextToClipboard(serialized)}
+            type="button"
+          >
+            Copy
+          </button>
+        </div>
+        <pre className={variant === "input" ? "workflow-overlay__result workflow-overlay__result--input" : "workflow-overlay__result"}>
+          {serialized}
+        </pre>
+      </div>
+    );
+  }
+
   return (
     <div className="workflow-overlay">
       <div className="workflow-overlay__topbar">
@@ -480,8 +512,12 @@ export function WorkflowInspector({
             <strong>{block.displayName}</strong>
           </div>
 
-          <button className="workflow-overlay__run" onClick={onRunTest} type="button">
-            {testStatus === "running" ? "Running..." : "Test step"}
+          <button
+            className={testStatus === "running" ? "workflow-overlay__run workflow-overlay__run--cancel" : "workflow-overlay__run"}
+            onClick={testStatus === "running" ? onCancel : onRunTest}
+            type="button"
+          >
+            {testStatus === "running" ? "Cancel" : "Test step"}
           </button>
         </div>
 
@@ -552,11 +588,7 @@ export function WorkflowInspector({
                   ))}
                 </div>
               ) : null}
-              {previousNodeTestResult ? (
-                <pre className="workflow-overlay__result workflow-overlay__result--input">
-                  {JSON.stringify(previousPayload, null, 2)}
-                </pre>
-              ) : null}
+              {previousNodeTestResult ? renderCopyableResult("Previous block JSON", previousPayload, "input") : null}
             </section>
           ) : (
             <section className="workflow-overlay__section workflow-overlay__section--stretch">
@@ -587,11 +619,7 @@ export function WorkflowInspector({
                           ))}
                         </div>
                       ) : null}
-                      {entry.payload ? (
-                        <pre className="workflow-overlay__result workflow-overlay__result--input">
-                          {JSON.stringify(entry.payload, null, 2)}
-                        </pre>
-                      ) : null}
+                      {entry.payload ? renderCopyableResult(`${entry.nodeName} JSON`, entry.payload, "input") : null}
                     </div>
                   ))}
                 </div>
@@ -765,11 +793,7 @@ export function WorkflowInspector({
               <p className="workflow-overlay__empty-text">Running block test...</p>
             ) : null}
             {testError ? <p className="error-text">{testError}</p> : null}
-            {testResult ? (
-              <pre className="workflow-overlay__result">
-                {JSON.stringify(currentPayload, null, 2)}
-              </pre>
-            ) : null}
+            {testResult ? renderCopyableResult("Last test result", currentPayload) : null}
           </section>
         </aside>
       </div>

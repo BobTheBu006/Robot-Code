@@ -2,8 +2,8 @@
   "id": "move_gantry",
   "display_name": "Move Gantry XY",
   "category": "Robot Actions",
-  "description": "High-level XY gantry move action for the ESP32 gantry controller.",
-  "version": "0.2.0",
+  "description": "Move the XY gantry to an absolute position from the calibrated origin.",
+  "version": "0.3.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -11,7 +11,10 @@
       "type": "file/path",
       "description": "Connected ESP32 board that should receive the XY gantry command.",
       "required": true,
-      "default": "/dev/ttyUSB0"
+      "default": "/dev/ttyUSB1",
+      "placeholder": "/dev/ttyUSB1",
+      "advanced": false,
+      "options": []
     },
     {
       "key": "x_cm",
@@ -19,7 +22,10 @@
       "type": "number",
       "description": "Target X position measured from the calibrated origin.",
       "required": true,
-      "default": 0
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     },
     {
       "key": "y_cm",
@@ -27,19 +33,33 @@
       "type": "number",
       "description": "Target Y position measured from the calibrated origin.",
       "required": true,
-      "default": 0
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     },
     {
       "key": "speed_profile",
       "label": "Speed Profile",
       "type": "select",
-      "description": "Named speed preset for the future XY motion controller.",
+      "description": "Named speed preset for the XY motion controller.",
       "required": true,
       "default": "normal",
+      "placeholder": null,
+      "advanced": false,
       "options": [
-        { "label": "Slow", "value": "slow" },
-        { "label": "Normal", "value": "normal" },
-        { "label": "Fast", "value": "fast" }
+        {
+          "label": "Slow",
+          "value": "slow"
+        },
+        {
+          "label": "Normal",
+          "value": "normal"
+        },
+        {
+          "label": "Fast",
+          "value": "fast"
+        }
       ]
     }
   ],
@@ -50,8 +70,10 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the X axis driver.",
       "required": false,
-      "default": 16,
-      "advanced": true
+      "default": 16.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "x_dir_pin",
@@ -59,8 +81,10 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the X axis driver.",
       "required": false,
-      "default": 17,
-      "advanced": true
+      "default": 17.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "y_step_pin",
@@ -68,8 +92,10 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the Y axis driver.",
       "required": false,
-      "default": 18,
-      "advanced": true
+      "default": 18.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "y_dir_pin",
@@ -77,8 +103,10 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the Y axis driver.",
       "required": false,
-      "default": 19,
-      "advanced": true
+      "default": 19.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "limit_switch_mode",
@@ -87,10 +115,17 @@
       "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
       "required": false,
       "default": "4",
+      "placeholder": null,
       "advanced": true,
       "options": [
-        { "label": "2 Limit Switches", "value": "2" },
-        { "label": "4 Limit Switches", "value": "4" }
+        {
+          "label": "2 Limit Switches",
+          "value": "2"
+        },
+        {
+          "label": "4 Limit Switches",
+          "value": "4"
+        }
       ]
     },
     {
@@ -99,8 +134,10 @@
       "type": "number",
       "description": "GPIO pin for the X minimum/home limit switch.",
       "required": false,
-      "default": 21,
-      "advanced": true
+      "default": 21.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "x_max_limit_pin",
@@ -108,8 +145,10 @@
       "type": "number",
       "description": "GPIO pin for the X maximum limit switch.",
       "required": false,
-      "default": 22,
-      "advanced": true
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "y_min_limit_pin",
@@ -117,8 +156,10 @@
       "type": "number",
       "description": "GPIO pin for the Y minimum/home limit switch.",
       "required": false,
-      "default": 23,
-      "advanced": true
+      "default": 23.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "y_max_limit_pin",
@@ -126,8 +167,10 @@
       "type": "number",
       "description": "GPIO pin for the Y maximum limit switch.",
       "required": false,
-      "default": 25,
-      "advanced": true
+      "default": 25.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     }
   ],
   "outputs": [
@@ -135,7 +178,7 @@
       "key": "accepted",
       "label": "Accepted",
       "type": "boolean",
-      "description": "Whether the future gantry runner accepted the XY move."
+      "description": "Whether the ESP32 accepted and completed the XY move."
     },
     {
       "key": "target",
@@ -143,5 +186,10 @@
       "type": "object",
       "description": "Echo of the requested XY target in centimeters."
     }
-  ]
+  ],
+  "builder_board_id": "ttyUSB1",
+  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/move_gantry.json",
+  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+  "builder_firmware_entry_file": "firmware/main.ino",
+  "builder_base_function_id": null
 }

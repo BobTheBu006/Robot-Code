@@ -5,8 +5,8 @@
       "id": "start-seed-start",
       "type": "workflowBlock",
       "position": {
-        "x": 80,
-        "y": 160
+        "x": -64.05130926408673,
+        "y": 178.78930120835918
       },
       "data": {
         "block": {
@@ -34,21 +34,23 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 8,
-        "benchmarkDurationMs": 35,
-        "lastDurationMs": 30
+        "runCount": 10,
+        "benchmarkDurationMs": 36,
+        "lastDurationMs": 41
       },
       "measured": {
         "width": 196,
         "height": 134
-      }
+      },
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "dispense-zk5jm",
       "type": "workflowBlock",
       "position": {
-        "x": 998.9183842912006,
-        "y": 94.56665759902455
+        "x": 928.4349470541778,
+        "y": 12.704260429487917
       },
       "data": {
         "block": {
@@ -64,22 +66,13 @@
             {
               "key": "tool_port",
               "label": "Selected ESP32",
-              "type": "select",
+              "type": "file/path",
               "description": "Serial device path for the connected ESP32 syringe board.",
               "required": false,
               "default": "/dev/ttyUSB0",
               "placeholder": "/dev/ttyUSB0",
               "advanced": false,
-              "options": [
-                {
-                  "label": "ESP32 ttyUSB0 (/dev/ttyUSB0)",
-                  "value": "/dev/ttyUSB0"
-                },
-                {
-                  "label": "ESP32 ttyUSB1 (/dev/ttyUSB1)",
-                  "value": "/dev/ttyUSB1"
-                }
-              ]
+              "options": []
             },
             {
               "key": "calibration_file",
@@ -412,9 +405,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 11,
-        "benchmarkDurationMs": 8511,
-        "lastDurationMs": 26896
+        "runCount": 13,
+        "benchmarkDurationMs": 8090,
+        "lastDurationMs": 5767
       },
       "measured": {
         "width": 196,
@@ -427,8 +420,8 @@
       "id": "calibrate_xy-rymf4",
       "type": "workflowBlock",
       "position": {
-        "x": 389.60617680030725,
-        "y": 129.04162740504384
+        "x": 236.78468526750436,
+        "y": 35.14522378629363
       },
       "data": {
         "block": {
@@ -436,7 +429,7 @@
           "displayName": "Calibrate Gantry XY",
           "category": "Robot Actions",
           "description": "Home the XY gantry against its limit switches and register the track lengths in centimeters.",
-          "version": "0.1.0",
+          "version": "0.2.0",
           "kind": "robot-action",
           "acceptsInput": true,
           "accent": "#0e7490",
@@ -444,22 +437,13 @@
             {
               "key": "tool_port",
               "label": "Selected ESP32",
-              "type": "select",
+              "type": "file/path",
               "description": "Connected ESP32 board that should run the XY calibration routine.",
               "required": true,
-              "default": "/dev/ttyUSB0",
-              "placeholder": null,
+              "default": "/dev/ttyUSB1",
+              "placeholder": "/dev/ttyUSB1",
               "advanced": false,
-              "options": [
-                {
-                  "label": "ESP32 ttyUSB0 (/dev/ttyUSB0)",
-                  "value": "/dev/ttyUSB0"
-                },
-                {
-                  "label": "ESP32 ttyUSB1 (/dev/ttyUSB1)",
-                  "value": "/dev/ttyUSB1"
-                }
-              ]
+              "options": []
             },
             {
               "key": "x_track_length_cm",
@@ -628,19 +612,256 @@
               "description": "Registered XY workspace dimensions in centimeters."
             }
           ],
-          "builderBoardId": null,
-          "builderSourcePath": null,
-          "builderWorkspacePath": null,
-          "builderFirmwareEntryFile": null,
+          "builderBoardId": "ttyUSB1",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/calibrate_xy.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB1",
           "x_track_length_cm": 100,
           "y_track_length_cm": 100,
-          "calibration_speed_profile": "safe",
-          "x_step_pin": 16,
-          "x_dir_pin": 17,
+          "calibration_speed_profile": "normal",
+          "x_step_pin": 26,
+          "x_dir_pin": 25,
+          "y_step_pin": 18,
+          "y_dir_pin": 19,
+          "limit_switch_mode": "2",
+          "x_min_limit_pin": 32,
+          "x_max_limit_pin": 23,
+          "y_min_limit_pin": 33,
+          "y_max_limit_pin": 22
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 5,
+        "benchmarkDurationMs": 79,
+        "lastDurationMs": 72
+      },
+      "measured": {
+        "width": 196,
+        "height": 185
+      },
+      "selected": true,
+      "dragging": false
+    },
+    {
+      "id": "move_gantry-qkmaz",
+      "type": "workflowBlock",
+      "position": {
+        "x": 620.0349081336975,
+        "y": 173.98251565172882
+      },
+      "data": {
+        "block": {
+          "id": "move_gantry",
+          "displayName": "Move Gantry XY",
+          "category": "Robot Actions",
+          "description": "Move the XY gantry to an absolute position from the calibrated origin.",
+          "version": "0.3.0",
+          "kind": "robot-action",
+          "acceptsInput": true,
+          "accent": "#0e7490",
+          "inputs": [
+            {
+              "key": "tool_port",
+              "label": "Selected ESP32",
+              "type": "file/path",
+              "description": "Connected ESP32 board that should receive the XY gantry command.",
+              "required": true,
+              "default": "/dev/ttyUSB1",
+              "placeholder": "/dev/ttyUSB1",
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "x_cm",
+              "label": "X Position (cm)",
+              "type": "number",
+              "description": "Target X position measured from the calibrated origin.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "y_cm",
+              "label": "Y Position (cm)",
+              "type": "number",
+              "description": "Target Y position measured from the calibrated origin.",
+              "required": true,
+              "default": 0,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "speed_profile",
+              "label": "Speed Profile",
+              "type": "select",
+              "description": "Named speed preset for the XY motion controller.",
+              "required": true,
+              "default": "normal",
+              "placeholder": null,
+              "advanced": false,
+              "options": [
+                {
+                  "label": "Slow",
+                  "value": "slow"
+                },
+                {
+                  "label": "Normal",
+                  "value": "normal"
+                },
+                {
+                  "label": "Fast",
+                  "value": "fast"
+                }
+              ]
+            }
+          ],
+          "advancedInputs": [
+            {
+              "key": "x_step_pin",
+              "label": "X Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO step pin for the X axis driver.",
+              "required": false,
+              "default": 16,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "x_dir_pin",
+              "label": "X Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO direction pin for the X axis driver.",
+              "required": false,
+              "default": 17,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_step_pin",
+              "label": "Y Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO step pin for the Y axis driver.",
+              "required": false,
+              "default": 18,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_dir_pin",
+              "label": "Y Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO direction pin for the Y axis driver.",
+              "required": false,
+              "default": 19,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "limit_switch_mode",
+              "label": "Limit Switch Layout",
+              "type": "select",
+              "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
+              "required": false,
+              "default": "4",
+              "placeholder": null,
+              "advanced": true,
+              "options": [
+                {
+                  "label": "2 Limit Switches",
+                  "value": "2"
+                },
+                {
+                  "label": "4 Limit Switches",
+                  "value": "4"
+                }
+              ]
+            },
+            {
+              "key": "x_min_limit_pin",
+              "label": "X Min Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the X minimum/home limit switch.",
+              "required": false,
+              "default": 21,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "x_max_limit_pin",
+              "label": "X Max Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the X maximum limit switch.",
+              "required": false,
+              "default": 22,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_min_limit_pin",
+              "label": "Y Min Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the Y minimum/home limit switch.",
+              "required": false,
+              "default": 23,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
+              "key": "y_max_limit_pin",
+              "label": "Y Max Limit Pin",
+              "type": "number",
+              "description": "GPIO pin for the Y maximum limit switch.",
+              "required": false,
+              "default": 25,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            }
+          ],
+          "outputs": [
+            {
+              "key": "accepted",
+              "label": "Accepted",
+              "type": "boolean",
+              "description": "Whether the ESP32 accepted and completed the XY move."
+            },
+            {
+              "key": "target",
+              "label": "Target",
+              "type": "object",
+              "description": "Echo of the requested XY target in centimeters."
+            }
+          ],
+          "builderBoardId": "ttyUSB1",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/move_gantry.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderFirmwareEntryFile": "firmware/main.ino",
+          "builderBaseFunctionId": null
+        },
+        "parameters": {
+          "tool_port": "/dev/ttyUSB1",
+          "x_cm": 10,
+          "y_cm": 10,
+          "speed_profile": "normal",
+          "x_step_pin": 26,
+          "x_dir_pin": 25,
           "y_step_pin": 18,
           "y_dir_pin": 19,
           "limit_switch_mode": "4",
@@ -654,15 +875,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 2,
-        "benchmarkDurationMs": 90,
-        "lastDurationMs": 50
+        "runCount": 10,
+        "benchmarkDurationMs": 59,
+        "lastDurationMs": 54
       },
       "measured": {
         "width": 196,
         "height": 185
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     }
   ],

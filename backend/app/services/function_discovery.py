@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from app.models.function_manifest import (
     DiscoveredFunctionDefinition,
+    FunctionCancelResponse,
     FunctionDiscoveryError,
     FunctionDiscoveryResponse,
     FunctionManifest,
@@ -171,6 +172,52 @@ class FunctionDiscoveryService:
             input_data=input_data,
             result=result or {},
             error=None,
+        )
+
+    def cancel_function(
+        self,
+        function_id: str,
+        inputs: dict[str, str | float | bool | None],
+    ) -> FunctionCancelResponse:
+        discovered_function = self.get_function(function_id)
+
+        try:
+            handler_module = self._load_handler_module(discovered_function)
+        except Exception as exc:  # pragma: no cover - defensive boundary around dynamic imports
+            raise RuntimeError(
+                f"Could not load handler for function '{function_id}': {exc}"
+            ) from exc
+
+        cancel = getattr(handler_module, "cancel", None)
+        if not callable(cancel):
+            raise RuntimeError(
+                f"Function '{function_id}' does not support cancellation yet."
+            )
+
+        context = {
+            "mode": "cancel",
+            "function_id": function_id,
+            "manifest": discovered_function.manifest.model_dump(),
+        }
+
+        try:
+            result = cancel(context, inputs)
+        except Exception as exc:  # pragma: no cover - defensive boundary around plugin code
+            raise RuntimeError(
+                f"Function '{function_id}' cancellation failed: {exc}"
+            ) from exc
+
+        if result is not None and not isinstance(result, dict):
+            raise RuntimeError(
+                f"Function '{function_id}' cancel returned {type(result).__name__}; expected dict or None."
+            )
+
+        result_payload = result or {}
+        return FunctionCancelResponse(
+            function_id=function_id,
+            ok=bool(result_payload.get("ok", True)),
+            message=str(result_payload.get("message", "Cancellation requested.")),
+            result=result_payload,
         )
 
 

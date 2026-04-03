@@ -119,6 +119,7 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   executionEtaMs?: number | null;
   onDelete?: (() => void) | undefined;
   onRun?: (() => void) | undefined;
+  onCancel?: (() => void) | undefined;
   onToggleActive?: (() => void) | undefined;
 }
 
@@ -129,6 +130,13 @@ export interface FunctionTestResponse {
   input_data?: Record<string, unknown> | null;
   result: Record<string, unknown> | null;
   error: string | null;
+}
+
+export interface FunctionCancelResponse {
+  function_id: string;
+  ok: boolean;
+  message: string;
+  result?: Record<string, unknown> | null;
 }
 
 export interface WorkflowCanvasNode {

@@ -1193,6 +1193,10 @@ body {
   cursor: pointer;
 }
 
+.workflow-overlay__run--cancel {
+  background: #ef5b5b;
+}
+
 .workflow-overlay__tabs {
   display: flex;
   gap: 18px;
@@ -1413,6 +1417,34 @@ body {
 
 .workflow-overlay__result--input {
   max-height: 320px;
+}
+
+.workflow-overlay__copyable-result {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-overlay__result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workflow-overlay__result-header strong {
+  color: #d7d3df;
+  font-size: 0.83rem;
+  letter-spacing: 0.03em;
+}
+
+.workflow-overlay__copy-button {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f0f8;
+  font: inherit;
+  cursor: pointer;
 }
 
 .workflow-editor__json {

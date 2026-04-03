@@ -2,8 +2,8 @@
   "id": "move_gantry_z",
   "display_name": "Move Gantry Z",
   "category": "Robot Actions",
-  "description": "High-level dual-Z gantry move action for two independently controlled Z axes.",
-  "version": "0.1.0",
+  "description": "Move the two independent Z axes to absolute positions from the calibrated origin.",
+  "version": "0.2.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -11,7 +11,10 @@
       "type": "file/path",
       "description": "Connected ESP32 board that should receive the Z-axis command.",
       "required": true,
-      "default": "/dev/ttyUSB0"
+      "default": "/dev/ttyUSB1",
+      "placeholder": "/dev/ttyUSB1",
+      "advanced": false,
+      "options": []
     },
     {
       "key": "z_left_cm",
@@ -19,7 +22,10 @@
       "type": "number",
       "description": "Target left Z position measured from the calibrated origin.",
       "required": true,
-      "default": 0
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     },
     {
       "key": "z_right_cm",
@@ -27,19 +33,33 @@
       "type": "number",
       "description": "Target right Z position measured from the calibrated origin.",
       "required": true,
-      "default": 0
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     },
     {
       "key": "speed_profile",
       "label": "Speed Profile",
       "type": "select",
-      "description": "Named speed preset for the future Z motion controller.",
+      "description": "Named speed preset for the Z motion controller.",
       "required": true,
       "default": "normal",
+      "placeholder": null,
+      "advanced": false,
       "options": [
-        { "label": "Slow", "value": "slow" },
-        { "label": "Normal", "value": "normal" },
-        { "label": "Fast", "value": "fast" }
+        {
+          "label": "Slow",
+          "value": "slow"
+        },
+        {
+          "label": "Normal",
+          "value": "normal"
+        },
+        {
+          "label": "Fast",
+          "value": "fast"
+        }
       ]
     }
   ],
@@ -50,8 +70,10 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the left Z axis driver.",
       "required": false,
-      "default": 32,
-      "advanced": true
+      "default": 32.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_left_dir_pin",
@@ -59,8 +81,10 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the left Z axis driver.",
       "required": false,
-      "default": 33,
-      "advanced": true
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_right_step_pin",
@@ -68,8 +92,10 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the right Z axis driver.",
       "required": false,
-      "default": 4,
-      "advanced": true
+      "default": 4.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_right_dir_pin",
@@ -77,8 +103,10 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the right Z axis driver.",
       "required": false,
-      "default": 5,
-      "advanced": true
+      "default": 5.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "limit_switch_mode",
@@ -87,10 +115,17 @@
       "description": "Choose whether the Z gantry uses 2 shared/home switches or 4 independent end-stop switches.",
       "required": false,
       "default": "4",
+      "placeholder": null,
       "advanced": true,
       "options": [
-        { "label": "2 Limit Switches", "value": "2" },
-        { "label": "4 Limit Switches", "value": "4" }
+        {
+          "label": "2 Limit Switches",
+          "value": "2"
+        },
+        {
+          "label": "4 Limit Switches",
+          "value": "4"
+        }
       ]
     },
     {
@@ -99,8 +134,10 @@
       "type": "number",
       "description": "GPIO pin for the left Z minimum/home limit switch.",
       "required": false,
-      "default": 12,
-      "advanced": true
+      "default": 12.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_left_max_limit_pin",
@@ -108,8 +145,10 @@
       "type": "number",
       "description": "GPIO pin for the left Z maximum limit switch.",
       "required": false,
-      "default": 13,
-      "advanced": true
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_right_min_limit_pin",
@@ -117,8 +156,10 @@
       "type": "number",
       "description": "GPIO pin for the right Z minimum/home limit switch.",
       "required": false,
-      "default": 14,
-      "advanced": true
+      "default": 14.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     },
     {
       "key": "z_right_max_limit_pin",
@@ -126,8 +167,10 @@
       "type": "number",
       "description": "GPIO pin for the right Z maximum limit switch.",
       "required": false,
-      "default": 15,
-      "advanced": true
+      "default": 15.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     }
   ],
   "outputs": [
@@ -135,7 +178,7 @@
       "key": "accepted",
       "label": "Accepted",
       "type": "boolean",
-      "description": "Whether the future Z gantry runner accepted the move."
+      "description": "Whether the ESP32 accepted and completed the Z move."
     },
     {
       "key": "target",
@@ -143,5 +186,10 @@
       "type": "object",
       "description": "Echo of the requested left/right Z targets in centimeters."
     }
-  ]
+  ],
+  "builder_board_id": "ttyUSB1",
+  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/move_gantry_z.json",
+  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+  "builder_firmware_entry_file": "firmware/main.ino",
+  "builder_base_function_id": null
 }

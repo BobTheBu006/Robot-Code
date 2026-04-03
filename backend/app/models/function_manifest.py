@@ -81,3 +81,14 @@ class FunctionTestResponse(BaseModel):
     input_data: dict[str, object] | None = None
     result: dict[str, object] | None = None
     error: str | None = None
+
+
+class FunctionCancelRequest(BaseModel):
+    inputs: dict[str, str | float | bool | None] = Field(default_factory=dict)
+
+
+class FunctionCancelResponse(BaseModel):
+    function_id: str
+    ok: bool
+    message: str
+    result: dict[str, object] | None = None

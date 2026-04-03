@@ -8,6 +8,7 @@ import type {
   Esp32FileSaveResponse,
 } from "../types/esp32Builder";
 import type {
+  FunctionCancelResponse,
   FunctionDiscoveryResponse,
   FunctionTestResponse,
   SavedWorkflowFile,
@@ -166,10 +167,22 @@ export function testFunction(
   functionId: string,
   inputs: Record<string, WorkflowParameterValue>,
   inputData?: Record<string, unknown> | null,
+  signal?: AbortSignal,
 ): Promise<FunctionTestResponse> {
   return request<FunctionTestResponse>(`/api/functions/${functionId}/test`, {
     method: "POST",
+    signal,
     body: JSON.stringify({ inputs, input_data: inputData ?? null }),
+  });
+}
+
+export function cancelFunction(
+  functionId: string,
+  inputs: Record<string, WorkflowParameterValue>,
+): Promise<FunctionCancelResponse> {
+  return request<FunctionCancelResponse>(`/api/functions/${functionId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ inputs }),
   });
 }
 

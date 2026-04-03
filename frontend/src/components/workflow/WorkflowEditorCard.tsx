@@ -19,6 +19,7 @@ import {
 } from "@xyflow/react";
 
 import {
+  cancelFunction,
   deleteEsp32CustomBlock,
   fetchEsp32Boards,
   fetchFunctions,
@@ -123,6 +124,7 @@ function WorkflowEditorSurface() {
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
+  const testAbortControllersRef = useRef<Record<string, AbortController>>({});
   const [workflowJson, setWorkflowJson] = useState(() => serializeWorkflow(starterWorkflow.nodes, starterWorkflow.edges));
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsPath, setSaveAsPath] = useState("");
@@ -190,6 +192,7 @@ function WorkflowEditorSurface() {
       executionEtaMs: getNodeExecutionEta(node.id),
       onDelete: () => handleDeleteNode(node.id),
       onRun: () => void handleRunTestForNode(node.id),
+      onCancel: () => void handleCancelNodeExecution(node.id),
       onToggleActive: () => handleToggleNodeActive(node.id),
     },
   }));
@@ -367,6 +370,8 @@ function WorkflowEditorSurface() {
   }
 
   function handleDeleteNode(nodeId: string) {
+    testAbortControllersRef.current[nodeId]?.abort();
+    delete testAbortControllersRef.current[nodeId];
     setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId));
     setEdges((existingEdges) =>
       existingEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
@@ -513,6 +518,8 @@ function WorkflowEditorSurface() {
   }
 
   function handleResetWorkflow() {
+    Object.values(testAbortControllersRef.current).forEach((controller) => controller.abort());
+    testAbortControllersRef.current = {};
     const nextStarterWorkflow = createStarterWorkflow();
     setNodes(nextStarterWorkflow.nodes);
     setEdges(nextStarterWorkflow.edges);
@@ -575,6 +582,7 @@ function WorkflowEditorSurface() {
     node: WorkflowFlowNode,
     inputData: Record<string, unknown> | null,
     blockResults: Record<string, Record<string, unknown> | null | undefined> = {},
+    signal?: AbortSignal,
   ): Promise<FunctionTestResponse> {
     const resolvedParameters = resolveWorkflowParameters(
       getAllBlockInputs(node.data.block),
@@ -594,7 +602,7 @@ function WorkflowEditorSurface() {
       return runBuiltInBlockTest(node.data.block, resolvedParameters, inputData);
     }
 
-    return testFunction(node.data.block.id, resolvedParameters, inputData);
+    return testFunction(node.data.block.id, resolvedParameters, inputData, signal);
   }
 
   async function executeNode(
@@ -641,12 +649,15 @@ function WorkflowEditorSurface() {
     }));
 
     const startedAt = performance.now();
+    const abortController = new AbortController();
+    testAbortControllersRef.current[nodeId] = abortController;
 
     try {
       const blockResults = buildBlockResultLookup();
-      const result = await runSingleNode(node, inputData, blockResults);
+      const result = await runSingleNode(node, inputData, blockResults, abortController.signal);
       const durationMs = performance.now() - startedAt;
       recordNodeDuration(nodeId, durationMs);
+      delete testAbortControllersRef.current[nodeId];
 
       updateTestState((currentState) => ({
         ...currentState,
@@ -661,7 +672,12 @@ function WorkflowEditorSurface() {
     } catch (error) {
       const durationMs = performance.now() - startedAt;
       recordNodeDuration(nodeId, durationMs);
-      const message = error instanceof Error ? error.message : "Block test failed.";
+      delete testAbortControllersRef.current[nodeId];
+      const message = error instanceof DOMException && error.name === "AbortError"
+        ? "Cancellation requested."
+        : error instanceof Error
+          ? error.message
+          : "Block test failed.";
       updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
@@ -671,6 +687,52 @@ function WorkflowEditorSurface() {
         },
       }));
       throw error;
+    }
+  }
+
+  async function handleCancelNodeExecution(nodeId: string) {
+    const node = nodeLookup.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    testAbortControllersRef.current[nodeId]?.abort();
+
+    updateTestState((currentState) => ({
+      ...currentState,
+      [nodeId]: {
+        status: "error",
+        result: currentState[nodeId]?.result ?? null,
+        error: "Cancellation requested.",
+      },
+    }));
+
+    if (node.data.block.kind !== "robot-action") {
+      return;
+    }
+
+    try {
+      const response = await cancelFunction(
+        node.data.block.id,
+        node.data.parameters,
+      );
+      updateTestState((currentState) => ({
+        ...currentState,
+        [nodeId]: {
+          status: response.ok ? "error" : (currentState[nodeId]?.status ?? "error"),
+          result: currentState[nodeId]?.result ?? null,
+          error: response.message,
+        },
+      }));
+    } catch (error) {
+      updateTestState((currentState) => ({
+        ...currentState,
+        [nodeId]: {
+          status: "error",
+          result: currentState[nodeId]?.result ?? null,
+          error: error instanceof Error ? error.message : "Could not cancel this block.",
+        },
+      }));
     }
   }
 
@@ -1013,6 +1075,7 @@ function WorkflowEditorSurface() {
                   setSelectedNodeId(nodeId);
                   setOpenedNodeId(nodeId);
                 }}
+                onCancel={() => void handleCancelNodeExecution(openedNode.id)}
                 onRunTest={handleRunTest}
                 onSaveCustomBlock={(displayName) => handleSaveCustomBlock(openedNode.id, displayName)}
                 onUpdateParameter={handleUpdateParameter}

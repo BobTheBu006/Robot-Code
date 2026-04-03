@@ -41,16 +41,20 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
         </button>
         <button
           className="workflow-node__action nodrag nopan"
-          disabled={!isActive}
+          disabled={!isActive && executionStatus !== "running"}
           onClick={(event) => {
             event.stopPropagation();
+            if (executionStatus === "running") {
+              data.onCancel?.();
+              return;
+            }
             data.onRun?.();
           }}
           onMouseDown={(event) => event.stopPropagation()}
-          title="Run block test"
+          title={executionStatus === "running" ? "Cancel block test" : "Run block test"}
           type="button"
         >
-          Run
+          {executionStatus === "running" ? "Cancel" : "Run"}
         </button>
         <button
           className="workflow-node__action nodrag nopan"
