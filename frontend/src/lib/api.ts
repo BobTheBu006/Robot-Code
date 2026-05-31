@@ -1,4 +1,5 @@
 ﻿import type { CameraStatus, HealthResponse, RobotState, RobotStateUpdate } from "../types/robot";
+import type { HardwareMap, HardwareMapSaveResponse } from "../types/hardwareMap";
 import type {
   Esp32BoardDetail,
   Esp32BoardListResponse,
@@ -77,6 +78,17 @@ export function fetchFunctions(): Promise<FunctionDiscoveryResponse> {
 
 export function fetchEsp32Boards(): Promise<Esp32BoardListResponse> {
   return request<Esp32BoardListResponse>("/api/esp32-builder/boards");
+}
+
+export function fetchHardwareMap(): Promise<HardwareMap> {
+  return request<HardwareMap>("/api/hardware-map");
+}
+
+export function saveHardwareMap(hardwareMap: HardwareMap): Promise<HardwareMapSaveResponse> {
+  return request<HardwareMapSaveResponse>("/api/hardware-map", {
+    method: "PUT",
+    body: JSON.stringify(hardwareMap),
+  });
 }
 
 export function fetchEsp32Board(boardId: string): Promise<Esp32BoardDetail> {

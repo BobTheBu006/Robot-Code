@@ -51,6 +51,7 @@ interface WorkflowInspectorProps {
   onClose: () => void;
   onNavigateToNode: (nodeId: string) => void;
   onCancel: () => void;
+  onEditCompound: () => void;
   onRunTest: () => void;
   onSaveCustomBlock: (displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
   onUpdateParameter: (
@@ -314,6 +315,7 @@ export function WorkflowInspector({
   onClose,
   onNavigateToNode,
   onCancel,
+  onEditCompound,
   onRunTest,
   onSaveCustomBlock,
   onUpdateParameter,
@@ -507,7 +509,7 @@ export function WorkflowInspector({
         <div className="workflow-overlay__topbar-center">
           <div className="workflow-overlay__title">
             <span className="workflow-overlay__eyebrow">
-              {block.kind === "robot-action" ? "Robot action" : block.category}
+              {block.kind === "compound" ? "Compound Function" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
             </span>
             <strong>{block.displayName}</strong>
           </div>
@@ -669,7 +671,7 @@ export function WorkflowInspector({
                             {(block.advancedInputs ?? []).map(renderParameterField)}
                           </div>
 
-                          {block.kind === "robot-action" && block.builderBoardId ? (
+                          {(block.kind === "advanced" || block.kind === "robot-action") && block.builderBoardId ? (
                             <div className="workflow-overlay__custom-block">
                               <label className="workflow-overlay__field">
                                 <div className="workflow-overlay__field-meta">
@@ -743,6 +745,16 @@ export function WorkflowInspector({
                   />
                   <p>How many times the executor should retry this block before marking it as failed.</p>
                 </label>
+
+                {block.kind === "compound" ? (
+                  <button
+                    className="workflow-overlay__save-block"
+                    onClick={onEditCompound}
+                    type="button"
+                  >
+                    Edit compound function
+                  </button>
+                ) : null}
 
                 <div className="workflow-overlay__setting-row">
                   <span>Node id</span>

@@ -134,16 +134,10 @@
     ],
     "outputs": [
       {
-        "key": "accepted",
-        "label": "Accepted",
-        "type": "boolean",
-        "description": "Whether the ESP32 accepted and completed the Z move."
-      },
-      {
-        "key": "target",
-        "label": "Target",
-        "type": "object",
-        "description": "Echo of the requested left/right Z targets in centimeters."
+        "key": "next",
+        "label": "Next",
+        "type": "flow",
+        "description": "Continue when the Z move completes."
       }
     ]
   },

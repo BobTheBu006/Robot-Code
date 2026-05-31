@@ -1,6 +1,6 @@
 export type WorkflowInputType = "string" | "number" | "boolean" | "select" | "file/path";
 export type WorkflowParameterValue = string | number | boolean;
-export type WorkflowBlockKind = "built-in" | "robot-action";
+export type WorkflowBlockKind = "basic" | "advanced" | "compound" | "built-in" | "robot-action";
 export type WorkflowFailureMode = "stop_flow" | "separate_path";
 export type WorkflowExecutionStatus = "idle" | "running" | "success" | "error";
 
@@ -26,6 +26,11 @@ export interface WorkflowOutputDefinition {
   label: string;
   type?: string;
   description?: string | null;
+}
+
+export interface WorkflowCompoundOutputDefinition extends WorkflowOutputDefinition {
+  sourceNodeId: string;
+  sourceHandle?: string | null;
 }
 
 export interface FunctionManifest {
@@ -83,6 +88,13 @@ export interface WorkflowSaveResponse {
   saved_at: string;
 }
 
+export interface WorkflowCompoundDefinition {
+  entryNodeId: string;
+  nodes: WorkflowCanvasNode[];
+  edges: WorkflowCanvasEdge[];
+  outputs: WorkflowCompoundOutputDefinition[];
+}
+
 export interface WorkflowBlockDefinition {
   id: string;
   displayName: string;
@@ -95,6 +107,10 @@ export interface WorkflowBlockDefinition {
   inputs: WorkflowInputDefinition[];
   advancedInputs?: WorkflowInputDefinition[];
   outputs: WorkflowOutputDefinition[];
+  hardwareDeviceId?: string | null;
+  hardwareDeviceKind?: "stepper_motor" | "servo" | null;
+  hardwareBoardId?: string | null;
+  compound?: WorkflowCompoundDefinition | null;
   builderBoardId?: string | null;
   builderSourcePath?: string | null;
   builderWorkspacePath?: string | null;

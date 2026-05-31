@@ -42,7 +42,14 @@ Each blueprint file should contain:
     "description": "High-level syringe dispense action.",
     "version": "0.1.0",
     "inputs": [],
-    "outputs": []
+    "outputs": [
+      {
+        "key": "next",
+        "label": "Next",
+        "type": "flow",
+        "description": "Continue when this action completes."
+      }
+    ]
   },
   "advanced_builder_inputs": [],
   "firmware_entry_file": "firmware/main.ino",
@@ -60,6 +67,13 @@ Each blueprint file should contain:
 ## Recommended split
 
 - Put runtime parameters in `manifest.inputs`.
+- Use `manifest.outputs` only for control-flow paths. Normal robot actions should have one `next` flow output; use the block settings error path for failures. Do not add outputs for returned data like status text, measurements, or raw controller replies.
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
 - Keep actual source code changes in `firmware/main.ino`.
 - Use `board.json` to override the active `fqbn` or firmware entry file for a specific board workspace if needed.
+
+## Workflow block types
+
+- Basic blocks come from the editor itself and from the Hardware Map. Adding a stepper motor creates a basic stepper move block. Adding a servo creates a basic servo angle block using the servo rotation range from the Hardware Map.
+- Advanced functions come from these ESP32 workflow-function blueprints and run through the backend function endpoint.
+- Compound functions are made in the Workflow Editor by selecting directly connected blocks, right-clicking the selection, and choosing `Create compound function`.

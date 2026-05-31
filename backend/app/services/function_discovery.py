@@ -14,6 +14,7 @@ from app.models.function_manifest import (
     FunctionTestResponse,
 )
 from app.services.esp32_builder import esp32_builder_service
+from app.services.hardware_map import hardware_map_service
 
 
 class FunctionDiscoveryService:
@@ -146,15 +147,18 @@ class FunctionDiscoveryService:
                 f"Function '{function_id}' does not expose a callable execute(context, inputs)."
             )
 
+        resolved_inputs = hardware_map_service.apply_function_defaults(discovered_function.manifest, inputs)
+        hardware_map = hardware_map_service.load_map()
         context = {
             "mode": "test",
             "function_id": function_id,
             "manifest": discovered_function.manifest.model_dump(),
             "input_data": input_data,
+            "hardware_map": hardware_map.model_dump(mode="json"),
         }
 
         try:
-            result = execute(context, inputs)
+            result = execute(context, resolved_inputs)
         except Exception as exc:  # pragma: no cover - defensive boundary around plugin code
             raise RuntimeError(
                 f"Function '{function_id}' test execution failed: {exc}"
@@ -168,7 +172,7 @@ class FunctionDiscoveryService:
         return FunctionTestResponse(
             function_id=function_id,
             ok=True,
-            inputs=inputs,
+            inputs=resolved_inputs,
             input_data=input_data,
             result=result or {},
             error=None,
@@ -194,14 +198,17 @@ class FunctionDiscoveryService:
                 f"Function '{function_id}' does not support cancellation yet."
             )
 
+        resolved_inputs = hardware_map_service.apply_function_defaults(discovered_function.manifest, inputs)
+        hardware_map = hardware_map_service.load_map()
         context = {
             "mode": "cancel",
             "function_id": function_id,
             "manifest": discovered_function.manifest.model_dump(),
+            "hardware_map": hardware_map.model_dump(mode="json"),
         }
 
         try:
-            result = cancel(context, inputs)
+            result = cancel(context, resolved_inputs)
         except Exception as exc:  # pragma: no cover - defensive boundary around plugin code
             raise RuntimeError(
                 f"Function '{function_id}' cancellation failed: {exc}"

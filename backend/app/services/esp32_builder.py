@@ -760,7 +760,7 @@ class Esp32BuilderService:
         cli_path = self._cli_path()
         if not cli_path:
             raise Esp32BuilderError(
-                "arduino-cli is not installed on this Pi yet. Install it first so the Function Builder can compile and upload firmware."
+                "arduino-cli is not installed on this Pi yet. Install it first before compiling or uploading ESP32 firmware."
             )
 
         return [
@@ -849,11 +849,11 @@ class Esp32BuilderService:
             f"- Port: `{port.device}`\n"
             f"- Display: `{port.description or 'ESP32 board'}`\n"
             f"- This folder stores the local source files and block blueprint metadata that the Pi UI edits.\n"
-            f"- Use the Function Builder's Build + Flash action to compile and upload these sources to the board from the Pi.\n"
+            f"- Compile and upload these sources from the Pi after the ESP32 hardware map is correct.\n"
         )
 
     def _instructions_markdown(self) -> str:
-        return """# ESP32 Function Builder Structure
+        return """# ESP32 Workspace Structure
 
 Each connected board gets its own workspace folder:
 
@@ -898,9 +898,9 @@ Each file under `workflow-functions/` should look like:
     ],
     "outputs": [
       {
-        "key": "status",
-        "label": "Status",
-        "type": "string"
+        "key": "next",
+        "label": "Next",
+        "type": "flow"
       }
     ]
   },
@@ -928,8 +928,15 @@ Each file under `workflow-functions/` should look like:
 ## Recommended split
 
 - Put normal runtime parameters in `manifest.inputs`.
+- Use `manifest.outputs` only for control-flow branches. Normal robot actions should expose a single `next` flow output; the Workflow Editor can add an `error` path from block settings. Data returned by the handler, such as status strings or controller replies, should stay in the handler result and should not become output handles.
 - Put firmware wiring and board-specific tuning in `advanced_builder_inputs`.
 - Keep source code changes in `firmware/main.ino`.
+
+## Workflow block types
+
+- Basic blocks are built into the editor or generated from the Hardware Map for simple stepper and servo moves.
+- Advanced functions are generated from these ESP32 workflow-function blueprints and run through the backend function endpoint.
+- Compound functions are created in the Workflow Editor by selecting directly connected canvas blocks and collapsing them from the right-click menu.
 """
 
     def _generated_placeholder_handler(self, function_id: str) -> str:
@@ -1122,16 +1129,10 @@ Each file under `workflow-functions/` should look like:
                 "advanced_inputs": advanced_inputs,
                 "outputs": [
                     {
-                        "key": "status",
-                        "label": "Status",
-                        "type": "string",
-                        "description": "High-level status for the dispense request.",
-                    },
-                    {
-                        "key": "reply",
-                        "label": "Controller Reply",
-                        "type": "string",
-                        "description": "Raw serial reply returned by the ESP32 firmware.",
+                        "key": "next",
+                        "label": "Next",
+                        "type": "flow",
+                        "description": "Continue when the dispense request completes.",
                     },
                 ],
             },

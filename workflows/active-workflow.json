@@ -34,13 +34,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 11,
-        "benchmarkDurationMs": 36,
-        "lastDurationMs": 34
+        "runCount": 12,
+        "benchmarkDurationMs": 34,
+        "lastDurationMs": 16
       },
       "measured": {
         "width": 196,
-        "height": 134
+        "height": 135
       },
       "selected": false,
       "dragging": false
@@ -66,13 +66,22 @@
             {
               "key": "tool_port",
               "label": "Selected ESP32",
-              "type": "file/path",
+              "type": "select",
               "description": "Serial device path for the connected ESP32 syringe board.",
               "required": false,
               "default": "/dev/ttyUSB0",
               "placeholder": "/dev/ttyUSB0",
               "advanced": false,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe ESP32 (/dev/ttyUSB0)",
+                  "value": "/dev/ttyUSB0"
+                },
+                {
+                  "label": "Gantry ESP32 (/dev/ttyUSB1)",
+                  "value": "/dev/ttyUSB1"
+                }
+              ]
             },
             {
               "key": "calibration_file",
@@ -200,175 +209,253 @@
             {
               "key": "head_a_step_pin",
               "label": "Head A Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head A.",
               "required": false,
-              "default": 33,
+              "default": "33",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head A - Step GPIO 33 (Syringe ESP32)",
+                  "value": "33",
+                  "inputKey": "head_a_step_pin"
+                }
+              ]
             },
             {
               "key": "head_a_dir_pin",
               "label": "Head A Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head A.",
               "required": false,
-              "default": 32,
+              "default": "32",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head A - Direction GPIO 32 (Syringe ESP32)",
+                  "value": "32",
+                  "inputKey": "head_a_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_b_step_pin",
               "label": "Head B Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head B.",
               "required": false,
-              "default": 25,
+              "default": "25",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head B - Step GPIO 25 (Syringe ESP32)",
+                  "value": "25",
+                  "inputKey": "head_b_step_pin"
+                }
+              ]
             },
             {
               "key": "head_b_dir_pin",
               "label": "Head B Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head B.",
               "required": false,
-              "default": 4,
+              "default": "4",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head B - Direction GPIO 4 (Syringe ESP32)",
+                  "value": "4",
+                  "inputKey": "head_b_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_c_step_pin",
               "label": "Head C Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head C.",
               "required": false,
-              "default": 26,
+              "default": "26",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head C - Step GPIO 26 (Syringe ESP32)",
+                  "value": "26",
+                  "inputKey": "head_c_step_pin"
+                }
+              ]
             },
             {
               "key": "head_c_dir_pin",
               "label": "Head C Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head C.",
               "required": false,
-              "default": 5,
+              "default": "5",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head C - Direction GPIO 5 (Syringe ESP32)",
+                  "value": "5",
+                  "inputKey": "head_c_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_d_step_pin",
               "label": "Head D Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head D.",
               "required": false,
-              "default": 27,
+              "default": "27",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head D - Step GPIO 27 (Syringe ESP32)",
+                  "value": "27",
+                  "inputKey": "head_d_step_pin"
+                }
+              ]
             },
             {
               "key": "head_d_dir_pin",
               "label": "Head D Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head D.",
               "required": false,
-              "default": 18,
+              "default": "18",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head D - Direction GPIO 18 (Syringe ESP32)",
+                  "value": "18",
+                  "inputKey": "head_d_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_e_step_pin",
               "label": "Head E Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head E.",
               "required": false,
-              "default": 14,
+              "default": "14",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head E - Step GPIO 14 (Syringe ESP32)",
+                  "value": "14",
+                  "inputKey": "head_e_step_pin"
+                }
+              ]
             },
             {
               "key": "head_e_dir_pin",
               "label": "Head E Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head E.",
               "required": false,
-              "default": 19,
+              "default": "19",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head E - Direction GPIO 19 (Syringe ESP32)",
+                  "value": "19",
+                  "inputKey": "head_e_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_f_step_pin",
               "label": "Head F Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head F.",
               "required": false,
-              "default": 12,
+              "default": "12",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head F - Step GPIO 12 (Syringe ESP32)",
+                  "value": "12",
+                  "inputKey": "head_f_step_pin"
+                }
+              ]
             },
             {
               "key": "head_f_dir_pin",
               "label": "Head F Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head F.",
               "required": false,
-              "default": 21,
+              "default": "21",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head F - Direction GPIO 21 (Syringe ESP32)",
+                  "value": "21",
+                  "inputKey": "head_f_dir_pin"
+                }
+              ]
             },
             {
               "key": "head_g_step_pin",
               "label": "Head G Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO step pin to use at runtime for syringe head G.",
               "required": false,
-              "default": 13,
+              "default": "13",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head G - Step GPIO 13 (Syringe ESP32)",
+                  "value": "13",
+                  "inputKey": "head_g_step_pin"
+                }
+              ]
             },
             {
               "key": "head_g_dir_pin",
               "label": "Head G Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO direction pin to use at runtime for syringe head G.",
               "required": false,
-              "default": 22,
+              "default": "22",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe Head G - Direction GPIO 22 (Syringe ESP32)",
+                  "value": "22",
+                  "inputKey": "head_g_dir_pin"
+                }
+              ]
             }
           ],
           "outputs": [
             {
-              "key": "status",
-              "label": "Status",
-              "type": "string",
-              "description": "High-level status for the dispense request."
-            },
-            {
-              "key": "reply",
-              "label": "Controller Reply",
-              "type": "string",
-              "description": "Raw serial reply returned by the ESP32 firmware."
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue to the next workflow node."
             }
           ],
           "builderBoardId": "ttyUSB0",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+          "builderSourcePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0\\workflow-functions\\dispense.json",
+          "builderWorkspacePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null
         },
@@ -385,8 +472,8 @@
           "G": 200,
           "intake_speed": 50,
           "outtake_speed": 200,
-          "head_a_step_pin": 13,
-          "head_a_dir_pin": 22,
+          "head_a_step_pin": "33",
+          "head_a_dir_pin": "32",
           "head_b_step_pin": 25,
           "head_b_dir_pin": 4,
           "head_c_step_pin": 26,
@@ -397,11 +484,11 @@
           "head_e_dir_pin": 19,
           "head_f_step_pin": 12,
           "head_f_dir_pin": 21,
-          "head_g_step_pin": 33,
-          "head_g_dir_pin": 32
+          "head_g_step_pin": "13",
+          "head_g_dir_pin": "22"
         },
         "settings": {
-          "failureMode": "stop_flow",
+          "failureMode": "separate_path",
           "retryCount": 0
         },
         "isActive": true,
@@ -411,17 +498,17 @@
       },
       "measured": {
         "width": 196,
-        "height": 185
+        "height": 186
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     },
     {
       "id": "calibrate_xy-rymf4",
       "type": "workflowBlock",
       "position": {
-        "x": 236.78468526750436,
-        "y": 35.14522378629363
+        "x": 274.88231051474116,
+        "y": 52.606635357943816
       },
       "data": {
         "block": {
@@ -437,13 +524,22 @@
             {
               "key": "tool_port",
               "label": "Selected ESP32",
-              "type": "file/path",
+              "type": "select",
               "description": "Connected ESP32 board that should run the XY calibration routine.",
               "required": true,
               "default": "/dev/ttyUSB1",
               "placeholder": "/dev/ttyUSB1",
               "advanced": false,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe ESP32 (/dev/ttyUSB0)",
+                  "value": "/dev/ttyUSB0"
+                },
+                {
+                  "label": "Gantry ESP32 (/dev/ttyUSB1)",
+                  "value": "/dev/ttyUSB1"
+                }
+              ]
             },
             {
               "key": "x_track_length_cm",
@@ -492,46 +588,70 @@
             {
               "key": "x_step_pin",
               "label": "X Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO step pin for the X axis driver.",
               "required": false,
-              "default": 16,
+              "default": "16",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "X Axis Motor - Step GPIO 16 (Gantry ESP32)",
+                  "value": "16",
+                  "inputKey": "x_step_pin"
+                }
+              ]
             },
             {
               "key": "x_dir_pin",
               "label": "X Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO direction pin for the X axis driver.",
               "required": false,
-              "default": 17,
+              "default": "17",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "X Axis Motor - Direction GPIO 17 (Gantry ESP32)",
+                  "value": "17",
+                  "inputKey": "x_dir_pin"
+                }
+              ]
             },
             {
               "key": "y_step_pin",
               "label": "Y Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO step pin for the Y axis driver.",
               "required": false,
-              "default": 18,
+              "default": "18",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Y Axis Motor - Step GPIO 18 (Gantry ESP32)",
+                  "value": "18",
+                  "inputKey": "y_step_pin"
+                }
+              ]
             },
             {
               "key": "y_dir_pin",
               "label": "Y Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO direction pin for the Y axis driver.",
               "required": false,
-              "default": 19,
+              "default": "19",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Y Axis Motor - Direction GPIO 19 (Gantry ESP32)",
+                  "value": "19",
+                  "inputKey": "y_dir_pin"
+                }
+              ]
             },
             {
               "key": "limit_switch_mode",
@@ -556,65 +676,83 @@
             {
               "key": "x_min_limit_pin",
               "label": "X Min Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the X minimum/home limit switch.",
               "required": false,
-              "default": 21,
+              "default": "21",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - X Min GPIO 21 (Gantry ESP32)",
+                  "value": "21",
+                  "inputKey": "x_min_limit_pin"
+                }
+              ]
             },
             {
               "key": "x_max_limit_pin",
               "label": "X Max Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the X maximum limit switch.",
               "required": false,
-              "default": 22,
+              "default": "22",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - X Max GPIO 22 (Gantry ESP32)",
+                  "value": "22",
+                  "inputKey": "x_max_limit_pin"
+                }
+              ]
             },
             {
               "key": "y_min_limit_pin",
               "label": "Y Min Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the Y minimum/home limit switch.",
               "required": false,
-              "default": 23,
+              "default": "23",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - Y Min GPIO 23 (Gantry ESP32)",
+                  "value": "23",
+                  "inputKey": "y_min_limit_pin"
+                }
+              ]
             },
             {
               "key": "y_max_limit_pin",
               "label": "Y Max Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the Y maximum limit switch.",
               "required": false,
-              "default": 25,
+              "default": "25",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - Y Max GPIO 25 (Gantry ESP32)",
+                  "value": "25",
+                  "inputKey": "y_max_limit_pin"
+                }
+              ]
             }
           ],
           "outputs": [
             {
-              "key": "calibrated",
-              "label": "Calibrated",
-              "type": "boolean",
-              "description": "Whether the XY calibration routine completed."
-            },
-            {
-              "key": "workspace",
-              "label": "Workspace",
-              "type": "object",
-              "description": "Registered XY workspace dimensions in centimeters."
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue to the next workflow node."
             }
           ],
           "builderBoardId": "ttyUSB1",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/calibrate_xy.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderSourcePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1\\workflow-functions\\calibrate_xy.json",
+          "builderWorkspacePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null
         },
@@ -623,15 +761,15 @@
           "x_track_length_cm": 100,
           "y_track_length_cm": 100,
           "calibration_speed_profile": "normal",
-          "x_step_pin": 26,
-          "x_dir_pin": 25,
+          "x_step_pin": "16",
+          "x_dir_pin": "17",
           "y_step_pin": 18,
           "y_dir_pin": 19,
           "limit_switch_mode": "2",
-          "x_min_limit_pin": 32,
-          "x_max_limit_pin": 23,
-          "y_min_limit_pin": 33,
-          "y_max_limit_pin": 22
+          "x_min_limit_pin": "21",
+          "x_max_limit_pin": "22",
+          "y_min_limit_pin": "23",
+          "y_max_limit_pin": "25"
         },
         "settings": {
           "failureMode": "stop_flow",
@@ -644,7 +782,7 @@
       },
       "measured": {
         "width": 196,
-        "height": 185
+        "height": 164
       },
       "selected": false,
       "dragging": false
@@ -670,13 +808,22 @@
             {
               "key": "tool_port",
               "label": "Selected ESP32",
-              "type": "file/path",
+              "type": "select",
               "description": "Connected ESP32 board that should receive the XY gantry command.",
               "required": true,
               "default": "/dev/ttyUSB1",
               "placeholder": "/dev/ttyUSB1",
               "advanced": false,
-              "options": []
+              "options": [
+                {
+                  "label": "Syringe ESP32 (/dev/ttyUSB0)",
+                  "value": "/dev/ttyUSB0"
+                },
+                {
+                  "label": "Gantry ESP32 (/dev/ttyUSB1)",
+                  "value": "/dev/ttyUSB1"
+                }
+              ]
             },
             {
               "key": "x_cm",
@@ -729,46 +876,70 @@
             {
               "key": "x_step_pin",
               "label": "X Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO step pin for the X axis driver.",
               "required": false,
-              "default": 16,
+              "default": "16",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "X Axis Motor - Step GPIO 16 (Gantry ESP32)",
+                  "value": "16",
+                  "inputKey": "x_step_pin"
+                }
+              ]
             },
             {
               "key": "x_dir_pin",
               "label": "X Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO direction pin for the X axis driver.",
               "required": false,
-              "default": 17,
+              "default": "17",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "X Axis Motor - Direction GPIO 17 (Gantry ESP32)",
+                  "value": "17",
+                  "inputKey": "x_dir_pin"
+                }
+              ]
             },
             {
               "key": "y_step_pin",
               "label": "Y Step Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO step pin for the Y axis driver.",
               "required": false,
-              "default": 18,
+              "default": "18",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Y Axis Motor - Step GPIO 18 (Gantry ESP32)",
+                  "value": "18",
+                  "inputKey": "y_step_pin"
+                }
+              ]
             },
             {
               "key": "y_dir_pin",
               "label": "Y Dir Pin",
-              "type": "number",
+              "type": "select",
               "description": "Runtime GPIO direction pin for the Y axis driver.",
               "required": false,
-              "default": 19,
+              "default": "19",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "Y Axis Motor - Direction GPIO 19 (Gantry ESP32)",
+                  "value": "19",
+                  "inputKey": "y_dir_pin"
+                }
+              ]
             },
             {
               "key": "limit_switch_mode",
@@ -793,65 +964,83 @@
             {
               "key": "x_min_limit_pin",
               "label": "X Min Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the X minimum/home limit switch.",
               "required": false,
-              "default": 21,
+              "default": "21",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - X Min GPIO 21 (Gantry ESP32)",
+                  "value": "21",
+                  "inputKey": "x_min_limit_pin"
+                }
+              ]
             },
             {
               "key": "x_max_limit_pin",
               "label": "X Max Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the X maximum limit switch.",
               "required": false,
-              "default": 22,
+              "default": "22",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - X Max GPIO 22 (Gantry ESP32)",
+                  "value": "22",
+                  "inputKey": "x_max_limit_pin"
+                }
+              ]
             },
             {
               "key": "y_min_limit_pin",
               "label": "Y Min Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the Y minimum/home limit switch.",
               "required": false,
-              "default": 23,
+              "default": "23",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - Y Min GPIO 23 (Gantry ESP32)",
+                  "value": "23",
+                  "inputKey": "y_min_limit_pin"
+                }
+              ]
             },
             {
               "key": "y_max_limit_pin",
               "label": "Y Max Limit Pin",
-              "type": "number",
+              "type": "select",
               "description": "GPIO pin for the Y maximum limit switch.",
               "required": false,
-              "default": 25,
+              "default": "25",
               "placeholder": null,
               "advanced": true,
-              "options": []
+              "options": [
+                {
+                  "label": "XY Limit Switches - Y Max GPIO 25 (Gantry ESP32)",
+                  "value": "25",
+                  "inputKey": "y_max_limit_pin"
+                }
+              ]
             }
           ],
           "outputs": [
             {
-              "key": "accepted",
-              "label": "Accepted",
-              "type": "boolean",
-              "description": "Whether the ESP32 accepted and completed the XY move."
-            },
-            {
-              "key": "target",
-              "label": "Target",
-              "type": "object",
-              "description": "Echo of the requested XY target in centimeters."
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue to the next workflow node."
             }
           ],
           "builderBoardId": "ttyUSB1",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/move_gantry.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderSourcePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1\\workflow-functions\\move_gantry.json",
+          "builderWorkspacePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null
         },
@@ -860,30 +1049,30 @@
           "x_cm": 100,
           "y_cm": 100,
           "speed_profile": "normal",
-          "x_step_pin": 26,
-          "x_dir_pin": 25,
+          "x_step_pin": "16",
+          "x_dir_pin": "17",
           "y_step_pin": 18,
           "y_dir_pin": 19,
           "limit_switch_mode": "2",
           "x_min_limit_pin": 21,
           "x_max_limit_pin": 22,
           "y_min_limit_pin": 23,
-          "y_max_limit_pin": 21
+          "y_max_limit_pin": "25"
         },
         "settings": {
-          "failureMode": "stop_flow",
+          "failureMode": "separate_path",
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 18,
-        "benchmarkDurationMs": 1093,
-        "lastDurationMs": 14437
+        "runCount": 19,
+        "benchmarkDurationMs": 1039,
+        "lastDurationMs": 74
       },
       "measured": {
         "width": 196,
-        "height": 185
+        "height": 186
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     }
   ],
@@ -911,6 +1100,22 @@
       "targetHandle": "input",
       "type": "workflowEdge",
       "id": "xy-edge__move_gantry-qkmazaccepted-dispense-zk5jminput"
+    },
+    {
+      "source": "calibrate_xy-rymf4",
+      "sourceHandle": "next",
+      "target": "move_gantry-qkmaz",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__calibrate_xy-rymf4next-move_gantry-qkmazinput"
+    },
+    {
+      "source": "move_gantry-qkmaz",
+      "sourceHandle": "next",
+      "target": "dispense-zk5jm",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__move_gantry-qkmaznext-dispense-zk5jminput"
     }
   ]
 }

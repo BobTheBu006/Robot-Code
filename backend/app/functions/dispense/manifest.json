@@ -296,21 +296,15 @@
   ],
   "outputs": [
     {
-      "key": "status",
-      "label": "Status",
-      "type": "string",
-      "description": "High-level status for the dispense request."
-    },
-    {
-      "key": "reply",
-      "label": "Controller Reply",
-      "type": "string",
-      "description": "Raw serial reply returned by the ESP32 firmware."
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue when the dispense request completes."
     }
   ],
   "builder_board_id": "ttyUSB0",
-  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
-  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+  "builder_source_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0\\workflow-functions\\dispense.json",
+  "builder_workspace_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0",
   "builder_firmware_entry_file": "firmware/main.ino",
   "builder_base_function_id": null
 }

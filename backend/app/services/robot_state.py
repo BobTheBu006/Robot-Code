@@ -18,8 +18,6 @@ def build_default_robot_state() -> RobotState:
         sensor_values=[
             SensorState(name="gantry_limit_x", value=0),
             SensorState(name="gantry_limit_y", value=0),
-            SensorState(name="vacuum_pressure", value=-42.3, unit="kPa"),
-            SensorState(name="motor_driver_temp", value=37.8, unit="C"),
         ],
         alarms=[
             AlarmState(

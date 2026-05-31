@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { CameraFeedCard } from "./components/CameraFeedCard";
-import { Esp32FunctionBuilderCard } from "./components/Esp32FunctionBuilderCard";
+import { HardwareDiagramCard } from "./components/HardwareDiagramCard";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { StatusBadge } from "./components/StatusBadge";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
@@ -21,6 +21,7 @@ function App() {
   const [isCameraToggling, setIsCameraToggling] = useState(false);
   const [robotStateError, setRobotStateError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [hardwareMapRevision, setHardwareMapRevision] = useState(0);
 
   async function loadDashboard() {
     const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
@@ -138,9 +139,9 @@ function App() {
           />
         </div>
 
-        <WorkflowEditorCard />
+        <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} />
 
-        <Esp32FunctionBuilderCard />
+        <HardwareDiagramCard onHardwareMapSaved={() => setHardwareMapRevision((revision) => revision + 1)} />
       </div>
     </main>
   );

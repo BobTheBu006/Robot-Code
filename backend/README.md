@@ -121,6 +121,14 @@ The `GET /api/functions` endpoint scans those folders, validates their manifests
 
 `POST /api/functions/{function_id}/test` loads the function folder's `handler.py` and calls `execute(context, inputs)` in test mode so the workflow editor can preview block behavior without introducing a full execution engine yet.
 
+Function manifest outputs are workflow control-flow paths, not data fields. Normal robot actions should expose a single `next` output with `"type": "flow"`; the Workflow Editor can add a separate `error` output from block settings. Branching blocks such as if/else or loops may expose multiple flow outputs. Handler return values such as status strings, measurements, or raw controller replies should remain in the result payload and should not be listed as graph outputs.
+
+The Workflow Editor separates blocks into three groups:
+
+- Basic blocks: triggers, logic blocks, and hardware-map generated servo/stepper moves.
+- Advanced functions: backend-discovered robot functions such as gantry calibration and syringe dispensing.
+- Compound functions: directly connected canvas blocks collapsed through the canvas context menu. Compound functions preserve their external flow outputs and can be expanded back into editable blocks.
+
 ## Mock update example
 
 ```powershell
@@ -132,10 +140,7 @@ Invoke-RestMethod -Method Post `
     "current_workflow": "tray_loading",
     "current_step": 4,
     "gantry": { "x": 210, "y": 85, "z": 32 },
-    "sensor_values": [
-      { "name": "vacuum_pressure", "value": -51.2, "unit": "kPa" },
-      { "name": "motor_driver_temp", "value": 41.6, "unit": "C" }
-    ],
+    "sensor_values": [],
     "alarms": [
       {
         "code": "low_air",

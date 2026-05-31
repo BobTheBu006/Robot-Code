@@ -20,6 +20,11 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
   const isActive = data.isActive !== false;
   const executionStatus = data.executionStatus ?? "idle";
   const showEstimate = executionStatus === "running" || Boolean(data.benchmarkDurationMs);
+  const kindLabel = data.block.kind === "compound"
+    ? "Compound Function"
+    : data.block.kind === "advanced" || data.block.kind === "robot-action"
+      ? "Advanced Function"
+      : "Basic Block";
 
   return (
     <div
@@ -75,7 +80,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
       ) : null}
 
       <div className="workflow-node__header">
-        <span className="workflow-node__kind">{data.block.kind === "built-in" ? data.block.category : "Robot Action"}</span>
+        <span className="workflow-node__kind">{kindLabel}</span>
         <strong>{data.block.displayName}</strong>
         <p>{data.block.description}</p>
       </div>

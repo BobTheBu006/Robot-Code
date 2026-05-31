@@ -133,16 +133,10 @@
     ],
     "outputs": [
       {
-        "key": "calibrated",
-        "label": "Calibrated",
-        "type": "boolean",
-        "description": "Whether the XY calibration routine completed."
-      },
-      {
-        "key": "workspace",
-        "label": "Workspace",
-        "type": "object",
-        "description": "Registered XY workspace dimensions in centimeters."
+        "key": "next",
+        "label": "Next",
+        "type": "flow",
+        "description": "Continue when XY calibration completes."
       }
     ]
   },

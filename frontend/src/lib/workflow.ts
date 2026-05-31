@@ -12,6 +12,7 @@ import type {
   WorkflowParameterValue,
 } from "../types/workflow";
 import type { Esp32BoardSummary } from "../types/esp32Builder";
+import type { HardwareDeviceMapping, HardwareMap, HardwarePinMapping } from "../types/hardwareMap";
 
 export const WORKFLOW_STORAGE_KEY = "robot-control.workflow-editor";
 export const WORKFLOW_BLOCK_MIME = "application/x-robot-workflow-block";
@@ -26,6 +27,8 @@ const ERROR_OUTPUT: WorkflowOutputDefinition = {
   type: "flow",
   description: "Continue down the error path when this block fails.",
 };
+const BASIC_BLOCK_CATEGORY = "Basic Blocks";
+const ADVANCED_FUNCTION_CATEGORY = "Advanced Functions";
 
 function buildInput(
   key: string,
@@ -58,6 +61,38 @@ function buildOutput(
     label,
     type,
     description,
+  };
+}
+
+function buildHardwarePinOptions(
+  hardwareMap: HardwareMap | null,
+): Array<WorkflowInputDefinition["options"][number] & { inputKey?: string | null }> {
+  if (!hardwareMap) {
+    return [];
+  }
+
+  const boardLookup = new Map(hardwareMap.boards.map((board) => [board.id, board]));
+
+  return hardwareMap.devices.flatMap((device) => {
+    const board = boardLookup.get(device.board_id);
+
+    return device.pins
+      .filter((pin): pin is HardwarePinMapping & { gpio: string } => Boolean(pin.gpio) && pin.gpio !== "-" && pin.signal !== "-")
+      .map((pin) => ({
+        label: `${device.name} - ${pin.signal} GPIO ${pin.gpio}${board ? ` (${board.label})` : ""}`,
+        value: pin.gpio,
+        inputKey: pin.function_input_key ?? null,
+      }));
+  });
+}
+
+function getServoRange(device: HardwareDeviceMapping): { min: number; max: number } {
+  const min = Number(device.rotation_min_deg ?? -5);
+  const max = Number(device.rotation_max_deg ?? 175);
+
+  return {
+    min: Number.isFinite(min) ? min : -5,
+    max: Number.isFinite(max) ? max : 175,
   };
 }
 
@@ -234,10 +269,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "start",
       displayName: "Start",
-      category: "Trigger",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Entry point for a workflow.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: false,
       accent: "#1b7f5c",
       inputs: [],
@@ -246,10 +281,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "if",
       displayName: "If",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Branch the workflow based on a condition.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#a85d13",
       inputs: [buildInput("condition", "Condition", "string", "", "Expression or variable to evaluate.")],
@@ -261,10 +296,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "if_else",
       displayName: "If / Else",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Split into explicit true and false branches.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#8e4ec6",
       inputs: [buildInput("condition", "Condition", "string", "", "Condition to evaluate before choosing a branch.")],
@@ -276,10 +311,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "while",
       displayName: "While",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Repeat the loop body while the condition remains true.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#c63b63",
       inputs: [buildInput("condition", "Condition", "string", "", "Loop condition checked before each iteration.")],
@@ -291,10 +326,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "for",
       displayName: "For",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Run the loop body a fixed number of times.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#175c96",
       inputs: [buildInput("iterations", "Iterations", "number", 1, "Number of iterations to execute.")],
@@ -306,10 +341,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "loop_over",
       displayName: "Loop Over",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Iterate over an upstream array or object input set.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#0f6f66",
       inputs: [
@@ -324,10 +359,10 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
     {
       id: "delay",
       displayName: "Delay / Wait",
-      category: "Logic",
+      category: BASIC_BLOCK_CATEGORY,
       description: "Pause execution for a number of milliseconds.",
       version: "1.0.0",
-      kind: "built-in",
+      kind: "basic",
       acceptsInput: true,
       accent: "#48711f",
       inputs: [buildInput("duration_ms", "Duration (ms)", "number", 1000, "How long to wait before continuing.")],
@@ -336,48 +371,131 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
   ];
 }
 
+export function createHardwareBasicBlocks(hardwareMap: HardwareMap | null): WorkflowBlockDefinition[] {
+  if (!hardwareMap) {
+    return [];
+  }
+
+  const boardLookup = new Map(hardwareMap.boards.map((board) => [board.id, board]));
+
+  return hardwareMap.devices.flatMap((device): WorkflowBlockDefinition[] => {
+    const board = boardLookup.get(device.board_id);
+
+    if (device.kind === "stepper_motor") {
+      return [{
+        id: `basic-stepper-${device.id}`,
+        displayName: `Move ${device.name}`,
+        category: BASIC_BLOCK_CATEGORY,
+        description: `Move ${device.name} by a signed step amount${board ? ` on ${board.label}` : ""}.`,
+        version: "1.0.0",
+        kind: "basic",
+        acceptsInput: true,
+        accent: "#a85d13",
+        inputs: [
+          buildInput("amount_steps", "Amount (steps)", "number", 0, "Signed step count. Positive and negative values move in opposite directions."),
+        ],
+        advancedInputs: [
+          buildInput("speed_steps_per_second", "Speed (steps/s)", "number", 800, "Step pulse speed used by the basic move."),
+        ],
+        outputs: [buildOutput("next", "Next", "flow", "Continue when the stepper move completes.")],
+        hardwareDeviceId: device.id,
+        hardwareDeviceKind: "stepper_motor",
+        hardwareBoardId: device.board_id,
+      }];
+    }
+
+    if (device.kind === "servo") {
+      const range = getServoRange(device);
+      return [{
+        id: `basic-servo-${device.id}`,
+        displayName: `Move ${device.name}`,
+        category: BASIC_BLOCK_CATEGORY,
+        description: `Move ${device.name} to an angle between ${range.min} and ${range.max} degrees.`,
+        version: "1.0.0",
+        kind: "basic",
+        acceptsInput: true,
+        accent: "#8e4ec6",
+        inputs: [
+          buildInput("angle_deg", "Angle (deg)", "number", Math.max(range.min, Math.min(90, range.max)), `Target servo angle. Hardware range is ${range.min} to ${range.max} degrees.`),
+        ],
+        outputs: [buildOutput("next", "Next", "flow", "Continue when the servo reaches the target angle.")],
+        hardwareDeviceId: device.id,
+        hardwareDeviceKind: "servo",
+        hardwareBoardId: device.board_id,
+      }];
+    }
+
+    return [];
+  });
+}
+
 export function mapDiscoveredFunctionToBlock(
   discoveredFunction: DiscoveredFunctionDefinition,
   esp32Boards: Esp32BoardSummary[] = [],
+  hardwareMap: HardwareMap | null = null,
 ): WorkflowBlockDefinition {
-  const toolPortOptions = esp32Boards
-    .filter((board) => Boolean(board.port))
+  const hardwareBoardOptions = (hardwareMap?.boards ?? [])
+    .filter((board) => Boolean(board.usb_port))
+    .map((board) => ({
+      label: `${board.label} (${board.usb_port})`,
+      value: board.usb_port,
+    }));
+  const hardwareBoardPorts = new Set(hardwareBoardOptions.map((option) => option.value));
+  const detectedBoardOptions = esp32Boards
+    .filter((board) => Boolean(board.port) && !hardwareBoardPorts.has(board.port as string))
     .map((board) => ({
       label: `${board.display_name}${board.port ? ` (${board.port})` : ""}`,
       value: board.port as string,
     }));
+  const toolPortOptions = [...hardwareBoardOptions, ...detectedBoardOptions];
+  const pinOptions = buildHardwarePinOptions(hardwareMap);
+  const flowOutputs = discoveredFunction.manifest.outputs.filter((output) => output.type === "flow");
 
   const mapInput = (input: WorkflowInputDefinition): WorkflowInputDefinition => {
-    if (input.key !== "tool_port" || toolPortOptions.length === 0) {
+    if (input.key === "tool_port" && toolPortOptions.length > 0) {
+      const defaultValue = String(input.default ?? toolPortOptions[0]?.value ?? "");
+      return {
+        ...input,
+        label: "Selected ESP32",
+        type: "select",
+        options: toolPortOptions,
+        default: toolPortOptions.some((option) => option.value === defaultValue)
+          ? defaultValue
+          : toolPortOptions[0]?.value ?? defaultValue,
+      };
+    }
+
+    if (!input.key.includes("pin") || pinOptions.length === 0) {
       return input;
     }
 
-    const defaultValue = String(input.default ?? toolPortOptions[0]?.value ?? "");
+    const exactOptions = pinOptions.filter((option) => option.inputKey === input.key);
+    const options = exactOptions.length > 0 ? exactOptions : pinOptions;
+    const defaultValue = String(input.default ?? options[0]?.value ?? "");
     return {
       ...input,
-      label: "Selected ESP32",
       type: "select",
-      options: toolPortOptions,
-      default: toolPortOptions.some((option) => option.value === defaultValue)
+      options,
+      default: options.some((option) => option.value === defaultValue)
         ? defaultValue
-        : toolPortOptions[0]?.value ?? defaultValue,
+        : options[0]?.value ?? defaultValue,
     };
   };
 
   return {
     id: discoveredFunction.manifest.id,
     displayName: discoveredFunction.manifest.display_name,
-    category: discoveredFunction.manifest.category,
+    category: ADVANCED_FUNCTION_CATEGORY,
     description: discoveredFunction.manifest.description,
     version: discoveredFunction.manifest.version,
-    kind: "robot-action",
+    kind: "advanced",
     acceptsInput: true,
     accent: "#0e7490",
     inputs: discoveredFunction.manifest.inputs.map(mapInput),
     advancedInputs: (discoveredFunction.manifest.advanced_inputs ?? []).map(mapInput),
     outputs:
-      discoveredFunction.manifest.outputs.length > 0
-        ? discoveredFunction.manifest.outputs.map((output) => ({
+      flowOutputs.length > 0
+        ? flowOutputs.map((output) => ({
             key: output.key,
             label: output.label,
             type: output.type,
@@ -566,6 +684,58 @@ export function runBuiltInBlockTest(
   parameters: Record<string, WorkflowParameterValue>,
   inputData?: Record<string, unknown> | null,
 ): FunctionTestResponse {
+  if (block.kind === "compound") {
+    return {
+      function_id: block.id,
+      ok: true,
+      inputs: parameters,
+      input_data: inputData ?? null,
+      result: {
+        status: "compound",
+        inner_block_count: block.compound?.nodes.length ?? 0,
+        outputs: block.outputs.map((output) => output.key),
+      },
+      error: null,
+    };
+  }
+
+  if (block.hardwareDeviceKind === "stepper_motor") {
+    return {
+      function_id: block.id,
+      ok: true,
+      inputs: parameters,
+      input_data: inputData ?? null,
+      result: {
+        status: "simulated",
+        action: "move_stepper",
+        device_id: block.hardwareDeviceId,
+        board_id: block.hardwareBoardId,
+        amount_steps: parameters.amount_steps ?? 0,
+        speed_steps_per_second: parameters.speed_steps_per_second ?? 800,
+        next_output: "next",
+      },
+      error: null,
+    };
+  }
+
+  if (block.hardwareDeviceKind === "servo") {
+    return {
+      function_id: block.id,
+      ok: true,
+      inputs: parameters,
+      input_data: inputData ?? null,
+      result: {
+        status: "simulated",
+        action: "move_servo",
+        device_id: block.hardwareDeviceId,
+        board_id: block.hardwareBoardId,
+        angle_deg: parameters.angle_deg ?? 0,
+        next_output: "next",
+      },
+      error: null,
+    };
+  }
+
   if (block.id === "start") {
     return {
       function_id: block.id,
@@ -672,9 +842,5 @@ export function runBuiltInBlockTest(
 }
 
 export function blockUsesUpstreamInput(block: WorkflowBlockDefinition): boolean {
-  return (
-    block.kind === "built-in"
-    && block.id !== "start"
-    && block.id !== "delay"
-  );
+  return ["if", "if_else", "while", "for", "loop_over"].includes(block.id);
 }
