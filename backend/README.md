@@ -125,9 +125,11 @@ Function manifest outputs are workflow control-flow paths, not data fields. Norm
 
 The Workflow Editor separates blocks into three groups:
 
-- Basic blocks: triggers, logic blocks, and hardware-map generated servo/stepper moves.
+- Basic blocks: triggers, logic blocks, and hardware-map generated servo/stepper/sensor actions.
 - Advanced functions: backend-discovered robot functions such as gantry calibration and syringe dispensing.
 - Compound functions: directly connected canvas blocks collapsed through the canvas context menu. Compound functions preserve their external flow outputs and can be expanded back into editable blocks.
+
+Advanced function manifests may declare `hardware_devices`. Each declared motor, servo, or sensor is synchronized into the Hardware Map using stable device IDs and `function_input_key` pin links. The Workflow Editor then generates the matching basic hardware block from the Hardware Map, so a custom function and its basic move/read block point at the same physical USB controller and GPIO pins.
 
 ## Mock update example
 

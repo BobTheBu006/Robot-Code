@@ -177,6 +177,198 @@
       "description": "Continue when XY calibration completes."
     }
   ],
+  "hardware_devices": [
+    {
+      "id": "x-axis-motor",
+      "name": "X Axis Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "x-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "x_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "x-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "x_step_pin",
+          "notes": null
+        },
+        {
+          "id": "x-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "x-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "x-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "x-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-x-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "y-axis-motor",
+      "name": "Y Axis Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "y-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "y_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "y-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "y_step_pin",
+          "notes": null
+        },
+        {
+          "id": "y-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "y-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "y-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "y-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-y-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "x-min-limit-switch",
+      "name": "X Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "x-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "x_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "x-max-limit-switch",
+      "name": "X Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "x-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "x_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-max-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "y-min-limit-switch",
+      "name": "Y Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "y-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "y-max-limit-switch",
+      "name": "Y Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "y-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-max-limit-switch",
+      "notes": null
+    }
+  ],
   "builder_board_id": "ttyUSB1",
   "builder_source_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1\\workflow-functions\\calibrate_xy.json",
   "builder_workspace_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1",

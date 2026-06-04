@@ -26,6 +26,7 @@ import {
   fetchFunctions,
   fetchHardwareMap,
   fetchSavedWorkflow,
+  flashEsp32BoardFirmware,
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
@@ -81,9 +82,11 @@ type NodeTestState = {
 };
 type WorkflowRunState = {
   isRunning: boolean;
+  phase: "idle" | "flashing" | "running";
   orderedNodeIds: string[];
   currentNodeId: string | null;
   completedNodeIds: string[];
+  flashingBoardId: string | null;
 };
 type WorkflowContextMenuState = {
   x: number;
@@ -567,9 +570,11 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const [saveAsName, setSaveAsName] = useState("active-workflow");
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
+    phase: "idle",
     orderedNodeIds: [],
     currentNodeId: null,
     completedNodeIds: [],
+    flashingBoardId: null,
   });
   const reactFlow = useReactFlow<WorkflowFlowNode, Edge>();
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
@@ -789,6 +794,14 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       const node = nodeLookup.get(nodeId);
       return total + (node ? estimateNodeDuration(node) : 0);
     }, 0);
+  const flashingBoard = workflowRunState.flashingBoardId
+    ? esp32Boards.find((board) => board.board_id === workflowRunState.flashingBoardId)
+    : null;
+  const workflowStatusMessage = functionsError
+    ? functionsError
+    : workflowRunState.phase === "flashing"
+      ? `Building and flashing ${flashingBoard?.display_name ?? workflowRunState.flashingBoardId ?? "ESP32 firmware"} before running the workflow.`
+      : `${hardwareBasicBlocks.length} hardware basic block${hardwareBasicBlocks.length === 1 ? "" : "s"} and ${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`;
 
   useEffect(() => {
     const blockLookup = new Map(availableBlocks.map((block) => [block.id, block]));
@@ -1711,7 +1724,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       `${trimmedDisplayName} reusable preset.`,
       node.data.parameters,
     );
-    await Promise.all([loadFunctions(), loadBoards()]);
+    await Promise.all([loadFunctions(), loadBoards(), loadHardwareMap()]);
     return response;
   }
 
@@ -1750,6 +1763,52 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     return orderedNodeIds;
   }
 
+  function collectEsp32BoardIdsFromBlock(
+    block: WorkflowBlockDefinition,
+    boardIds: Set<string>,
+  ) {
+    if (block.builderBoardId) {
+      boardIds.add(block.builderBoardId);
+    }
+
+    if (block.hardwareBoardId) {
+      boardIds.add(block.hardwareBoardId);
+    }
+
+    for (const innerNode of block.compound?.nodes ?? []) {
+      collectEsp32BoardIdsFromBlock(innerNode.data.block, boardIds);
+    }
+  }
+
+  function collectEsp32BoardIdsForRun(orderedNodeIds: string[]): string[] {
+    const boardIds = new Set<string>();
+
+    for (const nodeId of orderedNodeIds) {
+      const node = nodeLookup.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      collectEsp32BoardIdsFromBlock(node.data.block, boardIds);
+    }
+
+    return Array.from(boardIds);
+  }
+
+  async function flashEsp32BoardsForRun(boardIds: string[]) {
+    for (const boardId of boardIds) {
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        flashingBoardId: boardId,
+      }));
+
+      const response = await flashEsp32BoardFirmware(boardId);
+      if (!response.ok) {
+        throw new Error(`Could not flash ESP32 '${boardId}'. ${response.log || response.auto_reset_note}`);
+      }
+    }
+  }
+
   async function handleRunAll() {
     const startNodeIds = nodes
       .filter((node) => node.data.block.id === "start")
@@ -1769,20 +1828,30 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     for (const nodeId of rootNodeIds) {
       collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
     }
+    const boardIdsToFlash = collectEsp32BoardIdsForRun(orderedNodeIds);
 
     setFunctionsError(null);
     setSelectedNodeId(null);
     setOpenedNodeId(null);
     setWorkflowRunState({
       isRunning: true,
+      phase: boardIdsToFlash.length > 0 ? "flashing" : "running",
       orderedNodeIds,
       currentNodeId: null,
       completedNodeIds: [],
+      flashingBoardId: null,
     });
 
     const resultsByNodeId = new Map<string, FunctionTestResponse>();
 
     try {
+      await flashEsp32BoardsForRun(boardIdsToFlash);
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        phase: "running",
+        flashingBoardId: null,
+      }));
+
       for (const nodeId of orderedNodeIds) {
         const node = nodeLookup.get(nodeId);
         if (!node) {
@@ -1816,7 +1885,9 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       setWorkflowRunState((currentState) => ({
         ...currentState,
         isRunning: false,
+        phase: "idle",
         currentNodeId: null,
+        flashingBoardId: null,
       }));
     }
   }
@@ -1837,18 +1908,20 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           <div>
             <strong>Function discovery</strong>
             <p>
-              {functionsError
-                ? functionsError
-                : `${hardwareBasicBlocks.length} hardware basic block${hardwareBasicBlocks.length === 1 ? "" : "s"} and ${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`}
+              {workflowStatusMessage}
             </p>
             <div className="workflow-editor__run-stats">
               <span>
-                {workflowRunState.isRunning
+                {workflowRunState.phase === "flashing"
+                  ? "Preparing ESP32 firmware"
+                  : workflowRunState.isRunning
                   ? `${completedRunNodes} / ${totalRunNodes} blocks executed`
                   : `${nodes.length} blocks on canvas`}
               </span>
               <span>
-                {workflowRunState.isRunning
+                {workflowRunState.phase === "flashing"
+                  ? "Workflow will start after flashing"
+                  : workflowRunState.isRunning
                   ? `~${formatDurationShort(remainingEstimateMs)} remaining`
                   : `Est. total ${formatDurationShort(nodes.reduce((total, node) => total + estimateNodeDuration(node), 0))}`}
               </span>
@@ -1862,7 +1935,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
               onClick={() => void handleRunAll()}
               type="button"
             >
-              {workflowRunState.isRunning ? "Running flow..." : "Run all"}
+              {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
             </button>
             <button
               className="workflow-editor__action"

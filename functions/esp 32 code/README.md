@@ -42,6 +42,7 @@ Each blueprint file should contain:
     "description": "High-level syringe dispense action.",
     "version": "0.1.0",
     "inputs": [],
+    "hardware_devices": [],
     "outputs": [
       {
         "key": "next",
@@ -69,11 +70,13 @@ Each blueprint file should contain:
 - Put runtime parameters in `manifest.inputs`.
 - Use `manifest.outputs` only for control-flow paths. Normal robot actions should have one `next` flow output; use the block settings error path for failures. Do not add outputs for returned data like status text, measurements, or raw controller replies.
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
+- Put every actuator, motor, servo, or sensor the function uses in `manifest.hardware_devices`. Use stable device IDs that match the Hardware Map, and set each pin's `function_input_key` to the matching runtime or advanced input. The Hardware Map creates or updates those devices, and the Workflow Editor generates the matching basic block, for example `basic-stepper-syringe-head-a` for `syringe-head-a`.
+- Advanced functions should reference those generated basic hardware blocks conceptually instead of keeping an unrelated private pin list. If a function moves syringe head A, it should declare/reference the same `syringe-head-a` device that creates the `Move Syringe Head A` basic block.
 - Keep actual source code changes in `firmware/main.ino`.
 - Use `board.json` to override the active `fqbn` or firmware entry file for a specific board workspace if needed.
 
 ## Workflow block types
 
-- Basic blocks come from the editor itself and from the Hardware Map. Adding a stepper motor creates a basic stepper move block. Adding a servo creates a basic servo angle block using the servo rotation range from the Hardware Map.
+- Basic blocks come from the editor itself and from the Hardware Map. Adding a stepper motor creates a basic stepper move block. Adding a servo creates a basic servo angle block using the servo rotation range from the Hardware Map. Adding a sensor creates a basic sensor read block.
 - Advanced functions come from these ESP32 workflow-function blueprints and run through the backend function endpoint.
 - Compound functions are made in the Workflow Editor by selecting directly connected blocks, right-clicking the selection, and choosing `Create compound function`.

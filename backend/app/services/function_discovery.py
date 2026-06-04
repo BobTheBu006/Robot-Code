@@ -100,8 +100,11 @@ class FunctionDiscoveryService:
                 )
             )
 
+        sorted_functions = sorted(discovered_functions, key=lambda item: item.manifest.display_name.lower())
+        hardware_map_service.sync_manifest_devices([item.manifest for item in sorted_functions])
+
         return FunctionDiscoveryResponse(
-            functions=sorted(discovered_functions, key=lambda item: item.manifest.display_name.lower()),
+            functions=sorted_functions,
             errors=errors,
         )
 

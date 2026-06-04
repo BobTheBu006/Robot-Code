@@ -1499,6 +1499,43 @@ body {
   gap: 14px;
 }
 
+.workflow-overlay__hardware-links {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-overlay__hardware-links strong {
+  color: #fff4ef;
+  font-size: 0.88rem;
+}
+
+.workflow-overlay__hardware-links div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-overlay__hardware-links span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #efe8f6;
+  font-size: 0.82rem;
+}
+
+.workflow-overlay__hardware-links small {
+  color: #c5b5ff;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
 .workflow-overlay__advanced {
   display: grid;
   gap: 12px;

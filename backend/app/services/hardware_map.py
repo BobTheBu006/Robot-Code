@@ -63,6 +63,61 @@ class HardwareMapService:
             hardware_map=payload,
         )
 
+    def sync_manifest_devices(self, manifests: list[FunctionManifest]) -> HardwareMap:
+        hardware_map = self.load_map()
+        devices = list(hardware_map.devices)
+        boards = list(hardware_map.boards)
+        changed = False
+
+        for manifest in manifests:
+            if not manifest.hardware_devices:
+                continue
+
+            input_defaults = self._input_defaults(manifest)
+            default_port = input_defaults.get("tool_port")
+
+            for device_reference in manifest.hardware_devices:
+                board_id = self._board_id_for_device_reference(hardware_map, manifest, device_reference.board_id)
+                board, board_changed = self._ensure_board(boards, board_id, manifest, default_port)
+                changed = changed or board_changed
+                next_device = HardwareDeviceMapping(
+                    id=device_reference.id,
+                    board_id=board.id,
+                    name=device_reference.name,
+                    kind=device_reference.kind,
+                    sensor_kind=device_reference.sensor_kind,
+                    rotation_min_deg=device_reference.rotation_min_deg,
+                    rotation_max_deg=device_reference.rotation_max_deg,
+                    pins=[
+                        HardwarePinMapping(
+                            id=pin.id,
+                            signal=pin.signal,
+                            gpio=self._pin_gpio_from_reference(pin.gpio, pin.function_input_key, input_defaults),
+                            function_input_key=pin.function_input_key,
+                            notes=pin.notes,
+                        )
+                        for pin in device_reference.pins
+                    ],
+                    notes=device_reference.notes,
+                )
+                device_index = next((index for index, device in enumerate(devices) if device.id == next_device.id), None)
+                if device_index is None:
+                    devices.append(next_device)
+                    changed = True
+                    continue
+
+                merged_device = self._merge_device(devices[device_index], next_device)
+                if merged_device.model_dump() != devices[device_index].model_dump():
+                    devices[device_index] = merged_device
+                    changed = True
+
+        if not changed:
+            return hardware_map
+
+        return self.save_map(
+            hardware_map.model_copy(update={"boards": boards, "devices": devices})
+        ).hardware_map
+
     def apply_function_defaults(
         self,
         manifest: FunctionManifest,
@@ -112,6 +167,126 @@ class HardwareMapService:
                     return board
 
         return hardware_map.boards[0] if hardware_map.boards else None
+
+    def _input_defaults(self, manifest: FunctionManifest) -> dict[str, str]:
+        defaults: dict[str, str] = {}
+        for input_definition in [*manifest.inputs, *manifest.advanced_inputs]:
+            if input_definition.default not in {None, ""}:
+                defaults[input_definition.key] = str(input_definition.default)
+        return defaults
+
+    def _board_id_for_device_reference(
+        self,
+        hardware_map: HardwareMap,
+        manifest: FunctionManifest,
+        requested_board_id: str | None,
+    ) -> str:
+        if requested_board_id:
+            return requested_board_id
+
+        if manifest.builder_board_id:
+            return manifest.builder_board_id
+
+        board = self._board_for_manifest(hardware_map, manifest)
+        if board:
+            return board.id
+
+        return f"{manifest.id}-controller"
+
+    def _ensure_board(
+        self,
+        boards: list[HardwareBoardMapping],
+        board_id: str,
+        manifest: FunctionManifest,
+        default_port: str | None,
+    ) -> tuple[HardwareBoardMapping, bool]:
+        existing_board = next((board for board in boards if board.id == board_id), None)
+        if existing_board:
+            return existing_board, False
+
+        usb_port = default_port or (f"/dev/{board_id}" if board_id.startswith(("tty", "ttyUSB", "ttyACM")) else "-")
+        board = HardwareBoardMapping(
+            id=board_id,
+            label=f"{manifest.display_name} Controller",
+            usb_port=usb_port,
+            notes=f"Auto-created because {manifest.display_name} declares hardware devices.",
+        )
+        boards.append(board)
+        return board, True
+
+    def _pin_gpio_from_reference(
+        self,
+        gpio: str | float | None,
+        function_input_key: str | None,
+        input_defaults: dict[str, str],
+    ) -> str:
+        if gpio not in {None, ""}:
+            return self._stringify_gpio(gpio)
+
+        if function_input_key and function_input_key in input_defaults:
+            return self._stringify_gpio(input_defaults[function_input_key])
+
+        return "-"
+
+    def _stringify_gpio(self, value: str | float) -> str:
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+
+        string_value = str(value)
+        if string_value.endswith(".0"):
+            return string_value[:-2]
+
+        return string_value
+
+    def _merge_device(
+        self,
+        existing_device: HardwareDeviceMapping,
+        next_device: HardwareDeviceMapping,
+    ) -> HardwareDeviceMapping:
+        existing_pins = list(existing_device.pins)
+        merged_pins = list(existing_pins)
+
+        for next_pin in next_device.pins:
+            pin_index = next(
+                (
+                    index
+                    for index, existing_pin in enumerate(merged_pins)
+                    if existing_pin.id == next_pin.id
+                    or (
+                        next_pin.function_input_key
+                        and existing_pin.function_input_key == next_pin.function_input_key
+                    )
+                    or existing_pin.signal == next_pin.signal
+                ),
+                None,
+            )
+            if pin_index is None:
+                merged_pins.append(next_pin)
+                continue
+
+            existing_pin = merged_pins[pin_index]
+            gpio = existing_pin.gpio
+            if gpio in {"", "-"} and next_pin.gpio not in {"", "-"}:
+                gpio = next_pin.gpio
+
+            merged_pins[pin_index] = existing_pin.model_copy(update={
+                "id": existing_pin.id or next_pin.id,
+                "signal": next_pin.signal,
+                "gpio": gpio,
+                "function_input_key": next_pin.function_input_key or existing_pin.function_input_key,
+                "notes": existing_pin.notes or next_pin.notes,
+            })
+
+        return existing_device.model_copy(update={
+            "board_id": next_device.board_id,
+            "name": existing_device.name or next_device.name,
+            "kind": next_device.kind,
+            "sensor_kind": next_device.sensor_kind,
+            "rotation_min_deg": existing_device.rotation_min_deg if existing_device.rotation_min_deg is not None else next_device.rotation_min_deg,
+            "rotation_max_deg": existing_device.rotation_max_deg if existing_device.rotation_max_deg is not None else next_device.rotation_max_deg,
+            "pins": merged_pins,
+            "notes": existing_device.notes or next_device.notes,
+        })
 
     def _default_map(self) -> HardwareMap:
         syringe_board = HardwareBoardMapping(
@@ -189,8 +364,8 @@ class HardwareMapService:
                 name="Left Z Motor",
                 kind="stepper_motor",
                 pins=[
-                    _pin("z-left-dir", "direction", 17, "z_left_dir_pin"),
-                    _pin("z-left-step", "step", 16, "z_left_step_pin"),
+                    _pin("z-left-dir", "direction", 33, "z_left_dir_pin"),
+                    _pin("z-left-step", "step", 32, "z_left_step_pin"),
                     _pin("z-left-enable", "enable", "-", None),
                     _pin("z-left-ms1", "micro_step_1", "-", None),
                     _pin("z-left-ms2", "micro_step_2", "-", None),
@@ -203,8 +378,8 @@ class HardwareMapService:
                 name="Right Z Motor",
                 kind="stepper_motor",
                 pins=[
-                    _pin("z-right-dir", "direction", 19, "z_right_dir_pin"),
-                    _pin("z-right-step", "step", 18, "z_right_step_pin"),
+                    _pin("z-right-dir", "direction", 5, "z_right_dir_pin"),
+                    _pin("z-right-step", "step", 4, "z_right_step_pin"),
                     _pin("z-right-enable", "enable", "-", None),
                     _pin("z-right-ms1", "micro_step_1", "-", None),
                     _pin("z-right-ms2", "micro_step_2", "-", None),
@@ -258,7 +433,7 @@ class HardwareMapService:
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("z-left-min-limit", "signal", 21, "z_left_min_limit_pin"),
+                    _pin("z-left-min-limit", "signal", 12, "z_left_min_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
@@ -268,7 +443,7 @@ class HardwareMapService:
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("z-left-max-limit", "signal", 22, "z_left_max_limit_pin"),
+                    _pin("z-left-max-limit", "signal", 13, "z_left_max_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
@@ -278,7 +453,7 @@ class HardwareMapService:
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("z-right-min-limit", "signal", 23, "z_right_min_limit_pin"),
+                    _pin("z-right-min-limit", "signal", 14, "z_right_min_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
@@ -288,7 +463,7 @@ class HardwareMapService:
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("z-right-max-limit", "signal", 25, "z_right_max_limit_pin"),
+                    _pin("z-right-max-limit", "signal", 15, "z_right_max_limit_pin"),
                 ],
             ),
         ]

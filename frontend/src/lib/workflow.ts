@@ -96,6 +96,22 @@ function getServoRange(device: HardwareDeviceMapping): { min: number; max: numbe
   };
 }
 
+function getHardwareBasicBlockId(device: Pick<HardwareDeviceMapping, "id" | "kind">): string | null {
+  if (device.kind === "stepper_motor") {
+    return `basic-stepper-${device.id}`;
+  }
+
+  if (device.kind === "servo") {
+    return `basic-servo-${device.id}`;
+  }
+
+  if (device.kind === "sensor") {
+    return `basic-sensor-${device.id}`;
+  }
+
+  return null;
+}
+
 function resolveInputPath(
   inputData: Record<string, unknown> | null | undefined,
   path: string,
@@ -425,6 +441,24 @@ export function createHardwareBasicBlocks(hardwareMap: HardwareMap | null): Work
       }];
     }
 
+    if (device.kind === "sensor") {
+      return [{
+        id: `basic-sensor-${device.id}`,
+        displayName: `Read ${device.name}`,
+        category: BASIC_BLOCK_CATEGORY,
+        description: `Read ${device.name}${board ? ` on ${board.label}` : ""}.`,
+        version: "1.0.0",
+        kind: "basic",
+        acceptsInput: true,
+        accent: "#0f6f66",
+        inputs: [],
+        outputs: [buildOutput("next", "Next", "flow", "Continue after reading the sensor.")],
+        hardwareDeviceId: device.id,
+        hardwareDeviceKind: "sensor",
+        hardwareBoardId: device.board_id,
+      }];
+    }
+
     return [];
   });
 }
@@ -450,6 +484,10 @@ export function mapDiscoveredFunctionToBlock(
   const toolPortOptions = [...hardwareBoardOptions, ...detectedBoardOptions];
   const pinOptions = buildHardwarePinOptions(hardwareMap);
   const flowOutputs = discoveredFunction.manifest.outputs.filter((output) => output.type === "flow");
+  const hardwareDevices = discoveredFunction.manifest.hardware_devices ?? [];
+  const referencedBasicBlockIds = hardwareDevices
+    .map((device) => device.basic_block_id ?? getHardwareBasicBlockId({ id: device.id, kind: device.kind }))
+    .filter((blockId): blockId is string => Boolean(blockId));
 
   const mapInput = (input: WorkflowInputDefinition): WorkflowInputDefinition => {
     if (input.key === "tool_port" && toolPortOptions.length > 0) {
@@ -507,6 +545,8 @@ export function mapDiscoveredFunctionToBlock(
     builderWorkspacePath: discoveredFunction.manifest.builder_workspace_path ?? null,
     builderFirmwareEntryFile: discoveredFunction.manifest.builder_firmware_entry_file ?? null,
     builderBaseFunctionId: discoveredFunction.manifest.builder_base_function_id ?? null,
+    hardwareDevices,
+    referencedBasicBlockIds,
   };
 }
 
@@ -730,6 +770,23 @@ export function runBuiltInBlockTest(
         device_id: block.hardwareDeviceId,
         board_id: block.hardwareBoardId,
         angle_deg: parameters.angle_deg ?? 0,
+        next_output: "next",
+      },
+      error: null,
+    };
+  }
+
+  if (block.hardwareDeviceKind === "sensor") {
+    return {
+      function_id: block.id,
+      ok: true,
+      inputs: parameters,
+      input_data: inputData ?? null,
+      result: {
+        status: "simulated",
+        action: "read_sensor",
+        device_id: block.hardwareDeviceId,
+        board_id: block.hardwareBoardId,
         next_output: "next",
       },
       error: null,

@@ -181,6 +181,198 @@
       "description": "Continue when the Z move completes."
     }
   ],
+  "hardware_devices": [
+    {
+      "id": "left-z-motor",
+      "name": "Left Z Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-left-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "z_left_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "z_left_step_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-left-z-motor",
+      "notes": null
+    },
+    {
+      "id": "right-z-motor",
+      "name": "Right Z Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-right-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "z_right_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "z_right_step_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-right-z-motor",
+      "notes": null
+    },
+    {
+      "id": "z-left-min-limit-switch",
+      "name": "Left Z Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-left-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_left_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-left-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-left-max-limit-switch",
+      "name": "Left Z Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-left-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_left_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-left-max-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-right-min-limit-switch",
+      "name": "Right Z Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-right-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_right_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-right-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-right-max-limit-switch",
+      "name": "Right Z Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-right-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_right_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-right-max-limit-switch",
+      "notes": null
+    }
+  ],
   "builder_board_id": "ttyUSB1",
   "builder_source_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1\\workflow-functions\\move_gantry_z.json",
   "builder_workspace_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1",

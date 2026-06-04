@@ -3,6 +3,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 FunctionInputType = Literal["string", "number", "boolean", "select", "file/path"]
+FunctionHardwareDeviceKind = Literal["stepper_motor", "servo", "sensor"]
+FunctionHardwareSensorKind = Literal["position_limit_switch", "aht20_temperature_humidity"]
 
 
 class FunctionInputOption(BaseModel):
@@ -35,6 +37,27 @@ class FunctionOutputDefinition(BaseModel):
     description: str | None = None
 
 
+class FunctionHardwarePinReference(BaseModel):
+    id: str = Field(min_length=1)
+    signal: str = Field(min_length=1)
+    gpio: str | float | None = None
+    function_input_key: str | None = None
+    notes: str | None = None
+
+
+class FunctionHardwareDeviceReference(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    kind: FunctionHardwareDeviceKind
+    board_id: str | None = None
+    sensor_kind: FunctionHardwareSensorKind | None = None
+    rotation_min_deg: float | None = None
+    rotation_max_deg: float | None = None
+    pins: list[FunctionHardwarePinReference] = Field(default_factory=list)
+    basic_block_id: str | None = None
+    notes: str | None = None
+
+
 class FunctionManifest(BaseModel):
     id: str = Field(min_length=1)
     display_name: str = Field(min_length=1)
@@ -44,6 +67,7 @@ class FunctionManifest(BaseModel):
     inputs: list[FunctionInputDefinition] = Field(default_factory=list)
     advanced_inputs: list[FunctionInputDefinition] = Field(default_factory=list)
     outputs: list[FunctionOutputDefinition] = Field(default_factory=list)
+    hardware_devices: list[FunctionHardwareDeviceReference] = Field(default_factory=list)
     builder_board_id: str | None = None
     builder_source_path: str | None = None
     builder_workspace_path: str | None = None

@@ -302,6 +302,393 @@
       "description": "Continue when the dispense request completes."
     }
   ],
+  "hardware_devices": [
+    {
+      "id": "syringe-head-a",
+      "name": "Syringe Head A",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-a-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_a_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_a_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-a",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-b",
+      "name": "Syringe Head B",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-b-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_b_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_b_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-b",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-c",
+      "name": "Syringe Head C",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-c-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_c_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_c_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-c",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-d",
+      "name": "Syringe Head D",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-d-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_d_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_d_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-d",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-e",
+      "name": "Syringe Head E",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-e-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_e_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_e_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-e",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-f",
+      "name": "Syringe Head F",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-f-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_f_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_f_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-f",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-g",
+      "name": "Syringe Head G",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "head-g-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_g_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_g_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-g",
+      "notes": null
+    }
+  ],
   "builder_board_id": "ttyUSB0",
   "builder_source_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0\\workflow-functions\\7_syringe_dispenser_slow_and_good.json",
   "builder_workspace_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0",

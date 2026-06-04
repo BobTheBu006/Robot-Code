@@ -39,8 +39,14 @@
         "required": true,
         "default": "safe",
         "options": [
-          { "label": "Safe", "value": "safe" },
-          { "label": "Normal", "value": "normal" }
+          {
+            "label": "Safe",
+            "value": "safe"
+          },
+          {
+            "label": "Normal",
+            "value": "normal"
+          }
         ]
       }
     ],
@@ -90,8 +96,14 @@
         "default": "4",
         "advanced": true,
         "options": [
-          { "label": "2 Limit Switches", "value": "2" },
-          { "label": "4 Limit Switches", "value": "4" }
+          {
+            "label": "2 Limit Switches",
+            "value": "2"
+          },
+          {
+            "label": "4 Limit Switches",
+            "value": "4"
+          }
         ]
       },
       {
@@ -137,6 +149,146 @@
         "label": "Next",
         "type": "flow",
         "description": "Continue when Z calibration completes."
+      }
+    ],
+    "hardware_devices": [
+      {
+        "id": "left-z-motor",
+        "name": "Left Z Motor",
+        "kind": "stepper_motor",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-stepper-left-z-motor",
+        "pins": [
+          {
+            "id": "z-left-dir",
+            "signal": "direction",
+            "function_input_key": "z_left_dir_pin"
+          },
+          {
+            "id": "z-left-step",
+            "signal": "step",
+            "function_input_key": "z_left_step_pin"
+          },
+          {
+            "id": "z-left-enable",
+            "signal": "enable",
+            "gpio": "-"
+          },
+          {
+            "id": "z-left-ms1",
+            "signal": "micro_step_1",
+            "gpio": "-"
+          },
+          {
+            "id": "z-left-ms2",
+            "signal": "micro_step_2",
+            "gpio": "-"
+          },
+          {
+            "id": "z-left-ms3",
+            "signal": "micro_step_3",
+            "gpio": "-"
+          }
+        ]
+      },
+      {
+        "id": "right-z-motor",
+        "name": "Right Z Motor",
+        "kind": "stepper_motor",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-stepper-right-z-motor",
+        "pins": [
+          {
+            "id": "z-right-dir",
+            "signal": "direction",
+            "function_input_key": "z_right_dir_pin"
+          },
+          {
+            "id": "z-right-step",
+            "signal": "step",
+            "function_input_key": "z_right_step_pin"
+          },
+          {
+            "id": "z-right-enable",
+            "signal": "enable",
+            "gpio": "-"
+          },
+          {
+            "id": "z-right-ms1",
+            "signal": "micro_step_1",
+            "gpio": "-"
+          },
+          {
+            "id": "z-right-ms2",
+            "signal": "micro_step_2",
+            "gpio": "-"
+          },
+          {
+            "id": "z-right-ms3",
+            "signal": "micro_step_3",
+            "gpio": "-"
+          }
+        ]
+      },
+      {
+        "id": "z-left-min-limit-switch",
+        "name": "Left Z Min Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-z-left-min-limit-switch",
+        "pins": [
+          {
+            "id": "z-left-min-limit",
+            "signal": "signal",
+            "function_input_key": "z_left_min_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "z-left-max-limit-switch",
+        "name": "Left Z Max Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-z-left-max-limit-switch",
+        "pins": [
+          {
+            "id": "z-left-max-limit",
+            "signal": "signal",
+            "function_input_key": "z_left_max_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "z-right-min-limit-switch",
+        "name": "Right Z Min Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-z-right-min-limit-switch",
+        "pins": [
+          {
+            "id": "z-right-min-limit",
+            "signal": "signal",
+            "function_input_key": "z_right_min_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "z-right-max-limit-switch",
+        "name": "Right Z Max Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-z-right-max-limit-switch",
+        "pins": [
+          {
+            "id": "z-right-max-limit",
+            "signal": "signal",
+            "function_input_key": "z_right_max_limit_pin"
+          }
+        ]
       }
     ]
   },

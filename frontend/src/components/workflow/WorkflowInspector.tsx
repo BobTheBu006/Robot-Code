@@ -339,6 +339,15 @@ export function WorkflowInspector({
     : null;
   const previousPayload = useMemo(() => getResultPayload(previousNodeTestResult), [previousNodeTestResult]);
   const currentPayload = useMemo(() => getResultPayload(testResult), [testResult]);
+  const linkedHardwareBlocks = useMemo(
+    () =>
+      (block.hardwareDevices ?? []).map((device, index) => ({
+        id: block.referencedBasicBlockIds?.[index] ?? device.basic_block_id ?? device.id,
+        label: `${device.kind === "sensor" ? "Read" : "Move"} ${device.name}`,
+        meta: device.kind === "sensor" && device.sensor_kind ? device.sensor_kind : device.kind,
+      })),
+    [block.hardwareDevices, block.referencedBasicBlockIds],
+  );
   const blockPayloadLookup = useMemo(
     () =>
       Object.fromEntries(
@@ -652,6 +661,20 @@ export function WorkflowInspector({
             {activeTab === "parameters" ? (
               block.inputs.length > 0 || (block.advancedInputs?.length ?? 0) > 0 ? (
                 <div className="workflow-overlay__fields">
+                  {linkedHardwareBlocks.length > 0 ? (
+                    <section className="workflow-overlay__hardware-links">
+                      <strong>Linked basic blocks</strong>
+                      <div>
+                        {linkedHardwareBlocks.map((linkedBlock) => (
+                          <span key={linkedBlock.id}>
+                            {linkedBlock.label}
+                            <small>{linkedBlock.meta}</small>
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
                   {block.inputs.map(renderParameterField)}
 
                   {(block.advancedInputs?.length ?? 0) > 0 ? (

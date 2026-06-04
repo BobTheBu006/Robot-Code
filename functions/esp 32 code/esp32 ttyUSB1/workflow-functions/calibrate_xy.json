@@ -39,8 +39,14 @@
         "required": true,
         "default": "safe",
         "options": [
-          { "label": "Safe", "value": "safe" },
-          { "label": "Normal", "value": "normal" }
+          {
+            "label": "Safe",
+            "value": "safe"
+          },
+          {
+            "label": "Normal",
+            "value": "normal"
+          }
         ]
       }
     ],
@@ -90,8 +96,14 @@
         "default": "4",
         "advanced": true,
         "options": [
-          { "label": "2 Limit Switches", "value": "2" },
-          { "label": "4 Limit Switches", "value": "4" }
+          {
+            "label": "2 Limit Switches",
+            "value": "2"
+          },
+          {
+            "label": "4 Limit Switches",
+            "value": "4"
+          }
         ]
       },
       {
@@ -137,6 +149,146 @@
         "label": "Next",
         "type": "flow",
         "description": "Continue when XY calibration completes."
+      }
+    ],
+    "hardware_devices": [
+      {
+        "id": "x-axis-motor",
+        "name": "X Axis Motor",
+        "kind": "stepper_motor",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-stepper-x-axis-motor",
+        "pins": [
+          {
+            "id": "x-dir",
+            "signal": "direction",
+            "function_input_key": "x_dir_pin"
+          },
+          {
+            "id": "x-step",
+            "signal": "step",
+            "function_input_key": "x_step_pin"
+          },
+          {
+            "id": "x-enable",
+            "signal": "enable",
+            "gpio": "-"
+          },
+          {
+            "id": "x-ms1",
+            "signal": "micro_step_1",
+            "gpio": "-"
+          },
+          {
+            "id": "x-ms2",
+            "signal": "micro_step_2",
+            "gpio": "-"
+          },
+          {
+            "id": "x-ms3",
+            "signal": "micro_step_3",
+            "gpio": "-"
+          }
+        ]
+      },
+      {
+        "id": "y-axis-motor",
+        "name": "Y Axis Motor",
+        "kind": "stepper_motor",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-stepper-y-axis-motor",
+        "pins": [
+          {
+            "id": "y-dir",
+            "signal": "direction",
+            "function_input_key": "y_dir_pin"
+          },
+          {
+            "id": "y-step",
+            "signal": "step",
+            "function_input_key": "y_step_pin"
+          },
+          {
+            "id": "y-enable",
+            "signal": "enable",
+            "gpio": "-"
+          },
+          {
+            "id": "y-ms1",
+            "signal": "micro_step_1",
+            "gpio": "-"
+          },
+          {
+            "id": "y-ms2",
+            "signal": "micro_step_2",
+            "gpio": "-"
+          },
+          {
+            "id": "y-ms3",
+            "signal": "micro_step_3",
+            "gpio": "-"
+          }
+        ]
+      },
+      {
+        "id": "x-min-limit-switch",
+        "name": "X Min Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-x-min-limit-switch",
+        "pins": [
+          {
+            "id": "x-min-limit",
+            "signal": "signal",
+            "function_input_key": "x_min_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "x-max-limit-switch",
+        "name": "X Max Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-x-max-limit-switch",
+        "pins": [
+          {
+            "id": "x-max-limit",
+            "signal": "signal",
+            "function_input_key": "x_max_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "y-min-limit-switch",
+        "name": "Y Min Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-y-min-limit-switch",
+        "pins": [
+          {
+            "id": "y-min-limit",
+            "signal": "signal",
+            "function_input_key": "y_min_limit_pin"
+          }
+        ]
+      },
+      {
+        "id": "y-max-limit-switch",
+        "name": "Y Max Limit Switch",
+        "kind": "sensor",
+        "sensor_kind": "position_limit_switch",
+        "board_id": "ttyUSB1",
+        "basic_block_id": "basic-sensor-y-max-limit-switch",
+        "pins": [
+          {
+            "id": "y-max-limit",
+            "signal": "signal",
+            "function_input_key": "y_max_limit_pin"
+          }
+        ]
       }
     ]
   },

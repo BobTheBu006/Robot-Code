@@ -513,14 +513,14 @@
         {
           "id": "z-left-dir",
           "signal": "direction",
-          "gpio": "17",
+          "gpio": "33",
           "function_input_key": "z_left_dir_pin",
           "notes": null
         },
         {
           "id": "z-left-step",
           "signal": "step",
-          "gpio": "16",
+          "gpio": "32",
           "function_input_key": "z_left_step_pin",
           "notes": null
         },
@@ -567,14 +567,14 @@
         {
           "id": "z-right-dir",
           "signal": "direction",
-          "gpio": "19",
+          "gpio": "5",
           "function_input_key": "z_right_dir_pin",
           "notes": null
         },
         {
           "id": "z-right-step",
           "signal": "step",
-          "gpio": "18",
+          "gpio": "4",
           "function_input_key": "z_right_step_pin",
           "notes": null
         },
@@ -646,7 +646,159 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "x-min-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "X Min Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "x-min-limit",
+          "signal": "signal",
+          "gpio": "21",
+          "function_input_key": "x_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "x-max-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "X Max Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "x-max-limit",
+          "signal": "signal",
+          "gpio": "22",
+          "function_input_key": "x_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "y-min-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Y Min Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "y-min-limit",
+          "signal": "signal",
+          "gpio": "23",
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "y-max-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Y Max Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "y-max-limit",
+          "signal": "signal",
+          "gpio": "25",
+          "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-left-min-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Left Z Min Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-left-min-limit",
+          "signal": "signal",
+          "gpio": "12",
+          "function_input_key": "z_left_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-left-max-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Left Z Max Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-left-max-limit",
+          "signal": "signal",
+          "gpio": "13",
+          "function_input_key": "z_left_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-right-min-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Right Z Min Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-right-min-limit",
+          "signal": "signal",
+          "gpio": "14",
+          "function_input_key": "z_right_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-right-max-limit-switch",
+      "board_id": "ttyUSB1",
+      "name": "Right Z Max Limit Switch",
+      "kind": "sensor",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "z-right-max-limit",
+          "signal": "signal",
+          "gpio": "15",
+          "function_input_key": "z_right_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
     }
   ],
-  "updated_at": "2026-05-31T14:25:21.953519Z"
+  "updated_at": "2026-05-31T14:53:33.267533Z"
 }

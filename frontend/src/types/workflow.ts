@@ -28,6 +28,30 @@ export interface WorkflowOutputDefinition {
   description?: string | null;
 }
 
+export type WorkflowHardwareDeviceKind = "stepper_motor" | "servo" | "sensor";
+export type WorkflowHardwareSensorKind = "position_limit_switch" | "aht20_temperature_humidity";
+
+export interface WorkflowHardwarePinReference {
+  id: string;
+  signal: string;
+  gpio?: string | number | null;
+  function_input_key?: string | null;
+  notes?: string | null;
+}
+
+export interface WorkflowHardwareDeviceReference {
+  id: string;
+  name: string;
+  kind: WorkflowHardwareDeviceKind;
+  board_id?: string | null;
+  sensor_kind?: WorkflowHardwareSensorKind | null;
+  rotation_min_deg?: number | null;
+  rotation_max_deg?: number | null;
+  pins: WorkflowHardwarePinReference[];
+  basic_block_id?: string | null;
+  notes?: string | null;
+}
+
 export interface WorkflowCompoundOutputDefinition extends WorkflowOutputDefinition {
   sourceNodeId: string;
   sourceHandle?: string | null;
@@ -41,6 +65,7 @@ export interface FunctionManifest {
   version: string;
   inputs: WorkflowInputDefinition[];
   advanced_inputs?: WorkflowInputDefinition[];
+  hardware_devices?: WorkflowHardwareDeviceReference[];
   outputs: Array<{
     key: string;
     label: string;
@@ -108,8 +133,10 @@ export interface WorkflowBlockDefinition {
   advancedInputs?: WorkflowInputDefinition[];
   outputs: WorkflowOutputDefinition[];
   hardwareDeviceId?: string | null;
-  hardwareDeviceKind?: "stepper_motor" | "servo" | null;
+  hardwareDeviceKind?: "stepper_motor" | "servo" | "sensor" | null;
   hardwareBoardId?: string | null;
+  hardwareDevices?: WorkflowHardwareDeviceReference[];
+  referencedBasicBlockIds?: string[];
   compound?: WorkflowCompoundDefinition | null;
   builderBoardId?: string | null;
   builderSourcePath?: string | null;

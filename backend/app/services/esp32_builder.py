@@ -930,11 +930,12 @@ Each file under `workflow-functions/` should look like:
 - Put normal runtime parameters in `manifest.inputs`.
 - Use `manifest.outputs` only for control-flow branches. Normal robot actions should expose a single `next` flow output; the Workflow Editor can add an `error` path from block settings. Data returned by the handler, such as status strings or controller replies, should stay in the handler result and should not become output handles.
 - Put firmware wiring and board-specific tuning in `advanced_builder_inputs`.
+- Declare every motor, servo, and sensor the function uses in `manifest.hardware_devices`. The Hardware Map will create/update those devices, and the Workflow Editor will generate matching basic blocks from them. Advanced functions should reference those basic blocks instead of duplicating hidden pin state.
 - Keep source code changes in `firmware/main.ino`.
 
 ## Workflow block types
 
-- Basic blocks are built into the editor or generated from the Hardware Map for simple stepper and servo moves.
+- Basic blocks are built into the editor or generated from the Hardware Map for simple stepper, servo, and sensor actions.
 - Advanced functions are generated from these ESP32 workflow-function blueprints and run through the backend function endpoint.
 - Compound functions are created in the Workflow Editor by selecting directly connected canvas blocks and collapsing them from the right-click menu.
 """
@@ -1039,11 +1040,13 @@ Each file under `workflow-functions/` should look like:
                 "default": 100,
             },
         ]
+        hardware_devices: list[dict[str, object]] = []
 
         for head, pins in head_pin_defaults.items():
+            head_key = head.lower()
             advanced_inputs.extend([
                 {
-                    "key": f"head_{head.lower()}_step_pin",
+                    "key": f"head_{head_key}_step_pin",
                     "label": f"Head {head} Step Pin",
                     "type": "number",
                     "description": f"GPIO step pin for syringe head {head} when saving a reusable hardware preset.",
@@ -1052,7 +1055,7 @@ Each file under `workflow-functions/` should look like:
                     "advanced": True,
                 },
                 {
-                    "key": f"head_{head.lower()}_dir_pin",
+                    "key": f"head_{head_key}_dir_pin",
                     "label": f"Head {head} Dir Pin",
                     "type": "number",
                     "description": f"GPIO direction pin for syringe head {head} when saving a reusable hardware preset.",
@@ -1063,7 +1066,7 @@ Each file under `workflow-functions/` should look like:
             ])
             advanced_builder_inputs.extend([
                 {
-                    "key": f"head_{head.lower()}_step_pin",
+                    "key": f"head_{head_key}_step_pin",
                     "label": f"Head {head} Step Pin",
                     "type": "number",
                     "description": f"GPIO step pin for syringe head {head}.",
@@ -1071,7 +1074,7 @@ Each file under `workflow-functions/` should look like:
                     "default": pins["step"],
                 },
                 {
-                    "key": f"head_{head.lower()}_dir_pin",
+                    "key": f"head_{head_key}_dir_pin",
                     "label": f"Head {head} Dir Pin",
                     "type": "number",
                     "description": f"GPIO direction pin for syringe head {head}.",
@@ -1079,6 +1082,29 @@ Each file under `workflow-functions/` should look like:
                     "default": pins["dir"],
                 },
             ])
+            hardware_devices.append({
+                "id": f"syringe-head-{head_key}",
+                "name": f"Syringe Head {head}",
+                "kind": "stepper_motor",
+                "board_id": "ttyUSB0",
+                "basic_block_id": f"basic-stepper-syringe-head-{head_key}",
+                "pins": [
+                    {
+                        "id": f"head-{head_key}-dir",
+                        "signal": "direction",
+                        "function_input_key": f"head_{head_key}_dir_pin",
+                    },
+                    {
+                        "id": f"head-{head_key}-step",
+                        "signal": "step",
+                        "function_input_key": f"head_{head_key}_step_pin",
+                    },
+                    {"id": f"head-{head_key}-enable", "signal": "enable", "gpio": "-"},
+                    {"id": f"head-{head_key}-ms1", "signal": "micro_step_1", "gpio": "-"},
+                    {"id": f"head-{head_key}-ms2", "signal": "micro_step_2", "gpio": "-"},
+                    {"id": f"head-{head_key}-ms3", "signal": "micro_step_3", "gpio": "-"},
+                ],
+            })
 
         return {
             "manifest": {
@@ -1127,6 +1153,7 @@ Each file under `workflow-functions/` should look like:
                     ],
                 ],
                 "advanced_inputs": advanced_inputs,
+                "hardware_devices": hardware_devices,
                 "outputs": [
                     {
                         "key": "next",
