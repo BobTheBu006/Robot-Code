@@ -8,6 +8,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   type Connection,
@@ -23,6 +24,7 @@ import type {
   HardwareBoardMapping,
   HardwareDeviceKind,
   HardwareDeviceMapping,
+  HardwareGroupMapping,
   HardwareMap,
   HardwarePinMapping,
   HardwareSensorKind,
@@ -32,8 +34,13 @@ import { StatusBadge } from "./StatusBadge";
 
 type RequestStatus = "loading" | "success" | "error";
 type SaveState = "idle" | "saving" | "saved" | "error";
-type HardwareNodeKind = "raspberry" | "controller" | "device";
+type HardwareNodeKind = "raspberry" | "controller" | "device" | "group";
 type HardwareFlowNode = Node<HardwareNodeData>;
+type HardwareContextMenuState = {
+  x: number;
+  y: number;
+  nodeId: string | null;
+} | null;
 
 interface HardwareDiagramCardProps {
   onHardwareMapSaved: () => void;
@@ -53,6 +60,7 @@ const EMPTY_HARDWARE_MAP: HardwareMap = {
   version: 1,
   boards: [],
   devices: [],
+  groups: [],
   updated_at: null,
 };
 
@@ -206,6 +214,26 @@ function deviceAccent(device: HardwareDeviceMapping): string {
 }
 
 function HardwareDiagramNode({ data, selected }: NodeProps<HardwareFlowNode>) {
+  if (data.kind === "group") {
+    return (
+      <div
+        className={[
+          "hardware-flow-node",
+          "hardware-flow-node--group",
+          selected ? "hardware-flow-node--selected" : "",
+        ].filter(Boolean).join(" ")}
+        style={{ "--hardware-node-accent": data.accent } as CSSProperties}
+      >
+        <Handle className="hardware-flow-node__handle" position={Position.Left} type="target" />
+        <div className="hardware-flow-node__type">{data.kind}</div>
+        <strong>{data.title}</strong>
+        <span>{data.detail}</span>
+        <small>{data.meta}</small>
+        <Handle className="hardware-flow-node__handle" position={Position.Right} type="source" />
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
@@ -281,11 +309,26 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
         };
     })
     .filter((device) => boardIds.has(device.board_id) && device.name);
+  const itemIds = new Set([
+    RASPBERRY_NODE_ID,
+    ...boards.map((board) => board.id),
+    ...devices.map((device) => device.id),
+  ]);
+  const groups = (hardwareMap.groups ?? [])
+    .map((group) => ({
+      ...group,
+      id: group.id.trim(),
+      name: group.name.trim(),
+      member_ids: Array.from(new Set(group.member_ids.map((memberId) => memberId.trim()).filter((memberId) => itemIds.has(memberId)))),
+      notes: group.notes?.trim() || null,
+    }))
+    .filter((group) => group.id && group.name && group.member_ids.length > 0);
 
   return {
     version: 1,
     boards,
     devices,
+    groups,
     updated_at: hardwareMap.updated_at ?? null,
   };
 }
@@ -299,18 +342,80 @@ function getDetectedBoard(
   ) ?? null;
 }
 
+function groupFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): HardwareGroupMapping | null {
+  if (!nodeId) {
+    return null;
+  }
+
+  return (hardwareMap.groups ?? []).find((group) => group.id === nodeId) ?? null;
+}
+
+function nodePositionForId(
+  nodeId: string,
+  boardIndexById: Map<string, number>,
+  deviceIndexById: Map<string, { boardIndex: number; deviceIndex: number; boardDeviceCount: number }>,
+): { x: number; y: number } {
+  if (nodeId === RASPBERRY_NODE_ID) {
+    return { x: 40, y: 180 };
+  }
+
+  const boardIndex = boardIndexById.get(nodeId);
+  if (boardIndex !== undefined) {
+    return { x: 350, y: 80 + boardIndex * 190 };
+  }
+
+  const deviceIndex = deviceIndexById.get(nodeId);
+  if (deviceIndex) {
+    const boardY = 80 + deviceIndex.boardIndex * Math.max(190, Math.max(deviceIndex.boardDeviceCount, 1) * 110);
+    return { x: 680, y: boardY + deviceIndex.deviceIndex * 110 };
+  }
+
+  return { x: 260, y: 80 };
+}
+
 function buildHardwareNodes(
   hardwareMap: HardwareMap,
   detectedBoards: Esp32BoardSummary[],
   currentNodes: HardwareFlowNode[],
 ): HardwareFlowNode[] {
   const previousPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
+  const groupedMemberIds = new Set((hardwareMap.groups ?? []).flatMap((group) => group.member_ids));
   const devicesByBoard = new Map<string, HardwareDeviceMapping[]>();
   for (const device of hardwareMap.devices) {
     devicesByBoard.set(device.board_id, [...(devicesByBoard.get(device.board_id) ?? []), device]);
   }
+  const boardIndexById = new Map(hardwareMap.boards.map((board, index) => [board.id, index]));
+  const deviceIndexById = new Map<string, { boardIndex: number; deviceIndex: number; boardDeviceCount: number }>();
+  hardwareMap.boards.forEach((board, boardIndex) => {
+    const boardDevices = devicesByBoard.get(board.id) ?? [];
+    boardDevices.forEach((device, deviceIndex) => {
+      deviceIndexById.set(device.id, { boardIndex, deviceIndex, boardDeviceCount: boardDevices.length });
+    });
+  });
 
-  const nodes: HardwareFlowNode[] = [
+  const nodes: HardwareFlowNode[] = (hardwareMap.groups ?? []).map((group, groupIndex) => {
+    const memberPositions = group.member_ids.map((memberId) =>
+      previousPositionById.get(memberId) ?? nodePositionForId(memberId, boardIndexById, deviceIndexById),
+    );
+    const minX = Math.min(...memberPositions.map((position) => position.x), 260);
+    const minY = Math.min(...memberPositions.map((position) => position.y), 80);
+
+    return {
+      id: group.id,
+      type: "hardwareNode",
+      position: previousPositionById.get(group.id) ?? { x: minX, y: minY },
+      data: {
+        kind: "group",
+        title: group.name,
+        detail: "Hardware group",
+        meta: `${group.member_ids.length} block${group.member_ids.length === 1 ? "" : "s"}`,
+        accent: groupIndex % 2 === 0 ? "#6d5bd0" : "#0f6f66",
+        status: "group",
+      },
+    };
+  });
+
+  nodes.push(
     {
       id: RASPBERRY_NODE_ID,
       type: "hardwareNode",
@@ -324,9 +429,13 @@ function buildHardwareNodes(
         status: "source",
       },
     },
-  ];
+  );
 
   hardwareMap.boards.forEach((board, boardIndex) => {
+    if (groupedMemberIds.has(board.id)) {
+      return;
+    }
+
     const detectedBoard = getDetectedBoard(board, detectedBoards);
     const boardDevices = devicesByBoard.get(board.id) ?? [];
     const boardY = 80 + boardIndex * Math.max(190, Math.max(boardDevices.length, 1) * 110);
@@ -346,6 +455,10 @@ function buildHardwareNodes(
     });
 
     boardDevices.forEach((device, deviceIndex) => {
+      if (groupedMemberIds.has(device.id)) {
+        return;
+      }
+
       nodes.push({
         id: device.id,
         type: "hardwareNode",
@@ -367,23 +480,64 @@ function buildHardwareNodes(
 }
 
 function buildHardwareEdges(hardwareMap: HardwareMap): Edge[] {
-  return [
-    ...hardwareMap.boards.map((board) => ({
-      id: `edge-${RASPBERRY_NODE_ID}-${board.id}`,
-      source: RASPBERRY_NODE_ID,
-      target: board.id,
+  const groupedMemberIds = new Set((hardwareMap.groups ?? []).flatMap((group) => group.member_ids));
+  const groupByMemberId = new Map<string, HardwareGroupMapping>();
+  for (const group of hardwareMap.groups ?? []) {
+    for (const memberId of group.member_ids) {
+      groupByMemberId.set(memberId, group);
+    }
+  }
+  const edges: Edge[] = [];
+  const edgeKeys = new Set<string>();
+
+  function addEdge(source: string, target: string, label: string, animated = false) {
+    if (source === target) {
+      return;
+    }
+
+    const key = `${source}-${target}-${label}`;
+    if (edgeKeys.has(key)) {
+      return;
+    }
+
+    edgeKeys.add(key);
+    edges.push({
+      id: `edge-${source}-${target}-${edgeKeys.size}`,
+      source,
+      target,
       type: "smoothstep",
-      animated: true,
-      label: board.usb_port,
-    })),
-    ...hardwareMap.devices.map((device) => ({
-      id: `edge-${device.board_id}-${device.id}`,
-      source: device.board_id,
-      target: device.id,
-      type: "smoothstep",
-      label: deviceKindLabel(normalizeDeviceKind(device.kind)),
-    })),
-  ];
+      animated,
+      label,
+    });
+  }
+
+  for (const board of hardwareMap.boards) {
+    const boardGroup = groupByMemberId.get(board.id);
+    addEdge(
+      RASPBERRY_NODE_ID,
+      boardGroup?.id ?? board.id,
+      board.usb_port,
+      true,
+    );
+  }
+
+  for (const device of hardwareMap.devices) {
+    const sourceGroup = groupByMemberId.get(device.board_id);
+    const targetGroup = groupByMemberId.get(device.id);
+    if (sourceGroup && targetGroup && sourceGroup.id === targetGroup.id) {
+      continue;
+    }
+
+    addEdge(
+      sourceGroup?.id ?? device.board_id,
+      targetGroup?.id ?? device.id,
+      deviceKindLabel(normalizeDeviceKind(device.kind)),
+    );
+  }
+
+  return edges.filter((edge) =>
+    !groupedMemberIds.has(edge.source) && !groupedMemberIds.has(edge.target),
+  );
 }
 
 function boardFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): HardwareBoardMapping | null {
@@ -410,16 +564,20 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
+  const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<HardwareFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   const selectedBoard = boardFromNodeId(hardwareMap, selectedNodeId);
   const selectedDevice = deviceFromNodeId(hardwareMap, selectedNodeId);
+  const selectedGroup = groupFromNodeId(hardwareMap, selectedNodeId);
   const selectedKind: HardwareNodeKind = selectedNodeId === null || selectedNodeId === RASPBERRY_NODE_ID
     ? "raspberry"
     : selectedBoard
       ? "controller"
-      : "device";
+      : selectedDevice
+        ? "device"
+        : "group";
   const detectedSelectedBoard = selectedBoard ? getDetectedBoard(selectedBoard, detectedBoards) : null;
   const devicesByBoard = useMemo(() => {
     const groupedDevices = new Map<string, HardwareDeviceMapping[]>();
@@ -490,7 +648,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
 
     const selectedNodeStillExists = selectedNodeId === RASPBERRY_NODE_ID
       || hardwareMap.boards.some((board) => board.id === selectedNodeId)
-      || hardwareMap.devices.some((device) => device.id === selectedNodeId);
+      || hardwareMap.devices.some((device) => device.id === selectedNodeId)
+      || (hardwareMap.groups ?? []).some((group) => group.id === selectedNodeId);
 
     if (!selectedNodeStillExists) {
       setSelectedNodeId(RASPBERRY_NODE_ID);
@@ -510,6 +669,12 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               device.board_id === boardId ? { ...device, board_id: nextId } : device,
             )
           : currentMap.devices,
+        groups: nextId !== boardId
+          ? (currentMap.groups ?? []).map((group) => ({
+              ...group,
+              member_ids: group.member_ids.map((memberId) => memberId === boardId ? nextId : memberId),
+            }))
+          : currentMap.groups,
       };
     });
     if (updates.id) {
@@ -541,6 +706,12 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
       ...currentMap,
       boards: currentMap.boards.filter((board) => board.id !== boardId),
       devices: currentMap.devices.filter((device) => device.board_id !== boardId),
+      groups: (currentMap.groups ?? [])
+        .map((group) => ({
+          ...group,
+          member_ids: group.member_ids.filter((memberId) => memberId !== boardId && !currentMap.devices.some((device) => device.board_id === boardId && device.id === memberId)),
+        }))
+        .filter((group) => group.member_ids.length > 0),
     }));
     setSelectedNodeId(RASPBERRY_NODE_ID);
     setSaveState("idle");
@@ -588,6 +759,12 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     setHardwareMap((currentMap) => ({
       ...currentMap,
       devices: currentMap.devices.filter((device) => device.id !== deviceId),
+      groups: (currentMap.groups ?? [])
+        .map((group) => ({
+          ...group,
+          member_ids: group.member_ids.filter((memberId) => memberId !== deviceId),
+        }))
+        .filter((group) => group.member_ids.length > 0),
     }));
     setSelectedNodeId(RASPBERRY_NODE_ID);
     setSaveState("idle");
@@ -664,6 +841,117 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     setSelectedNodeId(targetDevice.id);
   }
 
+  function getSelectedHardwareNodeIds(fallbackNodeId: string | null = null): string[] {
+    const selectedIds = nodes
+      .filter((node) => node.selected && node.id !== RASPBERRY_NODE_ID && node.data.kind !== "group")
+      .map((node) => node.id);
+
+    if (
+      fallbackNodeId
+      && fallbackNodeId !== RASPBERRY_NODE_ID
+      && !groupFromNodeId(hardwareMap, fallbackNodeId)
+      && !selectedIds.includes(fallbackNodeId)
+    ) {
+      selectedIds.push(fallbackNodeId);
+    }
+
+    return Array.from(new Set(selectedIds));
+  }
+
+  function selectedHardwareNodesAreConnected(selectedIds: string[]): boolean {
+    if (selectedIds.length < 2) {
+      return false;
+    }
+
+    const selectedIdSet = new Set(selectedIds);
+    const selectedEdges = buildHardwareEdges(hardwareMap)
+      .filter((edge) => selectedIdSet.has(edge.source) && selectedIdSet.has(edge.target));
+    if (selectedEdges.length === 0) {
+      return false;
+    }
+
+    const adjacency = new Map(selectedIds.map((nodeId) => [nodeId, new Set<string>()]));
+    for (const edge of selectedEdges) {
+      adjacency.get(edge.source)?.add(edge.target);
+      adjacency.get(edge.target)?.add(edge.source);
+    }
+
+    const visited = new Set<string>([selectedIds[0]]);
+    const queue = [selectedIds[0]];
+    while (queue.length > 0) {
+      const currentId = queue.shift() as string;
+      for (const nextId of adjacency.get(currentId) ?? []) {
+        if (!visited.has(nextId)) {
+          visited.add(nextId);
+          queue.push(nextId);
+        }
+      }
+    }
+
+    return visited.size === selectedIds.length;
+  }
+
+  function handleCreateGroup(fallbackNodeId: string | null = null) {
+    const memberIds = getSelectedHardwareNodeIds(fallbackNodeId);
+    if (!selectedHardwareNodesAreConnected(memberIds)) {
+      setSaveState("error");
+      setSaveMessage("Select at least two connected controller/device blocks before creating a group.");
+      setContextMenu(null);
+      return;
+    }
+
+    const groupId = makeId("group");
+    setHardwareMap((currentMap) => ({
+      ...currentMap,
+      groups: [
+        ...(currentMap.groups ?? []),
+        {
+          id: groupId,
+          name: `Hardware Group ${(currentMap.groups ?? []).length + 1}`,
+          member_ids: memberIds,
+          notes: null,
+        },
+      ],
+    }));
+    setSelectedNodeId(groupId);
+    setContextMenu(null);
+    setSaveState("idle");
+    setSaveMessage(null);
+  }
+
+  function updateGroup(groupId: string, updates: Partial<HardwareGroupMapping>) {
+    setHardwareMap((currentMap) => ({
+      ...currentMap,
+      groups: (currentMap.groups ?? []).map((group) =>
+        group.id === groupId ? { ...group, ...updates } : group,
+      ),
+    }));
+    setSaveState("idle");
+  }
+
+  function ungroup(groupId: string) {
+    setHardwareMap((currentMap) => ({
+      ...currentMap,
+      groups: (currentMap.groups ?? []).filter((group) => group.id !== groupId),
+    }));
+    setSelectedNodeId(RASPBERRY_NODE_ID);
+    setContextMenu(null);
+    setSaveState("idle");
+  }
+
+  function openHardwareContextMenu(
+    event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number },
+    nodeId: string | null = null,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId,
+    });
+  }
+
   async function handleSave() {
     const cleanedMap = cleanHardwareMap(hardwareMap);
     if (cleanedMap.boards.length === 0) {
@@ -700,6 +988,62 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           </div>
           <button className="workflow-editor__action workflow-editor__action--primary" onClick={addBoard} type="button">
             Add controller
+          </button>
+        </div>
+      );
+    }
+
+    if (selectedGroup) {
+      return (
+        <div className="hardware-settings__body">
+          <label className="hardware-settings__field">
+            <span>Group name</span>
+            <input
+              onChange={(event) => updateGroup(selectedGroup.id, { name: event.target.value })}
+              value={selectedGroup.name}
+            />
+          </label>
+          <label className="hardware-settings__field">
+            <span>Group id</span>
+            <input
+              defaultValue={selectedGroup.id}
+              key={`${selectedGroup.id}-settings-id`}
+              onBlur={(event) => {
+                const nextId = normalizeId(event.target.value, selectedGroup.id);
+                updateGroup(selectedGroup.id, { id: nextId });
+                setSelectedNodeId(nextId);
+              }}
+            />
+          </label>
+          <div className="hardware-settings__connection-row">
+            <span>Members</span>
+            <strong>{selectedGroup.member_ids.length} block{selectedGroup.member_ids.length === 1 ? "" : "s"}</strong>
+          </div>
+          <div className="hardware-settings__group-members">
+            {selectedGroup.member_ids.map((memberId) => {
+              const board = boardFromNodeId(hardwareMap, memberId);
+              const device = deviceFromNodeId(hardwareMap, memberId);
+              return (
+                <button
+                  className="hardware-map__small-button"
+                  key={memberId}
+                  onClick={() => setSelectedNodeId(memberId)}
+                  type="button"
+                >
+                  {board?.label ?? device?.name ?? memberId}
+                </button>
+              );
+            })}
+          </div>
+          <label className="hardware-settings__field">
+            <span>Notes</span>
+            <textarea
+              onChange={(event) => updateGroup(selectedGroup.id, { notes: event.target.value })}
+              value={selectedGroup.notes ?? ""}
+            />
+          </label>
+          <button className="workflow-editor__action" onClick={() => ungroup(selectedGroup.id)} type="button">
+            Ungroup
           </button>
         </div>
       );
@@ -971,17 +1315,52 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               nodes={nodes}
               onConnect={handleConnect}
               onEdgesChange={onEdgesChange}
+              onNodeContextMenu={(event, node) => openHardwareContextMenu(event, node.id)}
               onNodeClick={(event, node) => {
                 event.stopPropagation();
                 setSelectedNodeId(node.id);
+                setContextMenu(null);
               }}
               onNodesChange={onNodesChange}
-              onPaneClick={() => setSelectedNodeId(RASPBERRY_NODE_ID)}
+              onPaneClick={() => {
+                setSelectedNodeId(RASPBERRY_NODE_ID);
+                setContextMenu(null);
+              }}
+              onPaneContextMenu={(event) => {
+                if (getSelectedHardwareNodeIds().length > 0) {
+                  openHardwareContextMenu(event);
+                }
+              }}
+              onSelectionContextMenu={(event) => openHardwareContextMenu(event)}
+              panActivationKeyCode="Control"
+              panOnDrag={false}
+              selectionMode={SelectionMode.Partial}
+              selectionOnDrag
             >
               <MiniMap pannable zoomable />
               <Controls />
               <Background gap={24} size={1} />
             </ReactFlow>
+            {contextMenu ? (
+              <div
+                className="hardware-context-menu"
+                style={{
+                  left: contextMenu.x,
+                  top: contextMenu.y,
+                }}
+              >
+                {contextMenu.nodeId && groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
+                  <button onClick={() => ungroup(contextMenu.nodeId as string)} type="button">
+                    Ungroup
+                  </button>
+                ) : null}
+                {!contextMenu.nodeId || !groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
+                  <button onClick={() => handleCreateGroup(contextMenu.nodeId)} type="button">
+                    Create hardware group
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <aside className="hardware-settings">

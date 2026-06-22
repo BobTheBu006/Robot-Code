@@ -28,10 +28,18 @@ export interface HardwareDeviceMapping {
   notes?: string | null;
 }
 
+export interface HardwareGroupMapping {
+  id: string;
+  name: string;
+  member_ids: string[];
+  notes?: string | null;
+}
+
 export interface HardwareMap {
   version: number;
   boards: HardwareBoardMapping[];
   devices: HardwareDeviceMapping[];
+  groups?: HardwareGroupMapping[];
   updated_at?: string | null;
 }
 

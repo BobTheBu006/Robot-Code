@@ -52,10 +52,18 @@ class HardwareDeviceMapping(BaseModel):
         return normalized_data
 
 
+class HardwareGroupMapping(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    member_ids: list[str] = Field(default_factory=list)
+    notes: str | None = None
+
+
 class HardwareMap(BaseModel):
     version: int = 1
     boards: list[HardwareBoardMapping] = Field(default_factory=list)
     devices: list[HardwareDeviceMapping] = Field(default_factory=list)
+    groups: list[HardwareGroupMapping] = Field(default_factory=list)
     updated_at: datetime | None = None
 
 
