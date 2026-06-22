@@ -1,79 +1,51 @@
-﻿# Robot Control App
+# Modular Robot Control Platform
 
-First-step monorepo skeleton for a Raspberry Pi 5 robot-control application.
+This repository is the working prototype for a modular, open-source lab robot platform aimed at underfunded research labs, universities, and small teams that need repairable automation built from cheap, available parts.
 
-This repository is intentionally minimal: it gives you a clean React frontend, a FastAPI backend, documentation, and placeholders for firmware work without implementing real robot logic yet.
+The long-term target is an extensible alternative to closed lab automation systems. The Raspberry Pi coordinates the robot, the browser UI edits workflows and hardware maps, and ESP32 controllers run the low-level motor, actuator, and sensor code.
 
-## Project goals for this step
+## Start Here
 
-- Run the full stack locally on a Raspberry Pi 5
-- Provide a simple dashboard UI
-- Expose backend health and mock robot-state endpoints
-- Keep the structure easy to extend into workflow editing, cameras, serial communication, WebSockets, and job execution later
+For future AI coding agents and maintainers:
 
-## Repository structure
+- Read `AGENTS.md` first.
+- Read `docs/PROJECT_STATUS.md` for the current robot state.
+- Read `docs/ARCHITECTURE_CONTRACTS.md` before changing schemas, workflow behavior, firmware generation, or module boundaries.
+- Read `docs/BACKWARDS_COMPATIBILITY.md` before changing saved workflows, hardware maps, manifests, or firmware protocols.
+- Put future ideas and deferred architecture work in `docs/TODO.md`.
+
+## Current Capabilities
+
+- FastAPI backend with health, robot state, camera, hardware map, function discovery, ESP32 builder, and workflow storage routes.
+- Vite + React + TypeScript frontend.
+- React Flow workflow editor with basic, advanced, and compound function blocks.
+- Hardware Map editor for Raspberry Pi, ESP32 controllers, motors, servos, sensors, and grouped hardware assemblies.
+- Function manifests can declare hardware dependencies so the Hardware Map and workflow blocks can reference the same logical devices.
+- Workflow runs flash the ESP32 boards used by the workflow before execution.
+
+## Repository Structure
 
 ```text
 .
+|-- AGENTS.md
 |-- backend/
 |-- docs/
 |-- firmware/
-`-- frontend/
+|-- frontend/
+|-- functions/
+|-- hardware-map.json
+`-- workflows/
 ```
 
-## Quick start
+## Quick Start
 
 Prerequisites:
 
 - Python 3.11+ for the backend
 - Node.js 20+ with `npm` for the frontend
+- Arduino CLI for ESP32 build/flash flows
 
-### 1. Start the backend
-
-On Raspberry Pi OS / Linux:
-
-```bash
-cd "/home/robot/robot control/Robot-Code"
-./start-backend.sh
-```
-
-On Windows 11:
-
-```powershell
-cd "C:\BOB\masters\Thesis\Robot Code"
-start-backend.bat
-```
-
-Backend runs at `http://127.0.0.1:8000`.
-
-### 2. Start the frontend
-
-Open a second terminal:
-
-On Raspberry Pi OS / Linux:
-
-```bash
-cd "/home/robot/robot control/Robot-Code"
-./start-frontend.sh
-```
-
-On Windows 11:
-
-```powershell
-cd "C:\BOB\masters\Thesis\Robot Code"
-start-frontend.bat
-```
-
-Frontend runs at `http://127.0.0.1:5173`.
-
-### Optional: start both
-
-On Raspberry Pi OS / Linux:
-
-```bash
-cd "/home/robot/robot control/Robot-Code"
-./start-all.sh
-```
+### Start Everything
 
 On Windows 11:
 
@@ -82,35 +54,54 @@ cd "C:\BOB\masters\Thesis\Robot Code"
 start-all.bat
 ```
 
-## Available endpoints
+On Raspberry Pi OS / Linux:
 
-- `GET /health`
-- `GET /api/robot/state`
-- `POST /api/robot/state/mock-update`
-- `GET /api/camera/status`
-- `GET /api/camera/frame`
-- `GET /api/camera/stream`
+```bash
+cd "/home/robot/robot control/Robot-Code"
+./start-all.sh
+```
 
-## Architecture notes
+Frontend UI:
 
-- `frontend/` is a small Vite + React + TypeScript app that polls the backend and renders a dashboard.
-- `frontend/` also includes a first-pass block-based workflow editor built with React Flow.
-- `backend/` is a FastAPI service with routers, models, an in-memory robot-state store, and folder-based robot function discovery.
-- `firmware/` is a placeholder for future ESP32 projects and shared protocol definitions.
-- `docs/` contains lightweight architecture notes so the project can grow without losing clarity.
+```text
+http://127.0.0.1:5173
+```
 
-## Why this structure
+Backend API:
 
-- Easy to run locally without Docker
-- Easy to understand for early development
-- Keeps frontend, backend, and future firmware concerns separated
-- Leaves natural extension points for:
-  - workflow editor
-  - camera monitoring
-  - serial communication with ESP32 boards
-  - WebSocket updates
-  - background job execution
+```text
+http://127.0.0.1:8000
+```
 
-## Next step ideas
+### Start Backend Only
 
-The most natural next increment is to add a small robot command model and a serial-communication abstraction layer on the backend, while keeping everything mocked until hardware integration starts.
+```powershell
+cd "C:\BOB\masters\Thesis\Robot Code"
+start-backend.bat
+```
+
+### Start Frontend Only
+
+```powershell
+cd "C:\BOB\masters\Thesis\Robot Code"
+start-frontend.bat
+```
+
+## Development Model
+
+The intended architecture is modular:
+
+- Hardware Map is the source of truth for physical USB ports, controllers, devices, pins, and hardware groups.
+- Function manifests declare the devices they require.
+- Basic workflow blocks are generated from hardware devices.
+- Advanced functions can use controller firmware and backend handlers, but they must still declare hardware dependencies.
+- Compound functions can be built from connected workflow blocks and should become exportable/shareable modules later.
+- Firmware flashed to each controller should eventually be generated from the Hardware Map plus every workflow block that needs that controller.
+
+Do not add one-off pin lists or hidden hardware assumptions inside functions. If a function uses a motor, servo, sensor, camera, API service, or future device, declare it through the module/function contract so the UI, backend, firmware, and tests can reason about it.
+
+## License
+
+This repository is licensed under Apache License 2.0 unless a file or module says otherwise. See `LICENSE` and `docs/LICENSE_POLICY.md`.
+
+Future hardware/CAD/electronics packages should carry an explicit open hardware license, with `CERN-OHL-S-2.0` as the preferred default when the goal is to keep hardware improvements open.

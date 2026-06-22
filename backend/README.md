@@ -1,6 +1,8 @@
-﻿# Backend
+# Backend
 
 FastAPI backend for the local robot-control app.
+
+Read `../AGENTS.md`, `../docs/PROJECT_STATUS.md`, and `../docs/ARCHITECTURE_CONTRACTS.md` before changing function discovery, hardware map sync, workflow execution, or firmware flashing behavior.
 
 ## Run locally
 
@@ -158,6 +160,8 @@ Invoke-RestMethod -Method Post `
 
 - `app/api/routes/` contains route definitions
 - `app/models/` contains Pydantic models for robot state and updates
-- `app/services/` contains the in-memory robot state store and update logic
+- `app/services/` contains robot state, hardware map, function discovery, workflow storage, and ESP32 builder logic
 
 This keeps routing, data contracts, and application logic separate from the start.
+
+For future changes, keep persistent schema updates versioned and covered by migration tests. See `../docs/BACKWARDS_COMPATIBILITY.md`.

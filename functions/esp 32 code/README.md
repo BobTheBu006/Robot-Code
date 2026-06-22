@@ -1,4 +1,6 @@
-# ESP32 Function Builder Structure
+# ESP32 Board Workspace Structure
+
+Read `../../AGENTS.md` and `../../docs/ARCHITECTURE_CONTRACTS.md` before changing board workspaces, workflow-function blueprints, or firmware behavior.
 
 Each connected board gets its own workspace folder:
 
@@ -17,17 +19,19 @@ functions/esp 32 code/
 ## What each file does
 
 - `board.json`: metadata for the board and the serial port currently associated with it.
-- `firmware/main.ino`: the local Arduino source edited from the Robot Control UI.
+- `firmware/main.ino`: the local Arduino source edited from the Robot Control UI or directly in the board workspace.
 - `workflow-functions/*.json`: blueprint files that generate workflow block manifests for the canvas.
 
 ## Build and flash flow
 
-1. Edit `firmware/main.ino` or one of the blueprint JSON files from the Function Builder UI.
+1. Edit `firmware/main.ino` or one of the workflow-function blueprint JSON files.
 2. Save the file.
 3. Use `Build firmware` to compile the sketch on the Pi.
 4. Use `Build + Flash` to upload it to the connected ESP32 on the configured serial port.
 
 Most ESP32 dev boards can enter the bootloader automatically through the USB serial adapter's DTR/RTS lines. If upload ever fails to connect, hold the board's `BOOT` button as flashing starts and release it once the upload begins.
+
+The long-term target is workflow-aware firmware assembly: each controller should be flashed with all routines needed by the active workflow, based on the Hardware Map and the blocks used in that workflow.
 
 ## Blueprint format
 
@@ -72,6 +76,7 @@ Each blueprint file should contain:
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
 - Put every actuator, motor, servo, or sensor the function uses in `manifest.hardware_devices`. Use stable device IDs that match the Hardware Map, and set each pin's `function_input_key` to the matching runtime or advanced input. The Hardware Map creates or updates those devices, and the Workflow Editor generates the matching basic block, for example `basic-stepper-syringe-head-a` for `syringe-head-a`.
 - Advanced functions should reference those generated basic hardware blocks conceptually instead of keeping an unrelated private pin list. If a function moves syringe head A, it should declare/reference the same `syringe-head-a` device that creates the `Move Syringe Head A` basic block.
+- Treat hardware and code as related but separate. The same syringe pump hardware can support multiple firmware routines and workflow functions.
 - Keep actual source code changes in `firmware/main.ino`.
 - Use `board.json` to override the active `fqbn` or firmware entry file for a specific board workspace if needed.
 

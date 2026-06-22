@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "id": "example_function",
+  "display_name": "Example Function",
+  "category": "Robot Actions",
+  "description": "Describe the operator-visible behavior of this function.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "amount",
+      "label": "Amount",
+      "type": "number",
+      "description": "Runtime parameter shown in the workflow block settings.",
+      "required": true,
+      "default": 1,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue when this action completes."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "example-stepper",
+      "name": "Example Stepper",
+      "kind": "stepper_motor",
+      "board_id": null,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "pins": [
+        {
+          "id": "example-stepper-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "example-stepper-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "example-stepper-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Use '-' when the signal is not connected."
+        },
+        {
+          "id": "example-stepper-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "example-stepper-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "example-stepper-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-example-stepper",
+      "notes": "Functions declare hardware dependencies; the Hardware Map owns final pins."
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "example_stepper_move",
+      "controller_role": "device_board",
+      "source": "firmware/example_stepper_move.ino"
+    }
+  ],
+  "builder_board_id": null,
+  "builder_source_path": null,
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
+  "builder_base_function_id": null
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "api_call_example",
+  "display_name": "API Call Example",
+  "category": "Integrations",
+  "description": "Calls an external service, waits for a response, and continues the workflow.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "service_url",
+      "label": "Service URL",
+      "type": "string",
+      "description": "URL or service identifier resolved by the backend.",
+      "required": true,
+      "default": "",
+      "placeholder": "https://example.local/endpoint",
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "secret_name",
+      "label": "Secret Name",
+      "type": "string",
+      "description": "Name of a backend environment secret. The secret value is not stored in workflow JSON.",
+      "required": false,
+      "default": "",
+      "placeholder": "MY_API_TOKEN",
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "timeout_seconds",
+      "label": "Timeout",
+      "type": "number",
+      "description": "Maximum time to wait before taking the timeout/error path.",
+      "required": true,
+      "default": 30,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [],
+  "outputs": [
+    {
+      "key": "success",
+      "label": "Success",
+      "type": "flow",
+      "description": "Continue when the API response matches the success rule."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "type": "flow",
+      "description": "Continue here on timeout, request failure, or rejected response."
+    }
+  ],
+  "hardware_devices": []
+}

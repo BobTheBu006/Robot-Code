@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "module_id": "example_module",
+  "display_name": "Example Module",
+  "version": "0.1.0",
+  "description": "A reusable robot hardware/software package.",
+  "licenses": {
+    "software": "Apache-2.0",
+    "hardware": "CERN-OHL-S-2.0",
+    "documentation": "Apache-2.0"
+  },
+  "compatibility": {
+    "platform_min_version": "0.1.0-beta",
+    "platform_max_version": "1.x",
+    "hardware_map_schema": 1,
+    "workflow_schema": 1
+  },
+  "hardware_templates": [
+    "hardware/example-hardware.json"
+  ],
+  "function_manifests": [
+    "functions/example_function/manifest.json"
+  ],
+  "backend_handlers": [
+    "functions/example_function/handler.py"
+  ],
+  "firmware": [
+    {
+      "routine_id": "example_routine",
+      "path": "firmware/example_routine.ino",
+      "target": "esp32"
+    }
+  ],
+  "frontend_extensions": [],
+  "example_workflows": [
+    "workflows/example-workflow.json"
+  ],
+  "cad_models": [
+    {
+      "path": "cad/example-part.step",
+      "purpose": "simulation_and_collision_checking"
+    }
+  ],
+  "tests": [
+    "tests/test_example_module.py"
+  ]
+}
