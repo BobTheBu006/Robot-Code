@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "id": "move_gantry",
   "display_name": "Move Gantry XY",
   "category": "Robot Actions",

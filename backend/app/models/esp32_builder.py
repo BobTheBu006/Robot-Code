@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 from app.models.function_manifest import FunctionInputDefinition, FunctionManifest
 
+ESP32_FUNCTION_BLUEPRINT_SCHEMA_VERSION = 1
+
 
 class Esp32BuilderFile(BaseModel):
     relative_path: str
@@ -15,6 +17,7 @@ class Esp32BuilderFile(BaseModel):
 
 
 class Esp32FunctionBlueprint(BaseModel):
+    schema_version: int = Field(default=ESP32_FUNCTION_BLUEPRINT_SCHEMA_VERSION, ge=1)
     manifest: FunctionManifest
     advanced_builder_inputs: list[FunctionInputDefinition] = Field(default_factory=list)
     firmware_entry_file: str

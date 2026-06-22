@@ -39,6 +39,7 @@ import {
   createBuiltInBlocks,
   createDefaultParameters,
   createDefaultNodeSettings,
+  createBrokenWorkflowBlock,
   createHardwareBasicBlocks,
   createStarterWorkflow,
   createWorkflowNode,
@@ -99,7 +100,7 @@ type CompoundOutputBuild = WorkflowOutputDefinition & {
 };
 
 function isClientExecutedBlock(block: WorkflowBlockDefinition): boolean {
-  return block.kind === "basic" || block.kind === "built-in" || block.kind === "compound";
+  return block.kind === "basic" || block.kind === "built-in" || block.kind === "compound" || block.kind === "broken";
 }
 
 function isAdvancedBlock(block: WorkflowBlockDefinition): boolean {
@@ -804,12 +805,27 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       : `${hardwareBasicBlocks.length} hardware basic block${hardwareBasicBlocks.length === 1 ? "" : "s"} and ${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`;
 
   useEffect(() => {
+    if (functionsStatus !== "success" || !hardwareMap) {
+      return;
+    }
+
     const blockLookup = new Map(availableBlocks.map((block) => [block.id, block]));
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
-        const latestBlock = blockLookup.get(node.data.block.id);
+        const originalBlockId = node.data.block.missingReference?.originalId ?? node.data.block.id;
+        const latestBlock = blockLookup.get(originalBlockId);
         if (!latestBlock) {
-          return node;
+          if (node.data.block.kind === "broken" || node.data.block.kind === "compound") {
+            return node;
+          }
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              block: createBrokenWorkflowBlock(node.data.block),
+            },
+          };
         }
 
         return {
@@ -822,7 +838,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
         };
       }),
     );
-  }, [availableBlocks, setNodes]);
+  }, [availableBlocks, functionsStatus, hardwareMap, setNodes]);
 
   useEffect(() => {
     if (selectedNodeId && !nodes.some((node) => node.id === selectedNodeId)) {
@@ -1410,6 +1426,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       inputData,
       { blockResults },
     );
+
+    if (node.data.block.kind === "broken") {
+      return runBuiltInBlockTest(node.data.block, resolvedParameters, inputData);
+    }
 
     if (node.data.block.kind === "compound") {
       return runCompoundBlock(node.data.block, resolvedParameters, inputData, blockResults, signal);

@@ -4,10 +4,10 @@ This file is for deferred ideas that should not be lost. Keep it practical: add 
 
 ## Near-Term Architecture Work
 
-- Add required schema version fields to workflow JSON and function manifests.
+- Extend schema version coverage to module manifests, firmware protocol descriptors, and future schematic/simulation imports.
 - Add migration helpers for hardware maps, workflows, and function manifests.
 - Add golden fixture tests for current hardware map and active workflow.
-- Add broken-placeholder UI behavior for missing functions, devices, controllers, and modules.
+- Extend broken-placeholder behavior to backend validation responses and hardware-map controller/device repair actions.
 - Formalize firmware requirement collection so each controller receives every routine needed by the active workflow.
 - Define how advanced functions reference generated basic blocks in a machine-readable way.
 - Make compound functions exportable and importable as reusable modules.

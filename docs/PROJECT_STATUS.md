@@ -51,12 +51,15 @@ The Workflow Editor currently has:
 - Individual hide/unhide behavior for palette blocks.
 - Right-click actions for creating, editing, and uncompounding compound functions.
 - Pre-run ESP32 flashing for boards referenced by blocks in the workflow.
+- Broken-reference placeholders for saved blocks whose function, hardware device, or module cannot currently be resolved.
 
 Workflow outputs are control-flow paths only. Function result data is not a graph output.
 
 ## Function And Hardware Dependency Status
 
 Function manifests can declare `hardware_devices`. Those devices are synced into the Hardware Map using stable IDs and optional `function_input_key` pin links.
+
+Function manifests now carry `schema_version` at the backend model boundary. Legacy manifests without the field are treated as schema version 1. Unsupported future manifest schemas are rejected with a validation error instead of being loaded as if they were compatible.
 
 Important rule: an advanced function and its generated basic hardware block should point to the same logical hardware device. For example, a syringe dispenser function should declare syringe-head stepper devices, and the Workflow Editor should generate matching basic move blocks from those devices.
 
@@ -73,6 +76,19 @@ Target architecture: firmware flashed to a controller should include every routi
 - each block's firmware requirements
 - each advanced function's declared hardware dependencies
 
+## Compatibility Status
+
+Workflow files now normalize `schema_version` and legacy `version` values through the backend workflow storage service. Saved workflows are written with both `schema_version: 1` and `version: 1` for current frontend compatibility. Invalid or unsupported future workflow schemas are rejected.
+
+There are lightweight backend `unittest` checks for:
+
+- legacy function manifests gaining the current schema version
+- unsupported function manifest schema versions being rejected
+- legacy workflow payloads saving/loading with the current schema version
+- unsupported workflow schema versions being rejected
+
+The frontend now preserves unresolved saved workflow blocks as explicit missing-block placeholders. The placeholder keeps the original block ID, outputs, and edges visible, but disables normal execution and shows a suggested repair path.
+
 ## Deferred But Important
 
 These are architecture directions, not implemented promises yet:
@@ -84,7 +100,7 @@ These are architecture directions, not implemented promises yet:
 - Community module packages that may live in Git repositories and include hardware, software, firmware, 3D models, docs, and tests.
 - Exporting compound functions as reusable/shareable modules.
 
-Track deferred work in `docs/TODO.md`.
+Track deferred feature work in `docs/FEATURE_ROADMAP.md` and lower-level architecture notes in `docs/TODO.md`.
 
 ## Status Update Rule
 

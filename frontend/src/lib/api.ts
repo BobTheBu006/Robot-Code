@@ -19,6 +19,7 @@ import type {
   WorkflowSaveResponse,
 } from "../types/workflow";
 
+const WORKFLOW_SCHEMA_VERSION = 1;
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
@@ -167,7 +168,8 @@ export function saveWorkflowToFile(
       path: path ?? null,
       filename: filename ?? null,
       workflow: {
-        version: 1,
+        schema_version: WORKFLOW_SCHEMA_VERSION,
+        version: WORKFLOW_SCHEMA_VERSION,
         nodes,
         edges,
       },

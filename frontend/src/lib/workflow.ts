@@ -29,6 +29,7 @@ const ERROR_OUTPUT: WorkflowOutputDefinition = {
 };
 const BASIC_BLOCK_CATEGORY = "Basic Blocks";
 const ADVANCED_FUNCTION_CATEGORY = "Advanced Functions";
+const BROKEN_REFERENCE_CATEGORY = "Broken References";
 
 function buildInput(
   key: string,
@@ -110,6 +111,46 @@ function getHardwareBasicBlockId(device: Pick<HardwareDeviceMapping, "id" | "kin
   }
 
   return null;
+}
+
+export function createBrokenWorkflowBlock(
+  originalBlock: WorkflowBlockDefinition,
+  reason?: string,
+): WorkflowBlockDefinition {
+  if (originalBlock.kind === "broken") {
+    return originalBlock;
+  }
+
+  const originalKind = originalBlock.kind;
+  const inferredReason = reason ?? (
+    originalBlock.hardwareDeviceId
+      ? `The hardware device '${originalBlock.hardwareDeviceId}' is no longer present in the Hardware Map.`
+      : `The block '${originalBlock.id}' is not available in the current function, module, or hardware block library.`
+  );
+  const suggestedFix = originalBlock.hardwareDeviceId
+    ? "Restore the missing device in the Hardware Map, or replace this block with a currently available hardware block."
+    : "Restore or reinstall the missing function/module, or replace this block with a currently available block.";
+
+  return {
+    ...originalBlock,
+    category: BROKEN_REFERENCE_CATEGORY,
+    displayName: `Missing: ${originalBlock.displayName}`,
+    description: inferredReason,
+    kind: "broken",
+    acceptsInput: originalBlock.acceptsInput,
+    accent: "#b42318",
+    inputs: originalBlock.inputs ?? [],
+    advancedInputs: originalBlock.advancedInputs ?? [],
+    outputs: originalBlock.outputs.length > 0
+      ? originalBlock.outputs
+      : [buildOutput("next", "Next", "flow", "Preserved placeholder output.")],
+    missingReference: {
+      originalId: originalBlock.id,
+      originalKind,
+      reason: inferredReason,
+      suggestedFix,
+    },
+  };
 }
 
 function resolveInputPath(
@@ -679,6 +720,7 @@ export function createStarterWorkflow(): {
 export function serializeWorkflow(nodes: Array<Node<WorkflowNodeData>>, edges: Edge[]): string {
   return JSON.stringify(
     {
+      schema_version: 1,
       version: 1,
       nodes,
       edges,
@@ -724,6 +766,22 @@ export function runBuiltInBlockTest(
   parameters: Record<string, WorkflowParameterValue>,
   inputData?: Record<string, unknown> | null,
 ): FunctionTestResponse {
+  if (block.kind === "broken") {
+    return {
+      function_id: block.id,
+      ok: false,
+      inputs: parameters,
+      input_data: inputData ?? null,
+      result: {
+        status: "missing_reference",
+        original_id: block.missingReference?.originalId ?? block.id,
+        reason: block.missingReference?.reason ?? "This workflow block cannot be resolved.",
+        suggested_fix: block.missingReference?.suggestedFix ?? "Replace this block with an available block.",
+      },
+      error: block.missingReference?.reason ?? "This workflow block cannot be resolved.",
+    };
+  }
+
   if (block.kind === "compound") {
     return {
       function_id: block.id,

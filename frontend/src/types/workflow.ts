@@ -1,6 +1,6 @@
 export type WorkflowInputType = "string" | "number" | "boolean" | "select" | "file/path";
 export type WorkflowParameterValue = string | number | boolean;
-export type WorkflowBlockKind = "basic" | "advanced" | "compound" | "built-in" | "robot-action";
+export type WorkflowBlockKind = "basic" | "advanced" | "compound" | "built-in" | "robot-action" | "broken";
 export type WorkflowFailureMode = "stop_flow" | "separate_path";
 export type WorkflowExecutionStatus = "idle" | "running" | "success" | "error";
 
@@ -58,6 +58,7 @@ export interface WorkflowCompoundOutputDefinition extends WorkflowOutputDefiniti
 }
 
 export interface FunctionManifest {
+  schema_version: number;
   id: string;
   display_name: string;
   category: string;
@@ -101,6 +102,7 @@ export interface SavedWorkflowFile {
   filename: string;
   path: string;
   workflow: {
+    schema_version?: number;
     version?: number;
     nodes?: WorkflowCanvasNode[];
     edges?: WorkflowCanvasEdge[];
@@ -143,6 +145,12 @@ export interface WorkflowBlockDefinition {
   builderWorkspacePath?: string | null;
   builderFirmwareEntryFile?: string | null;
   builderBaseFunctionId?: string | null;
+  missingReference?: {
+    originalId: string;
+    originalKind: WorkflowBlockKind;
+    reason: string;
+    suggestedFix: string;
+  } | null;
 }
 
 export interface WorkflowNodeSettings {

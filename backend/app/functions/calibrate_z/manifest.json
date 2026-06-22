@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "id": "calibrate_z",
   "display_name": "Calibrate Gantry Z",
   "category": "Robot Actions",

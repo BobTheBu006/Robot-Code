@@ -31,8 +31,8 @@ Compatibility does not mean every old bug must stay. It means old projects shoul
 Before `v0.1 beta`, ensure these files have explicit versions:
 
 - `hardware-map.json`: already has `version`
-- workflow JSON: should have a required `version`
-- function manifests: should gain a `schema_version` or equivalent
+- workflow JSON: backend-normalized with `schema_version` and legacy `version`
+- function manifests: backend model supports `schema_version`
 - module manifests: must have `schema_version`
 - firmware protocol descriptors: must have `schema_version`
 
@@ -81,3 +81,5 @@ Minimum long-term test set:
 - simulated workflow behavior tests once simulation exists
 
 The goal is not only passing tests. The goal is to let future agents detect when a change breaks old expected behavior and then repair it intentionally.
+
+Current implemented compatibility tests live in `backend/tests/test_schema_compatibility.py`.

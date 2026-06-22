@@ -13,7 +13,8 @@ The system should let users describe physical hardware, connect it to workflow b
 1. `docs/PROJECT_STATUS.md`
 2. `docs/ARCHITECTURE_CONTRACTS.md`
 3. `docs/BACKWARDS_COMPATIBILITY.md`
-4. `docs/TODO.md`
+4. `docs/FEATURE_ROADMAP.md`
+5. `docs/TODO.md`
 
 If you are adding or changing a function, also read:
 
@@ -36,7 +37,7 @@ Update `docs/PROJECT_STATUS.md` when a change affects any of these:
 
 Small CSS-only tweaks, copy edits, local refactors, and bug fixes that do not change behavior usually do not need a status update. If the next agent would be confused without knowing it, update the status file.
 
-Update `docs/ARCHITECTURE_CONTRACTS.md` only when the stable contract changes. Update `docs/BACKWARDS_COMPATIBILITY.md` when saved data, migrations, or public version promises change. Put deferred ideas in `docs/TODO.md` instead of scattering them through code comments.
+Update `docs/ARCHITECTURE_CONTRACTS.md` only when the stable contract changes. Update `docs/BACKWARDS_COMPATIBILITY.md` when saved data, migrations, or public version promises change. Put feature-sized deferred work in `docs/FEATURE_ROADMAP.md` and lower-level architecture notes in `docs/TODO.md` instead of scattering them through code comments.
 
 ## Development Rules
 
@@ -63,6 +64,13 @@ Backend import smoke test:
 ```powershell
 cd "C:\BOB\masters\Thesis\Robot Code\backend"
 .\.venv\Scripts\python.exe -c "from app.main import app; print(app.title)"
+```
+
+Backend compatibility tests:
+
+```powershell
+cd "C:\BOB\masters\Thesis\Robot Code"
+backend\.venv\Scripts\python.exe -m unittest discover -s backend\tests
 ```
 
 Docs only:

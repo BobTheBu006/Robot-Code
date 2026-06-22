@@ -1097,6 +1097,11 @@ body {
     0 16px 42px rgba(147, 37, 37, 0.16);
 }
 
+.workflow-node--broken {
+  background: linear-gradient(180deg, rgba(255, 250, 250, 0.98), rgba(255, 238, 236, 0.98));
+  border-color: rgba(180, 35, 24, 0.24);
+}
+
 .workflow-node--inactive {
   opacity: 0.58;
   filter: saturate(0.7);
@@ -1547,6 +1552,11 @@ body {
   gap: 14px;
 }
 
+.workflow-node__repair {
+  color: #932525;
+  font-weight: 700;
+}
+
 .workflow-overlay__hardware-links {
   display: grid;
   gap: 8px;
@@ -1655,6 +1665,26 @@ body {
 .workflow-overlay__settings {
   display: grid;
   gap: 10px;
+}
+
+.workflow-overlay__missing-reference {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 124, 102, 0.32);
+  border-radius: 14px;
+  background: rgba(255, 124, 102, 0.12);
+}
+
+.workflow-overlay__missing-reference strong {
+  color: #fff0eb;
+}
+
+.workflow-overlay__missing-reference p {
+  margin: 0;
+  color: #ffd7cf;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .workflow-overlay__input-switches {

@@ -2,6 +2,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+WORKFLOW_SCHEMA_VERSION = 1
+SUPPORTED_WORKFLOW_SCHEMA_VERSIONS = {1}
+
 
 class WorkflowFileSummary(BaseModel):
     filename: str

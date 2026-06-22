@@ -10,7 +10,9 @@ export interface Esp32BuilderFile {
 }
 
 export interface Esp32FunctionBlueprint {
+  schema_version: number;
   manifest: {
+    schema_version: number;
     id: string;
     display_name: string;
     category: string;

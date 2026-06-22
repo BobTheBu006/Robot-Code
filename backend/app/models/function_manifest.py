@@ -2,6 +2,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+FUNCTION_MANIFEST_SCHEMA_VERSION = 1
+SUPPORTED_FUNCTION_MANIFEST_SCHEMA_VERSIONS = {1}
+
 FunctionInputType = Literal["string", "number", "boolean", "select", "file/path"]
 FunctionHardwareDeviceKind = Literal["stepper_motor", "servo", "sensor"]
 FunctionHardwareSensorKind = Literal["position_limit_switch", "aht20_temperature_humidity"]
@@ -59,6 +62,7 @@ class FunctionHardwareDeviceReference(BaseModel):
 
 
 class FunctionManifest(BaseModel):
+    schema_version: int = Field(default=FUNCTION_MANIFEST_SCHEMA_VERSION, ge=1)
     id: str = Field(min_length=1)
     display_name: str = Field(min_length=1)
     category: str = Field(min_length=1)
@@ -73,6 +77,26 @@ class FunctionManifest(BaseModel):
     builder_workspace_path: str | None = None
     builder_firmware_entry_file: str | None = None
     builder_base_function_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_schema_version(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+
+        normalized_data = dict(data)
+        normalized_data.setdefault("schema_version", FUNCTION_MANIFEST_SCHEMA_VERSION)
+        return normalized_data
+
+    @model_validator(mode="after")
+    def validate_schema_version(self) -> "FunctionManifest":
+        if self.schema_version not in SUPPORTED_FUNCTION_MANIFEST_SCHEMA_VERSIONS:
+            supported_versions = ", ".join(str(version) for version in sorted(SUPPORTED_FUNCTION_MANIFEST_SCHEMA_VERSIONS))
+            raise ValueError(
+                f"Unsupported function manifest schema_version {self.schema_version}. "
+                f"Supported versions: {supported_versions}."
+            )
+        return self
 
 
 class DiscoveredFunctionDefinition(BaseModel):

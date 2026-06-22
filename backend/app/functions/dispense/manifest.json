@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "id": "dispense",
   "display_name": "7 Syringe Dispenser",
   "category": "Robot Actions",

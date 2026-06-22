@@ -329,6 +329,7 @@ export function WorkflowInspector({
   const [customBlockSaveState, setCustomBlockSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [customBlockSaveMessage, setCustomBlockSaveMessage] = useState<string | null>(null);
   const { block, parameters, settings } = selectedNode.data;
+  const isBrokenBlock = block.kind === "broken";
   const incomingEdges = edges.filter((edge) => edge.target === selectedNode.id);
   const outgoingEdges = edges.filter((edge) => edge.source === selectedNode.id);
   const previousNode = incomingEdges.length > 0
@@ -518,17 +519,18 @@ export function WorkflowInspector({
         <div className="workflow-overlay__topbar-center">
           <div className="workflow-overlay__title">
             <span className="workflow-overlay__eyebrow">
-              {block.kind === "compound" ? "Compound Function" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
+              {block.kind === "compound" ? "Compound Function" : block.kind === "broken" ? "Missing Block" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
             </span>
             <strong>{block.displayName}</strong>
           </div>
 
           <button
             className={testStatus === "running" ? "workflow-overlay__run workflow-overlay__run--cancel" : "workflow-overlay__run"}
+            disabled={isBrokenBlock}
             onClick={testStatus === "running" ? onCancel : onRunTest}
             type="button"
           >
-            {testStatus === "running" ? "Cancel" : "Test step"}
+            {isBrokenBlock ? "Missing" : testStatus === "running" ? "Cancel" : "Test step"}
           </button>
         </div>
 
@@ -659,6 +661,21 @@ export function WorkflowInspector({
 
           <div className="workflow-overlay__editor-body">
             {activeTab === "parameters" ? (
+              isBrokenBlock ? (
+                <div className="workflow-overlay__missing-reference">
+                  <strong>Missing reference</strong>
+                  <p>{block.missingReference?.reason ?? "This block cannot be resolved from the current project state."}</p>
+                  <p>{block.missingReference?.suggestedFix ?? "Restore the missing function, device, or module, then reload the workflow."}</p>
+                  <div className="workflow-overlay__setting-row">
+                    <span>Original id</span>
+                    <strong>{block.missingReference?.originalId ?? block.id}</strong>
+                  </div>
+                  <div className="workflow-overlay__setting-row">
+                    <span>Original kind</span>
+                    <strong>{block.missingReference?.originalKind ?? "unknown"}</strong>
+                  </div>
+                </div>
+              ) :
               block.inputs.length > 0 || (block.advancedInputs?.length ?? 0) > 0 ? (
                 <div className="workflow-overlay__fields">
                   {linkedHardwareBlocks.length > 0 ? (
