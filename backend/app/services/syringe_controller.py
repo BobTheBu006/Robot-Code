@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 
@@ -62,10 +63,20 @@ class SyringeControllerError(RuntimeError):
     pass
 
 
+@dataclass
+class _ActiveSyringeSession:
+    serial_port: object
+    io_lock: Lock = field(default_factory=Lock)
+    emergency_stop_requested: bool = False
+    stop_sent: bool = False
+
+
 class SyringeControllerService:
     def __init__(self) -> None:
         self._port_locks: dict[str, Lock] = {}
         self._port_locks_guard = Lock()
+        self._active_sessions: dict[str, _ActiveSyringeSession] = {}
+        self._active_sessions_guard = Lock()
 
     def _calibration_path(self, requested_path: str | None = None) -> Path:
         if requested_path:
@@ -280,6 +291,39 @@ class SyringeControllerService:
                 self._port_locks[port] = Lock()
             return self._port_locks[port]
 
+    def _register_active_session(self, port: str, serial_port) -> _ActiveSyringeSession:
+        session = _ActiveSyringeSession(serial_port=serial_port)
+        with self._active_sessions_guard:
+            self._active_sessions[port] = session
+        return session
+
+    def _unregister_active_session(self, port: str, session: _ActiveSyringeSession) -> None:
+        with self._active_sessions_guard:
+            if self._active_sessions.get(port) is session:
+                del self._active_sessions[port]
+
+    def emergency_stop(self) -> list[dict[str, object]]:
+        with self._active_sessions_guard:
+            active_sessions = list(self._active_sessions.items())
+
+        results: list[dict[str, object]] = []
+        for port, session in active_sessions:
+            session.emergency_stop_requested = True
+            try:
+                if not session.stop_sent:
+                    with session.io_lock:
+                        session.serial_port.write(b"STOP\n")
+                        session.serial_port.flush()
+                    session.stop_sent = True
+                results.append({"ok": True, "tool": "syringe", "tool_port": port, "message": "STOP sent."})
+            except Exception as exc:
+                results.append({"ok": False, "tool": "syringe", "tool_port": port, "message": str(exc)})
+
+        if not results:
+            results.append({"ok": True, "tool": "syringe", "tool_port": None, "message": "No active syringe command."})
+
+        return results
+
     def _reply_contains_prefix(self, reply: str | None, prefixes: tuple[str, ...]) -> bool:
         if not reply:
             return False
@@ -299,6 +343,7 @@ class SyringeControllerService:
         *,
         terminal_prefixes: tuple[str, ...],
         deadline_seconds: float,
+        active_session: _ActiveSyringeSession | None = None,
     ) -> tuple[str | None, bool]:
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
@@ -309,6 +354,14 @@ class SyringeControllerService:
         normalized_terminal_prefixes = tuple(prefix.upper() for prefix in terminal_prefixes)
 
         while time.monotonic() < deadline:
+            if active_session and active_session.emergency_stop_requested:
+                if not active_session.stop_sent:
+                    with active_session.io_lock:
+                        active_session.serial_port.write(b"STOP\n")
+                        active_session.serial_port.flush()
+                    active_session.stop_sent = True
+                raise SyringeControllerError("Syringe command was stopped by E-Stop.")
+
             reply_bytes = serial_port.readline()
             reply_line = reply_bytes.decode("utf-8", errors="replace").strip()
             if not reply_line:
@@ -518,69 +571,74 @@ class SyringeControllerService:
         try:
             with self._port_lock(port):
                 with serial.Serial(port, baud_rate, timeout=self._serial_timeout()) as serial_port:
-                    boot_delay = self._boot_delay()
-                    if boot_delay > 0:
-                        time.sleep(boot_delay)
+                    active_session = self._register_active_session(port, serial_port)
+                    try:
+                        boot_delay = self._boot_delay()
+                        if boot_delay > 0:
+                            time.sleep(boot_delay)
 
-                    selected_format = None
-                    command = None
-                    reply = None
-                    speed_result: dict[str, str | bool | None | int] = {
-                        "speed": request.speed,
-                        "intake_speed": request.intake_speed,
-                        "outtake_speed": request.outtake_speed,
-                        "speed_command_sent": None,
-                        "speed_reply": None,
-                        "speed_applied": False,
-                        "intake_speed_command_sent": None,
-                        "intake_speed_reply": None,
-                        "intake_speed_applied": False,
-                        "outtake_speed_command_sent": None,
-                        "outtake_speed_reply": None,
-                        "outtake_speed_applied": False,
-                    }
-                    pin_result: dict[str, object] = {
-                        "pin_config_commands_sent": [],
-                        "pin_config_replies": [],
-                        "pin_config_applied": False,
-                        "configured_pins": configured_pins,
-                    }
+                        selected_format = None
+                        command = None
+                        reply = None
+                        speed_result: dict[str, str | bool | None | int] = {
+                            "speed": request.speed,
+                            "intake_speed": request.intake_speed,
+                            "outtake_speed": request.outtake_speed,
+                            "speed_command_sent": None,
+                            "speed_reply": None,
+                            "speed_applied": False,
+                            "intake_speed_command_sent": None,
+                            "intake_speed_reply": None,
+                            "intake_speed_applied": False,
+                            "outtake_speed_command_sent": None,
+                            "outtake_speed_reply": None,
+                            "outtake_speed_applied": False,
+                        }
+                        pin_result: dict[str, object] = {
+                            "pin_config_commands_sent": [],
+                            "pin_config_replies": [],
+                            "pin_config_applied": False,
+                            "configured_pins": configured_pins,
+                        }
 
-                    pin_result = self._apply_head_pin_profile(
-                        serial_port,
-                        configured_pins,
-                    )
-
-                    if request.speed or request.intake_speed or request.outtake_speed:
-                        speed_result = self._apply_speed_profile(
+                        pin_result = self._apply_head_pin_profile(
                             serial_port,
-                            request.speed,
-                            request.intake_speed,
-                            request.outtake_speed,
+                            configured_pins,
                         )
 
-                    for command_format in self._command_formats_to_try():
-                        command = self._build_command(steps, command_format)
-                        reply, completed = self._send_command(
-                            serial_port,
-                            command,
-                            terminal_prefixes=("OK DISPENSE", "ERR "),
-                            deadline_seconds=self._dispense_command_deadline(),
-                        )
-                        selected_format = command_format
-
-                        if not completed:
-                            raise SyringeControllerError(
-                                "Timed out while waiting for the ESP32 to finish dispensing."
+                        if request.speed or request.intake_speed or request.outtake_speed:
+                            speed_result = self._apply_speed_profile(
+                                serial_port,
+                                request.speed,
+                                request.intake_speed,
+                                request.outtake_speed,
                             )
 
-                        if self._reply_contains_prefix(reply, ("OK DISPENSE",)):
-                            break
-
-                        if not self._is_unknown_command_reply(reply):
-                            raise SyringeControllerError(
-                                f"ESP32 rejected the dispense command: {reply}"
+                        for command_format in self._command_formats_to_try():
+                            command = self._build_command(steps, command_format)
+                            reply, completed = self._send_command(
+                                serial_port,
+                                command,
+                                terminal_prefixes=("OK DISPENSE", "ERR "),
+                                deadline_seconds=self._dispense_command_deadline(),
+                                active_session=active_session,
                             )
+                            selected_format = command_format
+
+                            if not completed:
+                                raise SyringeControllerError(
+                                    "Timed out while waiting for the ESP32 to finish dispensing."
+                                )
+
+                            if self._reply_contains_prefix(reply, ("OK DISPENSE",)):
+                                break
+
+                            if not self._is_unknown_command_reply(reply):
+                                raise SyringeControllerError(
+                                    f"ESP32 rejected the dispense command: {reply}"
+                                )
+                    finally:
+                        self._unregister_active_session(port, active_session)
         except Exception as exc:
             raise SyringeControllerError(
                 f"Failed to communicate with ESP32 on {port}: {exc}"

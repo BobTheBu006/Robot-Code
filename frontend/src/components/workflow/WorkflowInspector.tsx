@@ -67,6 +67,10 @@ interface WorkflowInspectorProps {
 
 const WORKFLOW_EXPRESSION_MIME = "application/x-workflow-expression";
 
+function isVisibleWorkflowInput(input: WorkflowInputDefinition): boolean {
+  return !input.hidden && input.key !== "tool_port" && !input.key.includes("pin");
+}
+
 function coerceInputValue(
   input: WorkflowInputDefinition,
   event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -329,6 +333,8 @@ export function WorkflowInspector({
   const [customBlockSaveState, setCustomBlockSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [customBlockSaveMessage, setCustomBlockSaveMessage] = useState<string | null>(null);
   const { block, parameters, settings } = selectedNode.data;
+  const visibleInputs = block.inputs.filter(isVisibleWorkflowInput);
+  const visibleAdvancedInputs = (block.advancedInputs ?? []).filter(isVisibleWorkflowInput);
   const isBrokenBlock = block.kind === "broken";
   const incomingEdges = edges.filter((edge) => edge.target === selectedNode.id);
   const outgoingEdges = edges.filter((edge) => edge.source === selectedNode.id);
@@ -677,7 +683,7 @@ export function WorkflowInspector({
                   </div>
                 </div>
               ) :
-              block.inputs.length > 0 || (block.advancedInputs?.length ?? 0) > 0 ? (
+              visibleInputs.length > 0 || visibleAdvancedInputs.length > 0 || linkedHardwareBlocks.length > 0 || firmwareRequirements.length > 0 ? (
                 <div className="workflow-overlay__fields">
                   {linkedHardwareBlocks.length > 0 ? (
                     <section className="workflow-overlay__hardware-links">
@@ -707,9 +713,9 @@ export function WorkflowInspector({
                     </section>
                   ) : null}
 
-                  {block.inputs.map(renderParameterField)}
+                  {visibleInputs.map(renderParameterField)}
 
-                  {(block.advancedInputs?.length ?? 0) > 0 ? (
+                  {visibleAdvancedInputs.length > 0 ? (
                     <div className="workflow-overlay__advanced">
                       <button
                         className="workflow-overlay__advanced-toggle"
@@ -723,7 +729,7 @@ export function WorkflowInspector({
                       {advancedExpanded ? (
                         <div className="workflow-overlay__advanced-body">
                           <div className="workflow-overlay__fields">
-                            {(block.advancedInputs ?? []).map(renderParameterField)}
+                            {visibleAdvancedInputs.map(renderParameterField)}
                           </div>
 
                           {(block.kind === "advanced" || block.kind === "robot-action") && block.builderBoardId ? (

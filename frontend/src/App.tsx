@@ -4,7 +4,7 @@ import { HardwareDiagramCard } from "./components/HardwareDiagramCard";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { StatusBadge } from "./components/StatusBadge";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
-import { fetchCameraStatus, fetchHealth, fetchRobotState, setCameraPower } from "./lib/api";
+import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, setCameraPower } from "./lib/api";
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
 
 type RequestStatus = "loading" | "success" | "error";
@@ -22,6 +22,8 @@ function App() {
   const [robotStateError, setRobotStateError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [hardwareMapRevision, setHardwareMapRevision] = useState(0);
+  const [emergencyStopState, setEmergencyStopState] = useState<"idle" | "stopping" | "sent" | "error">("idle");
+  const [emergencyStopMessage, setEmergencyStopMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
     const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
@@ -97,10 +99,35 @@ function App() {
     }
   }
 
+  async function handleEmergencyStop() {
+    window.dispatchEvent(new CustomEvent("robot-emergency-stop"));
+    setEmergencyStopState("stopping");
+    setEmergencyStopMessage("Stopping now");
+
+    try {
+      const response = await emergencyStop();
+      setEmergencyStopState(response.ok ? "sent" : "error");
+      setEmergencyStopMessage(response.message);
+    } catch (error) {
+      setEmergencyStopState("error");
+      setEmergencyStopMessage(error instanceof Error ? error.message : "Emergency stop request failed");
+    }
+  }
+
   const isConnected = connectionStatus === "success";
 
   return (
     <main className="app-shell">
+      <div className="emergency-stop-overlay" role="presentation">
+        <button
+          className={emergencyStopState === "stopping" ? "emergency-stop emergency-stop--active" : "emergency-stop"}
+          onClick={() => void handleEmergencyStop()}
+          type="button"
+        >
+          E-STOP
+        </button>
+        {emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
+      </div>
       <div className="app-shell__inner">
         <header className="hero">
           <div>

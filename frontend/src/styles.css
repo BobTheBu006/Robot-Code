@@ -37,6 +37,51 @@ body {
   margin: 0 auto;
 }
 
+.emergency-stop-overlay {
+  position: fixed;
+  right: 18px;
+  top: 18px;
+  z-index: 10000;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.emergency-stop {
+  pointer-events: auto;
+  min-width: 190px;
+  min-height: 92px;
+  border: 5px solid #6d0707;
+  border-radius: 8px;
+  background: #d10f0f;
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(109, 7, 7, 0.34);
+  cursor: pointer;
+  font-size: 1.7rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.emergency-stop:hover,
+.emergency-stop:focus-visible,
+.emergency-stop--active {
+  background: #a80707;
+  outline: 4px solid rgba(209, 15, 15, 0.22);
+}
+
+.emergency-stop-overlay span {
+  max-width: 240px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #6d0707;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+  box-shadow: 0 8px 22px rgba(23, 50, 42, 0.12);
+}
+
 .hero {
   display: flex;
   justify-content: space-between;

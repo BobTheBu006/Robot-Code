@@ -40,28 +40,59 @@
       "options": []
     },
     {
-      "key": "speed_profile",
-      "label": "Speed Profile",
-      "type": "select",
-      "description": "Named speed preset for the Z motion controller.",
+      "key": "speed_rpm",
+      "label": "Speed (RPM)",
+      "type": "number",
+      "description": "Numeric target motor speed for the move.",
       "required": true,
-      "default": "normal",
+      "default": 240.0,
       "placeholder": null,
       "advanced": false,
-      "options": [
-        {
-          "label": "Slow",
-          "value": "slow"
-        },
-        {
-          "label": "Normal",
-          "value": "normal"
-        },
-        {
-          "label": "Fast",
-          "value": "fast"
-        }
-      ]
+      "options": []
+    },
+    {
+      "key": "trapezoidal_speed",
+      "label": "Trapezoidal Speed",
+      "type": "boolean",
+      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "acceleration_rpm_per_s",
+      "label": "Acceleration (RPM/s)",
+      "type": "number",
+      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+      "required": false,
+      "default": 600.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "on_the_fly_calibration",
+      "label": "On-the-fly Calibration",
+      "type": "boolean",
+      "description": "When enabled, moves that end within 3 cm of a limit switch probe that switch and compare the observed position against calibration.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "calibration_max_diff_steps",
+      "label": "Max Calibration Difference (steps)",
+      "type": "number",
+      "description": "Maximum allowed on-the-fly limit-switch position error before a full recalibration is triggered.",
+      "required": false,
+      "default": 5.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     }
   ],
   "advanced_inputs": [
@@ -385,7 +416,7 @@
       "routine_id": "move_gantry_z",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z <leftCm> <rightCm> <speedProfile>.",
+      "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z <leftCm> <rightCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
       "entry_point": "move_gantry_z",
       "required_device_ids": [
         "left-z-motor",

@@ -137,18 +137,33 @@ class HardwareMapService:
             pin.function_input_key: pin.gpio
             for device in hardware_map.devices
             for pin in device.pins
-            if pin.function_input_key and pin.gpio != "-" and pin.signal != "-"
+            if device.board_id and pin.function_input_key and pin.gpio != "-" and pin.signal != "-"
         }
 
         for input_key in input_keys:
             if input_key == "tool_port" or "pin" not in input_key:
                 continue
-            if resolved_inputs.get(input_key) in {None, ""} and input_key in pins_by_input_key:
+            if input_key in pins_by_input_key:
                 resolved_inputs[input_key] = pins_by_input_key[input_key]
 
         return resolved_inputs
 
     def _board_for_manifest(self, hardware_map: HardwareMap, manifest: FunctionManifest) -> HardwareBoardMapping | None:
+        declared_device_ids = {device.id for device in manifest.hardware_devices}
+        mapped_board_ids = {
+            device.board_id
+            for device in hardware_map.devices
+            if device.id in declared_device_ids and device.board_id
+        }
+        if len(mapped_board_ids) == 1:
+            mapped_board_id = next(iter(mapped_board_ids))
+            if mapped_board_id == "raspberry-pi":
+                return None
+
+            for board in hardware_map.boards:
+                if board.id == mapped_board_id:
+                    return board
+
         if manifest.builder_board_id:
             for board in hardware_map.boards:
                 if board.id == manifest.builder_board_id:
@@ -287,7 +302,7 @@ class HardwareMapService:
             })
 
         return existing_device.model_copy(update={
-            "board_id": next_device.board_id,
+            "board_id": existing_device.board_id or next_device.board_id,
             "name": existing_device.name or next_device.name,
             "kind": next_device.kind,
             "sensor_kind": next_device.sensor_kind,
@@ -372,7 +387,7 @@ class HardwareMapService:
             HardwareDeviceMapping(
                 id="x-axis-motor",
                 board_id=gantry_board.id,
-                name="X Axis Motor",
+                name="CoreXY A Motor",
                 kind="stepper_motor",
                 pins=[
                     _pin("x-dir", "direction", 17, "x_dir_pin"),
@@ -382,11 +397,12 @@ class HardwareMapService:
                     _pin("x-ms2", "micro_step_2", "-", None),
                     _pin("x-ms3", "micro_step_3", "-", None),
                 ],
+                notes="Stable ID kept for compatibility; this is CoreXY motor A, not an independent X-only gantry motor.",
             ),
             HardwareDeviceMapping(
                 id="y-axis-motor",
                 board_id=gantry_board.id,
-                name="Y Axis Motor",
+                name="CoreXY B Motor",
                 kind="stepper_motor",
                 pins=[
                     _pin("y-dir", "direction", 19, "y_dir_pin"),
@@ -396,11 +412,12 @@ class HardwareMapService:
                     _pin("y-ms2", "micro_step_2", "-", None),
                     _pin("y-ms3", "micro_step_3", "-", None),
                 ],
+                notes="Stable ID kept for compatibility; this is CoreXY motor B, not an independent Y-only gantry motor.",
             ),
             HardwareDeviceMapping(
                 id="left-z-motor",
                 board_id=gantry_board.id,
-                name="Left Z Motor",
+                name="Z Axis Motor",
                 kind="stepper_motor",
                 pins=[
                     _pin("z-left-dir", "direction", 33, "z_left_dir_pin"),
@@ -410,11 +427,12 @@ class HardwareMapService:
                     _pin("z-left-ms2", "micro_step_2", "-", None),
                     _pin("z-left-ms3", "micro_step_3", "-", None),
                 ],
+                notes="Single Z axis motor. Stable legacy ID kept for compatibility.",
             ),
             HardwareDeviceMapping(
                 id="right-z-motor",
-                board_id=gantry_board.id,
-                name="Right Z Motor",
+                board_id="",
+                name="Legacy Right Z Motor",
                 kind="stepper_motor",
                 pins=[
                     _pin("z-right-dir", "direction", 5, "z_right_dir_pin"),
@@ -424,6 +442,7 @@ class HardwareMapService:
                     _pin("z-right-ms2", "micro_step_2", "-", None),
                     _pin("z-right-ms3", "micro_step_3", "-", None),
                 ],
+                notes="Legacy placeholder for older dual-Z maps. Leave unconnected for the current single-Z CoreXY robot.",
             ),
             HardwareDeviceMapping(
                 id="x-min-limit-switch",
@@ -468,7 +487,7 @@ class HardwareMapService:
             HardwareDeviceMapping(
                 id="z-left-min-limit-switch",
                 board_id=gantry_board.id,
-                name="Left Z Min Limit Switch",
+                name="Z Min Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
@@ -478,7 +497,7 @@ class HardwareMapService:
             HardwareDeviceMapping(
                 id="z-left-max-limit-switch",
                 board_id=gantry_board.id,
-                name="Left Z Max Limit Switch",
+                name="Z Max Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
@@ -487,8 +506,8 @@ class HardwareMapService:
             ),
             HardwareDeviceMapping(
                 id="z-right-min-limit-switch",
-                board_id=gantry_board.id,
-                name="Right Z Min Limit Switch",
+                board_id="",
+                name="Legacy Right Z Min Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
@@ -497,8 +516,8 @@ class HardwareMapService:
             ),
             HardwareDeviceMapping(
                 id="z-right-max-limit-switch",
-                board_id=gantry_board.id,
-                name="Right Z Max Limit Switch",
+                board_id="",
+                name="Legacy Right Z Max Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[

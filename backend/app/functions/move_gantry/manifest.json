@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "id": "move_gantry",
-  "display_name": "Move Gantry XY",
+  "display_name": "Move Gantry XYZ",
   "category": "Robot Actions",
-  "description": "Move the XY gantry to an absolute position from the calibrated origin.",
-  "version": "0.3.0",
+  "description": "Move the CoreXY gantry to an absolute X/Y/Z position inside the 115 x 60 x 60 cm workspace. Origin 0,0,0 is the back-bottom-left corner.",
+  "version": "0.4.0",
   "inputs": [
     {
       "key": "tool_port",
       "label": "Selected ESP32",
       "type": "file/path",
-      "description": "Connected ESP32 board that should receive the XY gantry command.",
+      "description": "Controller resolved from the Hardware Map for the CoreXY gantry routine.",
       "required": true,
       "default": "/dev/ttyUSB1",
       "placeholder": "/dev/ttyUSB1",
@@ -21,7 +21,7 @@
       "key": "x_cm",
       "label": "X Position (cm)",
       "type": "number",
-      "description": "Target X position measured from the calibrated origin.",
+      "description": "Target X position in cm from the back-bottom-left origin. Range: 0 to 115 cm.",
       "required": true,
       "default": 0.0,
       "placeholder": null,
@@ -32,7 +32,7 @@
       "key": "y_cm",
       "label": "Y Position (cm)",
       "type": "number",
-      "description": "Target Y position measured from the calibrated origin.",
+      "description": "Target Y position in cm from the back-bottom-left origin. Range: 0 to 60 cm.",
       "required": true,
       "default": 0.0,
       "placeholder": null,
@@ -40,28 +40,70 @@
       "options": []
     },
     {
-      "key": "speed_profile",
-      "label": "Speed Profile",
-      "type": "select",
-      "description": "Named speed preset for the XY motion controller.",
+      "key": "z_cm",
+      "label": "Z Position (cm)",
+      "type": "number",
+      "description": "Target Z position in cm from the back-bottom-left origin. Range: 0 to 60 cm.",
       "required": true,
-      "default": "normal",
+      "default": 0.0,
       "placeholder": null,
       "advanced": false,
-      "options": [
-        {
-          "label": "Slow",
-          "value": "slow"
-        },
-        {
-          "label": "Normal",
-          "value": "normal"
-        },
-        {
-          "label": "Fast",
-          "value": "fast"
-        }
-      ]
+      "options": []
+    },
+    {
+      "key": "speed_rpm",
+      "label": "Speed (RPM)",
+      "type": "number",
+      "description": "Numeric target motor speed for the move.",
+      "required": true,
+      "default": 240.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "trapezoidal_speed",
+      "label": "Trapezoidal Speed",
+      "type": "boolean",
+      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "acceleration_rpm_per_s",
+      "label": "Acceleration (RPM/s)",
+      "type": "number",
+      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+      "required": false,
+      "default": 600.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "on_the_fly_calibration",
+      "label": "On-the-fly Calibration",
+      "type": "boolean",
+      "description": "When enabled, moves that end within 3 cm of a limit switch probe that switch and compare the observed position against calibration.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "calibration_max_diff_steps",
+      "label": "Max Calibration Difference (steps)",
+      "type": "number",
+      "description": "Maximum allowed on-the-fly limit-switch position error before a full recalibration is triggered.",
+      "required": false,
+      "default": 5.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     }
   ],
   "advanced_inputs": [
@@ -172,6 +214,94 @@
       "placeholder": null,
       "advanced": true,
       "options": []
+    },
+    {
+      "key": "z_left_step_pin",
+      "label": "Z Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO step pin for the single Z axis driver.",
+      "required": false,
+      "default": 32.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_left_dir_pin",
+      "label": "Z Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO direction pin for the single Z axis driver.",
+      "required": false,
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_right_step_pin",
+      "label": "Legacy Z Step Pin",
+      "type": "number",
+      "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z step pin.",
+      "required": false,
+      "default": 32.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_right_dir_pin",
+      "label": "Legacy Z Dir Pin",
+      "type": "number",
+      "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z direction pin.",
+      "required": false,
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_left_min_limit_pin",
+      "label": "Z Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Z minimum/home limit switch.",
+      "required": false,
+      "default": 12.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_left_max_limit_pin",
+      "label": "Z Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Z maximum limit switch.",
+      "required": false,
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_right_min_limit_pin",
+      "label": "Legacy Z Min Limit Pin",
+      "type": "number",
+      "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z min limit pin.",
+      "required": false,
+      "default": 12.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "z_right_max_limit_pin",
+      "label": "Legacy Z Max Limit Pin",
+      "type": "number",
+      "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z max limit pin.",
+      "required": false,
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     }
   ],
   "outputs": [
@@ -185,7 +315,7 @@
   "hardware_devices": [
     {
       "id": "x-axis-motor",
-      "name": "X Axis Motor",
+      "name": "CoreXY A Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -241,7 +371,7 @@
     },
     {
       "id": "y-axis-motor",
-      "name": "Y Axis Motor",
+      "name": "CoreXY B Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -378,6 +508,62 @@
       ],
       "basic_block_id": "basic-sensor-y-max-limit-switch",
       "notes": null
+    },
+    {
+      "id": "left-z-motor",
+      "name": "Z Axis Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB1",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "z_left_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "z_left_step_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-left-z-motor",
+      "notes": "Single Z axis motor. Stable legacy ID kept for compatibility."
     }
   ],
   "firmware_requirements": [
@@ -385,17 +571,18 @@
       "routine_id": "move_gantry",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: PING, SET XY PINS <xStep> <xDir> <yStep> <yDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, MOVE XY <xCm> <yCm> <speedProfile>.",
+      "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
       "entry_point": "move_gantry",
       "required_device_ids": [
         "x-axis-motor",
         "y-axis-motor",
+        "left-z-motor",
         "x-min-limit-switch",
         "x-max-limit-switch",
         "y-min-limit-switch",
         "y-max-limit-switch"
       ],
-      "description": "Firmware routine required by Move Gantry XY."
+      "description": "Firmware routine required by Move Gantry XYZ on a CoreXY gantry with a single Z axis."
     }
   ],
   "builder_board_id": "ttyUSB1",

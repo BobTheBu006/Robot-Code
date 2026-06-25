@@ -73,7 +73,7 @@ class ToolChangeRequestTests(unittest.TestCase):
     def test_slot_defaults_are_ten_cm_apart(self) -> None:
         request = ToolChangeRequest.model_validate({"slot": 2})
 
-        self.assertEqual(request.slot_position(), {"x_cm": 2.0, "y_cm": 45.0, "z_cm": 70.0})
+        self.assertEqual(request.slot_position(), {"x_cm": 2.0, "y_cm": 45.0, "z_cm": 60.0})
 
     def test_get_tool_sequence_matches_slot_one_geometry(self) -> None:
         request = ToolChangeRequest.model_validate({"action": "get_tool", "slot": 1})
@@ -83,10 +83,10 @@ class ToolChangeRequestTests(unittest.TestCase):
         self.assertEqual(
             sequence,
             [
-                {"label": "approach_slot", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 70.0},
-                {"label": "move_left_into_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 70.0},
-                {"label": "move_back_lock_tool", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 70.0},
-                {"label": "move_right_clear_rack", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 70.0},
+                {"label": "approach_slot", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 60.0},
+                {"label": "move_left_into_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 60.0},
+                {"label": "move_back_lock_tool", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 60.0},
+                {"label": "move_right_clear_rack", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 60.0},
             ],
         )
 
@@ -98,10 +98,10 @@ class ToolChangeRequestTests(unittest.TestCase):
         self.assertEqual(
             sequence,
             [
-                {"label": "approach_loaded_tool", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 70.0},
-                {"label": "move_left_to_drop_lane", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 70.0},
-                {"label": "move_forward_release_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 70.0},
-                {"label": "move_right_clear_empty_tool", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 70.0},
+                {"label": "approach_loaded_tool", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 60.0},
+                {"label": "move_left_to_drop_lane", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 60.0},
+                {"label": "move_forward_release_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 60.0},
+                {"label": "move_right_clear_empty_tool", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 60.0},
             ],
         )
 

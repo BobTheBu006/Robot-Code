@@ -1,5 +1,5 @@
-import type { DragEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addEdge,
@@ -104,6 +104,10 @@ const RASPBERRY_BOARD_ID = "raspberry-pi";
 
 function isEsp32WorkflowBoardId(boardId: string | null | undefined): boardId is string {
   return Boolean(boardId) && boardId !== RASPBERRY_BOARD_ID;
+}
+
+function isVisibleWorkflowInput(input: WorkflowInputDefinition): boolean {
+  return !input.hidden && input.key !== "tool_port" && !input.key.includes("pin");
 }
 
 function isClientExecutedBlock(block: WorkflowBlockDefinition): boolean {
@@ -312,6 +316,91 @@ function mergeParametersForBlock(
   return nextParameters;
 }
 
+function getBoardIdForBlock(block: WorkflowBlockDefinition, hardwareMap: HardwareMap | null): string | null {
+  const hardwareDeviceIds = new Set((block.hardwareDevices ?? []).map((device) => device.id));
+  if (block.hardwareDeviceId) {
+    hardwareDeviceIds.add(block.hardwareDeviceId);
+  }
+
+  const mappedBoardIds = new Set<string>();
+  for (const deviceId of hardwareDeviceIds) {
+    const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceId);
+    if (mappedDevice?.board_id) {
+      mappedBoardIds.add(mappedDevice.board_id);
+      continue;
+    }
+
+    const blockDevice = block.hardwareDevices?.find((device) => device.id === deviceId);
+    if (blockDevice?.board_id) {
+      mappedBoardIds.add(blockDevice.board_id);
+    }
+  }
+
+  if (mappedBoardIds.size === 1) {
+    return Array.from(mappedBoardIds)[0];
+  }
+
+  if (mappedBoardIds.size > 1) {
+    return null;
+  }
+
+  return block.hardwareBoardId ?? block.builderBoardId ?? null;
+}
+
+function getHardwareMapPortForBlock(block: WorkflowBlockDefinition, hardwareMap: HardwareMap | null): string | null {
+  const boardId = getBoardIdForBlock(block, hardwareMap);
+  if (!boardId || boardId === RASPBERRY_BOARD_ID) {
+    return null;
+  }
+
+  return hardwareMap?.boards.find((board) => board.id === boardId)?.usb_port ?? null;
+}
+
+function getHardwareMapPinParameters(hardwareMap: HardwareMap | null): Record<string, WorkflowParameterValue> {
+  const pinParameters: Record<string, WorkflowParameterValue> = {};
+
+  for (const device of hardwareMap?.devices ?? []) {
+    for (const pin of device.pins) {
+      if (!pin.function_input_key || pin.gpio === "-" || pin.signal === "-") {
+        continue;
+      }
+
+      pinParameters[pin.function_input_key] = pin.gpio;
+    }
+  }
+
+  return pinParameters;
+}
+
+function resolveHardwareMapParameters(
+  block: WorkflowBlockDefinition,
+  parameters: Record<string, WorkflowParameterValue>,
+  hardwareMap: HardwareMap | null,
+): Record<string, WorkflowParameterValue> {
+  const inputs = getAllBlockInputs(block);
+  const shouldResolveToolPort = inputs.some((input) => input.key === "tool_port");
+  const pinInputKeys = inputs
+    .filter((input) => input.key.includes("pin"))
+    .map((input) => input.key);
+  const pinParameters = getHardwareMapPinParameters(hardwareMap);
+  const resolvedParameters = { ...parameters };
+
+  if (shouldResolveToolPort) {
+    const toolPort = getHardwareMapPortForBlock(block, hardwareMap);
+    if (toolPort) {
+      resolvedParameters.tool_port = toolPort;
+    }
+  }
+
+  for (const inputKey of pinInputKeys) {
+    if (pinParameters[inputKey] !== undefined) {
+      resolvedParameters[inputKey] = pinParameters[inputKey];
+    }
+  }
+
+  return resolvedParameters;
+}
+
 const nodeTypes: NodeTypes = {
   workflowBlock: WorkflowNode,
 };
@@ -320,6 +409,79 @@ const edgeTypes: EdgeTypes = {
   workflowEdge: WorkflowEdge,
 };
 
+function useControlKeyPressed(): boolean {
+  const [isPressed, setIsPressed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsPressed(true);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsPressed(false);
+      }
+    };
+    const handleBlur = () => setIsPressed(false);
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
+  return isPressed;
+}
+
+function shouldIgnoreControlDragPan(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && Boolean(target.closest(".react-flow__controls, .react-flow__minimap, input, textarea, select, button, a"));
+}
+
+function useControlDragPan() {
+  const reactFlow = useReactFlow();
+
+  return useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (!event.ctrlKey || event.button !== 0 || shouldIgnoreControlDragPan(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startViewport = reactFlow.getViewport();
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      reactFlow.setViewport(
+        {
+          x: startViewport.x + moveEvent.clientX - startX,
+          y: startViewport.y + moveEvent.clientY - startY,
+          zoom: startViewport.zoom,
+        },
+        { duration: 0 },
+      );
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+  }, [reactFlow]);
+}
+
 interface CompoundFunctionEditorProps {
   node: WorkflowFlowNode;
   onClose: () => void;
@@ -327,6 +489,8 @@ interface CompoundFunctionEditorProps {
 }
 
 function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEditorProps) {
+  const controlKeyPressed = useControlKeyPressed();
+  const handleControlDragPan = useControlDragPan();
   const compound = node.data.block.compound;
   const initialNodes = useMemo(
     () => normalizeWorkflowNodes((compound?.nodes ?? []) as WorkflowFlowNode[]),
@@ -478,7 +642,9 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
                 setSelectedInnerNodeId(innerNode.id);
               }}
               onNodesChange={onEditorNodesChange}
+              onPointerDownCapture={handleControlDragPan}
               onPaneClick={() => setSelectedInnerNodeId(null)}
+              nodesDraggable={!controlKeyPressed}
               panActivationKeyCode="Control"
               panOnDrag={false}
               selectionMode={SelectionMode.Partial}
@@ -505,7 +671,7 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
               <section>
                 <h4>{selectedInnerNode.data.block.displayName}</h4>
                 <div className="workflow-compound-editor__fields">
-                  {getAllBlockInputs(selectedInnerNode.data.block).map((input) => (
+                  {getAllBlockInputs(selectedInnerNode.data.block).filter(isVisibleWorkflowInput).map((input) => (
                     <label className="workflow-compound-editor__field" key={input.key}>
                       <span>{input.label}</span>
                       {input.type === "select" ? (
@@ -553,6 +719,8 @@ interface WorkflowEditorSurfaceProps {
 }
 
 function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfaceProps) {
+  const controlKeyPressed = useControlKeyPressed();
+  const handleControlDragPan = useControlDragPan();
   const starterWorkflow = useMemo(() => createStarterWorkflow(), []);
   const builtInBlocks = useMemo(() => createBuiltInBlocks(), []);
   const [nodes, setNodes, onNodesChange] = useNodesState<WorkflowFlowNode>(starterWorkflow.nodes);
@@ -728,6 +896,38 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       cancellationToken.cancelled = true;
     };
   }, [hardwareMapRevision]);
+
+  useEffect(() => {
+    const handleEmergencyStop = () => {
+      Object.values(testAbortControllersRef.current).forEach((controller) => controller.abort());
+      testAbortControllersRef.current = {};
+      setWorkflowRunState({
+        isRunning: false,
+        phase: "idle",
+        orderedNodeIds: [],
+        currentNodeId: null,
+        completedNodeIds: [],
+        flashingBoardId: null,
+      });
+      setTestStateByNodeId((currentState) =>
+        Object.fromEntries(
+          Object.entries(currentState).map(([nodeId, state]) => [
+            nodeId,
+            state.status === "running"
+              ? {
+                  status: "error",
+                  result: state.result,
+                  error: "Stopped by E-Stop.",
+                }
+              : state,
+          ]),
+        ),
+      );
+    };
+
+    window.addEventListener("robot-emergency-stop", handleEmergencyStop);
+    return () => window.removeEventListener("robot-emergency-stop", handleEmergencyStop);
+  }, []);
 
   useEffect(() => {
     testStateByNodeIdRef.current = testStateByNodeId;
@@ -1433,27 +1633,32 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       inputData,
       { blockResults },
     );
+    const hardwareResolvedParameters = resolveHardwareMapParameters(
+      node.data.block,
+      resolvedParameters,
+      hardwareMap,
+    );
 
     if (node.data.block.kind === "broken") {
-      return runBuiltInBlockTest(node.data.block, resolvedParameters, inputData);
+      return runBuiltInBlockTest(node.data.block, hardwareResolvedParameters, inputData);
     }
 
     if (node.data.block.kind === "compound") {
-      return runCompoundBlock(node.data.block, resolvedParameters, inputData, blockResults, signal);
+      return runCompoundBlock(node.data.block, hardwareResolvedParameters, inputData, blockResults, signal);
     }
 
     if (node.data.block.id === "delay") {
-      const durationMs = Number(resolvedParameters.duration_ms ?? 0);
+      const durationMs = Number(hardwareResolvedParameters.duration_ms ?? 0);
       if (Number.isFinite(durationMs) && durationMs > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, durationMs));
       }
     }
 
     if (isClientExecutedBlock(node.data.block)) {
-      return runBuiltInBlockTest(node.data.block, resolvedParameters, inputData);
+      return runBuiltInBlockTest(node.data.block, hardwareResolvedParameters, inputData);
     }
 
-    return testFunction(node.data.block.id, resolvedParameters, inputData, signal);
+    return testFunction(node.data.block.id, hardwareResolvedParameters, inputData, signal);
   }
 
   async function runCompoundBlock(
@@ -1794,10 +1999,6 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     block: WorkflowBlockDefinition,
     boardIds: Set<string>,
   ) {
-    if (isEsp32WorkflowBoardId(block.builderBoardId)) {
-      boardIds.add(block.builderBoardId);
-    }
-
     if (isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
@@ -1820,6 +2021,19 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     }
 
     return Array.from(boardIds);
+  }
+
+  function getHardwareMapEsp32BoardIds(): Set<string> {
+    return new Set((hardwareMap?.boards ?? []).map((board) => board.id).filter(isEsp32WorkflowBoardId));
+  }
+
+  function filterBoardIdsToHardwareMap(boardIds: string[]): string[] {
+    const hardwareBoardIds = getHardwareMapEsp32BoardIds();
+    if (hardwareBoardIds.size === 0) {
+      return [];
+    }
+
+    return Array.from(new Set(boardIds.filter((boardId) => hardwareBoardIds.has(boardId))));
   }
 
   function addHardwareDeviceBoardIds(
@@ -1856,28 +2070,17 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
         boardIds.add(block.hardwareBoardId);
       }
-      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.builderBoardId)) {
-        boardIds.add(block.builderBoardId);
-      }
       return Array.from(boardIds);
     }
 
     if (requirement.controller_role === "builder_board") {
-      if (isEsp32WorkflowBoardId(block.builderBoardId)) {
-        boardIds.add(block.builderBoardId);
-      }
+      addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
       if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
         boardIds.add(block.hardwareBoardId);
-      }
-      if (boardIds.size === 0) {
-        addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
       }
       return Array.from(boardIds);
     }
 
-    if (isEsp32WorkflowBoardId(block.builderBoardId)) {
-      boardIds.add(block.builderBoardId);
-    }
     if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
@@ -1945,7 +2148,12 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       collectWorkflowFirmwarePlanItemsFromBlock(node.data.block, nodeId, itemsByKey);
     }
 
-    return Array.from(itemsByKey.values());
+    const hardwareBoardIds = getHardwareMapEsp32BoardIds();
+    if (hardwareBoardIds.size === 0) {
+      return [];
+    }
+
+    return Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
   }
 
   function summarizeWorkflowFirmwarePlanFailure(errors: string[], warnings: string[]): string {
@@ -2006,7 +2214,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     for (const nodeId of rootNodeIds) {
       collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
     }
-    const fallbackBoardIdsToFlash = collectEsp32BoardIdsForRun(orderedNodeIds);
+    const fallbackBoardIdsToFlash = filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
     const firmwarePlanItems = collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
     const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
@@ -2166,6 +2374,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
             className="workflow-editor__canvas-shell"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onPointerDownCapture={handleControlDragPan}
           >
             <div className="workflow-editor__canvas">
               <ReactFlow
@@ -2211,6 +2420,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                   }
                 }}
                 onSelectionContextMenu={(event) => openWorkflowContextMenu(event)}
+                nodesDraggable={!controlKeyPressed}
                 panActivationKeyCode="Control"
                 panOnDrag={false}
                 selectionMode={SelectionMode.Partial}

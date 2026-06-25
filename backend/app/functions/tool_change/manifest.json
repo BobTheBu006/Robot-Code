@@ -1,634 +1,708 @@
 {
-  "schema_version": 1,
-  "id": "tool_change",
-  "display_name": "Tool Change",
-  "category": "Robot Actions",
-  "description": "Pick up or drop a tool from one of six rack slots along the top-left edge of the work area.",
-  "version": "0.1.0",
-  "inputs": [
-    {
-      "key": "tool_port",
-      "label": "Selected ESP32",
-      "type": "file/path",
-      "description": "Connected gantry ESP32 board that should run the tool-change moves.",
-      "required": true,
-      "default": "/dev/ttyUSB1",
-      "placeholder": "/dev/ttyUSB1",
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "action",
-      "label": "Action",
-      "type": "select",
-      "description": "Choose whether to pick up or drop the selected tool.",
-      "required": true,
-      "default": "get_tool",
-      "placeholder": null,
-      "advanced": false,
-      "options": [
-        {
-          "label": "Get tool",
-          "value": "get_tool"
-        },
-        {
-          "label": "Drop tool",
-          "value": "drop_tool"
-        }
-      ]
-    },
-    {
-      "key": "slot",
-      "label": "Tool Slot",
-      "type": "select",
-      "description": "Rack slot to use. Defaults are 10 cm apart with a 5 cm edge buffer.",
-      "required": true,
-      "default": "1",
-      "placeholder": null,
-      "advanced": false,
-      "options": [
-        {
-          "label": "Slot 1",
-          "value": "1"
-        },
-        {
-          "label": "Slot 2",
-          "value": "2"
-        },
-        {
-          "label": "Slot 3",
-          "value": "3"
-        },
-        {
-          "label": "Slot 4",
-          "value": "4"
-        },
-        {
-          "label": "Slot 5",
-          "value": "5"
-        },
-        {
-          "label": "Slot 6",
-          "value": "6"
-        }
-      ]
-    },
-    {
-      "key": "speed_profile",
-      "label": "Speed Profile",
-      "type": "select",
-      "description": "Named speed preset for the tool-change motion.",
-      "required": true,
-      "default": "slow",
-      "placeholder": null,
-      "advanced": false,
-      "options": [
-        {
-          "label": "Slow",
-          "value": "slow"
-        },
-        {
-          "label": "Normal",
-          "value": "normal"
-        },
-        {
-          "label": "Fast",
-          "value": "fast"
-        }
-      ]
-    }
-  ],
-  "advanced_inputs": [
-    {
-      "key": "lateral_offset_cm",
-      "label": "Left / Right Offset (cm)",
-      "type": "number",
-      "description": "Distance moved left into the rack and right back out.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "backoff_y_cm",
-      "label": "Back Offset (cm)",
-      "type": "number",
-      "description": "Distance moved backward after entering the slot.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_1_x_cm",
-      "label": "Slot 1 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 1.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_1_y_cm",
-      "label": "Slot 1 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 1.",
-      "required": true,
-      "default": 55.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_1_z_cm",
-      "label": "Slot 1 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 1.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_2_x_cm",
-      "label": "Slot 2 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 2.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_2_y_cm",
-      "label": "Slot 2 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 2.",
-      "required": true,
-      "default": 45.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_2_z_cm",
-      "label": "Slot 2 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 2.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_3_x_cm",
-      "label": "Slot 3 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 3.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_3_y_cm",
-      "label": "Slot 3 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 3.",
-      "required": true,
-      "default": 35.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_3_z_cm",
-      "label": "Slot 3 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 3.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_4_x_cm",
-      "label": "Slot 4 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 4.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_4_y_cm",
-      "label": "Slot 4 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 4.",
-      "required": true,
-      "default": 25.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_4_z_cm",
-      "label": "Slot 4 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 4.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_5_x_cm",
-      "label": "Slot 5 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 5.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_5_y_cm",
-      "label": "Slot 5 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 5.",
-      "required": true,
-      "default": 15.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_5_z_cm",
-      "label": "Slot 5 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 5.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_6_x_cm",
-      "label": "Slot 6 X (cm)",
-      "type": "number",
-      "description": "Editable X coordinate for tool slot 6.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_6_y_cm",
-      "label": "Slot 6 Y (cm)",
-      "type": "number",
-      "description": "Editable Y coordinate for tool slot 6.",
-      "required": true,
-      "default": 5.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "slot_6_z_cm",
-      "label": "Slot 6 Z (cm)",
-      "type": "number",
-      "description": "Editable Z coordinate for tool slot 6.",
-      "required": true,
-      "default": 70.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "x_step_pin",
-      "label": "X Step Pin",
-      "type": "number",
-      "description": "Runtime GPIO step pin for the X axis driver.",
-      "required": false,
-      "default": 16.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "x_dir_pin",
-      "label": "X Dir Pin",
-      "type": "number",
-      "description": "Runtime GPIO direction pin for the X axis driver.",
-      "required": false,
-      "default": 17.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "y_step_pin",
-      "label": "Y Step Pin",
-      "type": "number",
-      "description": "Runtime GPIO step pin for the Y axis driver.",
-      "required": false,
-      "default": 18.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "y_dir_pin",
-      "label": "Y Dir Pin",
-      "type": "number",
-      "description": "Runtime GPIO direction pin for the Y axis driver.",
-      "required": false,
-      "default": 19.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_left_step_pin",
-      "label": "Left Z Step Pin",
-      "type": "number",
-      "description": "Runtime GPIO step pin for the left Z driver.",
-      "required": false,
-      "default": 32.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_left_dir_pin",
-      "label": "Left Z Dir Pin",
-      "type": "number",
-      "description": "Runtime GPIO direction pin for the left Z driver.",
-      "required": false,
-      "default": 33.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_right_step_pin",
-      "label": "Right Z Step Pin",
-      "type": "number",
-      "description": "Runtime GPIO step pin for the right Z driver.",
-      "required": false,
-      "default": 4.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_right_dir_pin",
-      "label": "Right Z Dir Pin",
-      "type": "number",
-      "description": "Runtime GPIO direction pin for the right Z driver.",
-      "required": false,
-      "default": 5.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "limit_switch_mode",
-      "label": "Limit Switch Layout",
-      "type": "select",
-      "description": "Choose whether the gantry uses 2 shared/home switches or 4 end-stop switches per plane.",
-      "required": false,
-      "default": "4",
-      "placeholder": null,
-      "advanced": true,
-      "options": [
-        {
-          "label": "2 Limit Switches",
-          "value": "2"
-        },
-        {
-          "label": "4 Limit Switches",
-          "value": "4"
-        }
-      ]
-    },
-    {
-      "key": "x_min_limit_pin",
-      "label": "X Min Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the X minimum/home limit switch.",
-      "required": false,
-      "default": 21.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "x_max_limit_pin",
-      "label": "X Max Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the X maximum limit switch.",
-      "required": false,
-      "default": 22.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "y_min_limit_pin",
-      "label": "Y Min Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the Y minimum/home limit switch.",
-      "required": false,
-      "default": 23.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "y_max_limit_pin",
-      "label": "Y Max Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the Y maximum limit switch.",
-      "required": false,
-      "default": 25.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_left_min_limit_pin",
-      "label": "Left Z Min Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the left Z minimum/home limit switch.",
-      "required": false,
-      "default": 12.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_left_max_limit_pin",
-      "label": "Left Z Max Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the left Z maximum limit switch.",
-      "required": false,
-      "default": 13.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_right_min_limit_pin",
-      "label": "Right Z Min Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the right Z minimum/home limit switch.",
-      "required": false,
-      "default": 14.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    },
-    {
-      "key": "z_right_max_limit_pin",
-      "label": "Right Z Max Limit Pin",
-      "type": "number",
-      "description": "GPIO pin for the right Z maximum limit switch.",
-      "required": false,
-      "default": 15.0,
-      "placeholder": null,
-      "advanced": true,
-      "options": []
-    }
-  ],
-  "outputs": [
-    {
-      "key": "next",
-      "label": "Next",
-      "type": "flow",
-      "description": "Continue when the tool change sequence completes."
-    }
-  ],
-  "hardware_devices": [
-    {
-      "id": "x-axis-motor",
-      "name": "X Axis Motor",
-      "kind": "stepper_motor",
-      "board_id": "ttyUSB1",
-      "pins": [
-        {
-          "id": "x-dir",
-          "signal": "direction",
-          "gpio": null,
-          "function_input_key": "x_dir_pin"
-        },
-        {
-          "id": "x-step",
-          "signal": "step",
-          "gpio": null,
-          "function_input_key": "x_step_pin"
-        }
-      ],
-      "basic_block_id": "basic-stepper-x-axis-motor"
-    },
-    {
-      "id": "y-axis-motor",
-      "name": "Y Axis Motor",
-      "kind": "stepper_motor",
-      "board_id": "ttyUSB1",
-      "pins": [
-        {
-          "id": "y-dir",
-          "signal": "direction",
-          "gpio": null,
-          "function_input_key": "y_dir_pin"
-        },
-        {
-          "id": "y-step",
-          "signal": "step",
-          "gpio": null,
-          "function_input_key": "y_step_pin"
-        }
-      ],
-      "basic_block_id": "basic-stepper-y-axis-motor"
-    },
-    {
-      "id": "left-z-motor",
-      "name": "Left Z Motor",
-      "kind": "stepper_motor",
-      "board_id": "ttyUSB1",
-      "pins": [
-        {
-          "id": "z-left-dir",
-          "signal": "direction",
-          "gpio": null,
-          "function_input_key": "z_left_dir_pin"
-        },
-        {
-          "id": "z-left-step",
-          "signal": "step",
-          "gpio": null,
-          "function_input_key": "z_left_step_pin"
-        }
-      ],
-      "basic_block_id": "basic-stepper-left-z-motor"
-    },
-    {
-      "id": "right-z-motor",
-      "name": "Right Z Motor",
-      "kind": "stepper_motor",
-      "board_id": "ttyUSB1",
-      "pins": [
-        {
-          "id": "z-right-dir",
-          "signal": "direction",
-          "gpio": null,
-          "function_input_key": "z_right_dir_pin"
-        },
-        {
-          "id": "z-right-step",
-          "signal": "step",
-          "gpio": null,
-          "function_input_key": "z_right_step_pin"
-        }
-      ],
-      "basic_block_id": "basic-stepper-right-z-motor"
-    }
-  ],
-  "firmware_requirements": [
-    {
-      "routine_id": "tool_change",
-      "controller_role": "builder_board",
-      "source": "firmware/main.ino",
-      "protocol": "serial-text",
-      "entry_point": "tool_change_sequence",
-      "required_device_ids": [
-        "x-axis-motor",
-        "y-axis-motor",
-        "left-z-motor",
-        "right-z-motor"
-      ],
-      "description": "Gantry firmware must support XY and Z motion commands used by the tool-change sequence."
-    }
-  ],
-  "builder_board_id": "ttyUSB1",
-  "builder_source_path": null,
-  "builder_workspace_path": "functions/esp 32 code/esp32 ttyUSB1",
-  "builder_firmware_entry_file": "firmware/main.ino",
-  "builder_base_function_id": null
+    "schema_version":  1,
+    "id":  "tool_change",
+    "display_name":  "Tool Change",
+    "category":  "Robot Actions",
+    "description":  "Pick up or drop a tool from one of six rack slots along the top-left edge of the work area.",
+    "version":  "0.1.0",
+    "inputs":  [
+                   {
+                       "key":  "tool_port",
+                       "label":  "Selected ESP32",
+                       "type":  "file/path",
+                       "description":  "Connected gantry ESP32 board that should run the tool-change moves.",
+                       "required":  true,
+                       "default":  "/dev/ttyUSB1",
+                       "placeholder":  "/dev/ttyUSB1",
+                       "advanced":  false,
+                       "options":  [
+
+                                   ]
+                   },
+                   {
+                       "key":  "action",
+                       "label":  "Action",
+                       "type":  "select",
+                       "description":  "Choose whether to pick up or drop the selected tool.",
+                       "required":  true,
+                       "default":  "get_tool",
+                       "placeholder":  null,
+                       "advanced":  false,
+                       "options":  [
+                                       {
+                                           "label":  "Get tool",
+                                           "value":  "get_tool"
+                                       },
+                                       {
+                                           "label":  "Drop tool",
+                                           "value":  "drop_tool"
+                                       }
+                                   ]
+                   },
+                   {
+                       "key":  "slot",
+                       "label":  "Tool Slot",
+                       "type":  "select",
+                       "description":  "Rack slot to use. Defaults are 10 cm apart with a 5 cm edge buffer.",
+                       "required":  true,
+                       "default":  "1",
+                       "placeholder":  null,
+                       "advanced":  false,
+                       "options":  [
+                                       {
+                                           "label":  "Slot 1",
+                                           "value":  "1"
+                                       },
+                                       {
+                                           "label":  "Slot 2",
+                                           "value":  "2"
+                                       },
+                                       {
+                                           "label":  "Slot 3",
+                                           "value":  "3"
+                                       },
+                                       {
+                                           "label":  "Slot 4",
+                                           "value":  "4"
+                                       },
+                                       {
+                                           "label":  "Slot 5",
+                                           "value":  "5"
+                                       },
+                                       {
+                                           "label":  "Slot 6",
+                                           "value":  "6"
+                                       }
+                                   ]
+                   },
+                   {
+                       "key":  "speed_profile",
+                       "label":  "Speed Profile",
+                       "type":  "select",
+                       "description":  "Named speed preset for the tool-change motion.",
+                       "required":  true,
+                       "default":  "slow",
+                       "placeholder":  null,
+                       "advanced":  false,
+                       "options":  [
+                                       {
+                                           "label":  "Slow",
+                                           "value":  "slow"
+                                       },
+                                       {
+                                           "label":  "Normal",
+                                           "value":  "normal"
+                                       },
+                                       {
+                                           "label":  "Fast",
+                                           "value":  "fast"
+                                       }
+                                   ]
+                   }
+               ],
+    "advanced_inputs":  [
+                            {
+                                "key":  "lateral_offset_cm",
+                                "label":  "Left / Right Offset (cm)",
+                                "type":  "number",
+                                "description":  "Distance moved left into the rack and right back out.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "backoff_y_cm",
+                                "label":  "Back Offset (cm)",
+                                "type":  "number",
+                                "description":  "Distance moved backward after entering the slot.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_1_x_cm",
+                                "label":  "Slot 1 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 1.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_1_y_cm",
+                                "label":  "Slot 1 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 1.",
+                                "required":  true,
+                                "default":  55.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_1_z_cm",
+                                "label":  "Slot 1 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_2_x_cm",
+                                "label":  "Slot 2 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 2.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_2_y_cm",
+                                "label":  "Slot 2 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 2.",
+                                "required":  true,
+                                "default":  45.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_2_z_cm",
+                                "label":  "Slot 2 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_3_x_cm",
+                                "label":  "Slot 3 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 3.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_3_y_cm",
+                                "label":  "Slot 3 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 3.",
+                                "required":  true,
+                                "default":  35.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_3_z_cm",
+                                "label":  "Slot 3 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_4_x_cm",
+                                "label":  "Slot 4 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 4.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_4_y_cm",
+                                "label":  "Slot 4 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 4.",
+                                "required":  true,
+                                "default":  25.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_4_z_cm",
+                                "label":  "Slot 4 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_5_x_cm",
+                                "label":  "Slot 5 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 5.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_5_y_cm",
+                                "label":  "Slot 5 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 5.",
+                                "required":  true,
+                                "default":  15.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_5_z_cm",
+                                "label":  "Slot 5 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_6_x_cm",
+                                "label":  "Slot 6 X (cm)",
+                                "type":  "number",
+                                "description":  "Editable X coordinate for tool slot 6.",
+                                "required":  true,
+                                "default":  2.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_6_y_cm",
+                                "label":  "Slot 6 Y (cm)",
+                                "type":  "number",
+                                "description":  "Editable Y coordinate for tool slot 6.",
+                                "required":  true,
+                                "default":  5.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "slot_6_z_cm",
+                                "label":  "Slot 6 Z (cm)",
+                                "type":  "number",
+                                "description":  "Tool rack Z position in cm from the back-bottom-left origin. Nominal workspace max is 60 cm.",
+                                "required":  true,
+                                "default":  60,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "x_step_pin",
+                                "label":  "X Step Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO step pin for the X axis driver.",
+                                "required":  false,
+                                "default":  16.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "x_dir_pin",
+                                "label":  "X Dir Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO direction pin for the X axis driver.",
+                                "required":  false,
+                                "default":  17.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "y_step_pin",
+                                "label":  "Y Step Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO step pin for the Y axis driver.",
+                                "required":  false,
+                                "default":  18.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "y_dir_pin",
+                                "label":  "Y Dir Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO direction pin for the Y axis driver.",
+                                "required":  false,
+                                "default":  19.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_left_step_pin",
+                                "label":  "Left Z Step Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO step pin for the left Z driver.",
+                                "required":  false,
+                                "default":  32.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_left_dir_pin",
+                                "label":  "Left Z Dir Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO direction pin for the left Z driver.",
+                                "required":  false,
+                                "default":  33.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_right_step_pin",
+                                "label":  "Right Z Step Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO step pin for the right Z driver.",
+                                "required":  false,
+                                "default":  4.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_right_dir_pin",
+                                "label":  "Right Z Dir Pin",
+                                "type":  "number",
+                                "description":  "Runtime GPIO direction pin for the right Z driver.",
+                                "required":  false,
+                                "default":  5.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "limit_switch_mode",
+                                "label":  "Limit Switch Layout",
+                                "type":  "select",
+                                "description":  "Choose whether the gantry uses 2 shared/home switches or 4 end-stop switches per plane.",
+                                "required":  false,
+                                "default":  "4",
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+                                                {
+                                                    "label":  "2 Limit Switches",
+                                                    "value":  "2"
+                                                },
+                                                {
+                                                    "label":  "4 Limit Switches",
+                                                    "value":  "4"
+                                                }
+                                            ]
+                            },
+                            {
+                                "key":  "x_min_limit_pin",
+                                "label":  "X Min Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the X minimum/home limit switch.",
+                                "required":  false,
+                                "default":  21.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "x_max_limit_pin",
+                                "label":  "X Max Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the X maximum limit switch.",
+                                "required":  false,
+                                "default":  22.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "y_min_limit_pin",
+                                "label":  "Y Min Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the Y minimum/home limit switch.",
+                                "required":  false,
+                                "default":  23.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "y_max_limit_pin",
+                                "label":  "Y Max Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the Y maximum limit switch.",
+                                "required":  false,
+                                "default":  25.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_left_min_limit_pin",
+                                "label":  "Left Z Min Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the left Z minimum/home limit switch.",
+                                "required":  false,
+                                "default":  12.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_left_max_limit_pin",
+                                "label":  "Left Z Max Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the left Z maximum limit switch.",
+                                "required":  false,
+                                "default":  13.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_right_min_limit_pin",
+                                "label":  "Right Z Min Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the right Z minimum/home limit switch.",
+                                "required":  false,
+                                "default":  14.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            },
+                            {
+                                "key":  "z_right_max_limit_pin",
+                                "label":  "Right Z Max Limit Pin",
+                                "type":  "number",
+                                "description":  "GPIO pin for the right Z maximum limit switch.",
+                                "required":  false,
+                                "default":  15.0,
+                                "placeholder":  null,
+                                "advanced":  true,
+                                "options":  [
+
+                                            ]
+                            }
+                        ],
+    "outputs":  [
+                    {
+                        "key":  "next",
+                        "label":  "Next",
+                        "type":  "flow",
+                        "description":  "Continue when the tool change sequence completes."
+                    }
+                ],
+    "hardware_devices":  [
+                             {
+                                 "id":  "x-axis-motor",
+                                 "name":  "CoreXY A Motor",
+                                 "kind":  "stepper_motor",
+                                 "board_id":  "ttyUSB1",
+                                 "pins":  [
+                                              {
+                                                  "id":  "x-dir",
+                                                  "signal":  "direction",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "x_dir_pin"
+                                              },
+                                              {
+                                                  "id":  "x-step",
+                                                  "signal":  "step",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "x_step_pin"
+                                              }
+                                          ],
+                                 "basic_block_id":  "basic-stepper-x-axis-motor"
+                             },
+                             {
+                                 "id":  "y-axis-motor",
+                                 "name":  "CoreXY B Motor",
+                                 "kind":  "stepper_motor",
+                                 "board_id":  "ttyUSB1",
+                                 "pins":  [
+                                              {
+                                                  "id":  "y-dir",
+                                                  "signal":  "direction",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "y_dir_pin"
+                                              },
+                                              {
+                                                  "id":  "y-step",
+                                                  "signal":  "step",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "y_step_pin"
+                                              }
+                                          ],
+                                 "basic_block_id":  "basic-stepper-y-axis-motor"
+                             },
+                             {
+                                 "id":  "left-z-motor",
+                                 "name":  "Z Axis Motor",
+                                 "kind":  "stepper_motor",
+                                 "board_id":  "ttyUSB1",
+                                 "pins":  [
+                                              {
+                                                  "id":  "z-left-dir",
+                                                  "signal":  "direction",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "z_left_dir_pin"
+                                              },
+                                              {
+                                                  "id":  "z-left-step",
+                                                  "signal":  "step",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "z_left_step_pin"
+                                              }
+                                          ],
+                                 "basic_block_id":  "basic-stepper-left-z-motor"
+                             },
+                             {
+                                 "id":  "right-z-motor",
+                                 "name":  "Legacy Right Z Motor",
+                                 "kind":  "stepper_motor",
+                                 "board_id":  "ttyUSB1",
+                                 "pins":  [
+                                              {
+                                                  "id":  "z-right-dir",
+                                                  "signal":  "direction",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "z_right_dir_pin"
+                                              },
+                                              {
+                                                  "id":  "z-right-step",
+                                                  "signal":  "step",
+                                                  "gpio":  null,
+                                                  "function_input_key":  "z_right_step_pin"
+                                              }
+                                          ],
+                                 "basic_block_id":  "basic-stepper-right-z-motor"
+                             }
+                         ],
+    "firmware_requirements":  [
+                                  {
+                                      "routine_id":  "tool_change",
+                                      "controller_role":  "builder_board",
+                                      "source":  "firmware/main.ino",
+                                      "protocol":  "serial-text",
+                                      "entry_point":  "tool_change_sequence",
+                                      "required_device_ids":  [
+                                                                  "x-axis-motor",
+                                                                  "y-axis-motor",
+                                                                  "left-z-motor",
+                                                                  "right-z-motor"
+                                                              ],
+                                      "description":  "Gantry firmware must support XY and Z motion commands used by the tool-change sequence."
+                                  }
+                              ],
+    "builder_board_id":  "ttyUSB1",
+    "builder_source_path":  null,
+    "builder_workspace_path":  "functions/esp 32 code/esp32 ttyUSB1",
+    "builder_firmware_entry_file":  "firmware/main.ino",
+    "builder_base_function_id":  null
 }

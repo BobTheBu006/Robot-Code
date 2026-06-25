@@ -3,7 +3,7 @@
                      "id":  "calibrate_z",
                      "display_name":  "Calibrate Gantry Z",
                      "category":  "Robot Actions",
-                     "description":  "Home both Z axes against their limit switches and register the travel lengths in centimeters.",
+                     "description":  "Define the Z work-area boundaries by double-probing both Z motors against min and max limit switches.",
                      "version":  "0.2.0",
                      "inputs":  [
                                     {
@@ -17,37 +17,43 @@
                                     },
                                     {
                                         "key":  "z_left_track_length_cm",
-                                        "label":  "Left Z Track Length (cm)",
+                                        "label":  "Z Track Length (cm)",
                                         "type":  "number",
-                                        "description":  "Physical usable left Z travel from origin to max limit in centimeters.",
+                                        "description":  "Single Z workspace height in cm. Nominal robot height is 60 cm from the back-bottom-left origin.",
                                         "required":  true,
-                                        "default":  40
+                                        "default":  60
                                     },
                                     {
                                         "key":  "z_right_track_length_cm",
                                         "label":  "Right Z Track Length (cm)",
                                         "type":  "number",
-                                        "description":  "Physical usable right Z travel from origin to max limit in centimeters.",
+                                        "description":  "Legacy dual-Z compatibility value. Single-Z setups use the same 60 cm Z height.",
                                         "required":  true,
-                                        "default":  40
+                                        "default":  60
                                     },
                                     {
-                                        "key":  "calibration_speed_profile",
-                                        "label":  "Calibration Speed",
-                                        "type":  "select",
-                                        "description":  "Speed preset used while probing the Z limits.",
+                                        "key":  "speed_rpm",
+                                        "label":  "Calibration Speed (RPM)",
+                                        "type":  "number",
+                                        "description":  "Numeric motor speed used while probing limits.",
                                         "required":  true,
-                                        "default":  "safe",
-                                        "options":  [
-                                                        {
-                                                            "label":  "Safe",
-                                                            "value":  "safe"
-                                                        },
-                                                        {
-                                                            "label":  "Normal",
-                                                            "value":  "normal"
-                                                        }
-                                                    ]
+                                        "default":  100
+                                    },
+                                    {
+                                        "key":  "trapezoidal_speed",
+                                        "label":  "Trapezoidal Speed",
+                                        "type":  "boolean",
+                                        "description":  "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+                                        "required":  false,
+                                        "default":  true
+                                    },
+                                    {
+                                        "key":  "acceleration_rpm_per_s",
+                                        "label":  "Acceleration (RPM/s)",
+                                        "type":  "number",
+                                        "description":  "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+                                        "required":  false,
+                                        "default":  300
                                     }
                                 ],
                      "advanced_inputs":  [
@@ -154,7 +160,7 @@
                      "hardware_devices":  [
                                               {
                                                   "id":  "left-z-motor",
-                                                  "name":  "Left Z Motor",
+                                                  "name":  "Z Axis Motor",
                                                   "kind":  "stepper_motor",
                                                   "board_id":  "ttyUSB1",
                                                   "basic_block_id":  "basic-stepper-left-z-motor",
@@ -193,7 +199,7 @@
                                               },
                                               {
                                                   "id":  "right-z-motor",
-                                                  "name":  "Right Z Motor",
+                                                  "name":  "Legacy Right Z Motor",
                                                   "kind":  "stepper_motor",
                                                   "board_id":  "ttyUSB1",
                                                   "basic_block_id":  "basic-stepper-right-z-motor",
@@ -297,7 +303,7 @@
                                                        "routine_id":  "calibrate_z",
                                                        "controller_role":  "builder_board",
                                                        "source":  "firmware/main.ino",
-                                                       "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+                                                       "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedRpm\u003e \u003ctrapezoidFlag\u003e \u003caccelerationRpmPerSecond\u003e. Firmware probes min and max with a fast touch followed by a slow touch.",
                                                        "entry_point":  "calibrate_z",
                                                        "required_device_ids":  [
                                                                                    "left-z-motor",
@@ -312,7 +318,11 @@
                                                ]
                  },
     "firmware_entry_file":  "firmware/main.ino",
-    "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+    "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedRpm\u003e \u003ctrapezoidFlag\u003e \u003caccelerationRpmPerSecond\u003e.",
     "notes":  "Homes the two Z axes to their minimum switches, optionally probes max switches, and records the usable travel.",
-    "schema_version":  1
+    "schema_version":  1,
+    "inputs":  [
+
+               ],
+    "version":  "0.3.0"
 }

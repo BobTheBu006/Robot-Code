@@ -24,7 +24,7 @@ class HardwarePinMapping(BaseModel):
 
 class HardwareDeviceMapping(BaseModel):
     id: str = Field(min_length=1)
-    board_id: str = Field(min_length=1)
+    board_id: str = ""
     name: str = Field(min_length=1)
     kind: HardwareDeviceKind = "stepper_motor"
     sensor_kind: HardwareSensorKind | None = None

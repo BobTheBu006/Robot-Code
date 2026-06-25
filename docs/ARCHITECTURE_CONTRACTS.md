@@ -17,9 +17,13 @@ The Hardware Map owns physical wiring and grouping:
 
 Functions, firmware, and workflow blocks must not treat private pin maps as the source of truth. They may provide defaults or requirements, but the Hardware Map resolves the actual physical setup.
 
+Workflow function blocks must not expose controller selection, USB port selection, "Selected ESP32", or GPIO pin selection as normal per-block operator settings. Those values are derived from the function's logical hardware devices and the Hardware Map at execution/firmware-planning time.
+
 Devices wired directly to the Pi use `board_id: raspberry-pi`. This is a virtual controller ID and must not create a duplicate ESP32/controller block.
 
 Devices with an empty `board_id` are intentionally unconnected. The UI must keep them visible so they can be reconnected instead of silently deleting or reassigning them.
+
+The current gantry model is CoreXY, not independent left/right or independent X/Y motors. The stable `x-axis-motor` and `y-axis-motor` IDs are compatibility names for CoreXY A and CoreXY B motors. The normal Cartesian gantry coordinate system is X/Y/Z in centimeters from the back-bottom-left origin, with a current nominal work envelope of 115 cm x 60 cm x 60 cm.
 
 ## Contract 2: Logical Device IDs Are Stable
 
@@ -69,6 +73,8 @@ Normal robot-action blocks should expose:
 
 Failures should use the block settings error path unless the block is explicitly a branching/logic block.
 
+Motion blocks should prefer explicit numeric motion parameters such as RPM and acceleration over opaque speed presets. If a preset field is kept for backwards compatibility, new UI should present the numeric fields.
+
 Allowed multi-output blocks include:
 
 - if/else
@@ -116,11 +122,21 @@ The firmware build/flash step should be driven by:
 
 The backend should build or assemble one firmware image per controller and flash each used controller before workflow execution. The image must include every routine needed by that controller during the workflow, not only the first block that uses it.
 
+Only controllers present in the Hardware Map should be flashed. If the Hardware Map has no ESP32 controller boards for the workflow, the run must skip flashing and continue directly to execution. Stale manifest `builder_board_id` values are not enough to flash a board.
+
 Each firmware requirement should carry a stable `routine_id`, controller targeting role, source file or fragment, protocol, optional entry point, and any required logical device IDs.
 
 Current implementation note: `POST /api/esp32-builder/workflow-firmware/plan` is the backend boundary for collecting and validating per-controller requirements before flashing. Future code generation should extend this plan into actual assembled firmware images instead of introducing a separate path.
 
-## Contract 9: Missing References Stay Visible
+## Contract 9: E-Stop Is Highest Priority
+
+The operator UI must keep an E-Stop control visible independent of page scroll or canvas state.
+
+When E-Stop is pressed, the frontend must immediately abort in-flight workflow requests and the backend must immediately send a stop command to every active controller session it knows about. Controller firmware should treat `STOP` as a highest-priority command and stop motion before normal command completion handling.
+
+During normal gantry motion, an unexpected physical limit-switch hit is treated as the same class of immediate stop fault. Calibration routines are the exception: they intentionally probe limit switches using controlled fast-touch, backoff, and slow-touch motion to define workspace boundaries.
+
+## Contract 10: Missing References Stay Visible
 
 If an old workflow references a missing function, module, device, controller, pin, or firmware routine:
 
@@ -131,7 +147,7 @@ If an old workflow references a missing function, module, device, controller, pi
 
 Do not silently delete blocks or edges from saved workflows.
 
-## Contract 10: Modules Are Contract Packages
+## Contract 11: Modules Are Contract Packages
 
 Future modules may live in this repository, a local folder, or a Git repository.
 
@@ -152,7 +168,7 @@ A module package should be able to declare:
 
 Do not split modules into separate repositories until the import/build/test workflow is clear enough to reduce maintenance work instead of increasing it.
 
-## Contract 11: Simulation Is A First-Class Future Target
+## Contract 12: Simulation Is A First-Class Future Target
 
 Simulation should eventually use the same contracts as real hardware:
 
@@ -164,7 +180,7 @@ Simulation should eventually use the same contracts as real hardware:
 
 Do not design simulation-only APIs that bypass the Hardware Map.
 
-## Contract 12: Schema Versions Are Required For Persistent Data
+## Contract 13: Schema Versions Are Required For Persistent Data
 
 Persistent project files must carry a schema version before `v0.1 beta`.
 

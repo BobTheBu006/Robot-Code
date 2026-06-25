@@ -3,7 +3,7 @@
   "id": "calibrate_xy",
   "display_name": "Calibrate Gantry XY",
   "category": "Robot Actions",
-  "description": "Home the XY gantry against its limit switches and register the track lengths in centimeters.",
+  "description": "Define the CoreXY work-area boundaries by double-probing X min/max first, returning to X=0, then double-probing Y min/max at X=0.",
   "version": "0.2.0",
   "inputs": [
     {
@@ -21,9 +21,9 @@
       "key": "x_track_length_cm",
       "label": "X Track Length (cm)",
       "type": "number",
-      "description": "Physical usable X travel from origin to max limit in centimeters.",
+      "description": "CoreXY X workspace length in cm. Nominal robot length is 115 cm from the back-bottom-left origin.",
       "required": true,
-      "default": 100.0,
+      "default": 115.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -32,7 +32,18 @@
       "key": "y_track_length_cm",
       "label": "Y Track Length (cm)",
       "type": "number",
-      "description": "Physical usable Y travel from origin to max limit in centimeters.",
+      "description": "CoreXY Y workspace width in cm. Nominal robot width is 60 cm from the back-bottom-left origin.",
+      "required": true,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "speed_rpm",
+      "label": "Calibration Speed (RPM)",
+      "type": "number",
+      "description": "Numeric motor speed used while probing limits.",
       "required": true,
       "default": 100.0,
       "placeholder": null,
@@ -40,24 +51,26 @@
       "options": []
     },
     {
-      "key": "calibration_speed_profile",
-      "label": "Calibration Speed",
-      "type": "select",
-      "description": "Speed preset used while probing the XY limits.",
-      "required": true,
-      "default": "safe",
+      "key": "trapezoidal_speed",
+      "label": "Trapezoidal Speed",
+      "type": "boolean",
+      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+      "required": false,
+      "default": true,
       "placeholder": null,
       "advanced": false,
-      "options": [
-        {
-          "label": "Safe",
-          "value": "safe"
-        },
-        {
-          "label": "Normal",
-          "value": "normal"
-        }
-      ]
+      "options": []
+    },
+    {
+      "key": "acceleration_rpm_per_s",
+      "label": "Acceleration (RPM/s)",
+      "type": "number",
+      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+      "required": false,
+      "default": 300.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     }
   ],
   "advanced_inputs": [
@@ -181,7 +194,7 @@
   "hardware_devices": [
     {
       "id": "x-axis-motor",
-      "name": "X Axis Motor",
+      "name": "CoreXY A Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -237,7 +250,7 @@
     },
     {
       "id": "y-axis-motor",
-      "name": "Y Axis Motor",
+      "name": "CoreXY B Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -381,7 +394,7 @@
       "routine_id": "calibrate_xy",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedProfile>.",
+      "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch.",
       "entry_point": "calibrate_xy",
       "required_device_ids": [
         "x-axis-motor",

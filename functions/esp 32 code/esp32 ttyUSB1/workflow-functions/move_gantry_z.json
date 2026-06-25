@@ -32,25 +32,53 @@
                                         "default":  0
                                     },
                                     {
-                                        "key":  "speed_profile",
-                                        "label":  "Speed Profile",
-                                        "type":  "select",
-                                        "description":  "Named speed preset for the Z motion controller.",
+                                        "key":  "speed_rpm",
+                                        "label":  "Speed (RPM)",
+                                        "type":  "number",
+                                        "description":  "Numeric target motor speed for the move.",
                                         "required":  true,
-                                        "default":  "normal",
+                                        "default":  240
+                                    },
+                                    {
+                                        "key":  "trapezoidal_speed",
+                                        "label":  "Trapezoidal Speed",
+                                        "type":  "boolean",
+                                        "description":  "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+                                        "required":  false,
+                                        "default":  true
+                                    },
+                                    {
+                                        "key":  "acceleration_rpm_per_s",
+                                        "label":  "Acceleration (RPM/s)",
+                                        "type":  "number",
+                                        "description":  "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+                                        "required":  false,
+                                        "default":  600
+                                    },
+                                    {
+                                        "key":  "on_the_fly_calibration",
+                                        "label":  "On-the-fly Calibration",
+                                        "type":  "boolean",
+                                        "description":  "When enabled, moves that end within 3 cm of a limit switch probe that switch and compare the observed position against calibration.",
+                                        "required":  false,
+                                        "default":  true,
+                                        "placeholder":  null,
+                                        "advanced":  false,
                                         "options":  [
-                                                        {
-                                                            "label":  "Slow",
-                                                            "value":  "slow"
-                                                        },
-                                                        {
-                                                            "label":  "Normal",
-                                                            "value":  "normal"
-                                                        },
-                                                        {
-                                                            "label":  "Fast",
-                                                            "value":  "fast"
-                                                        }
+
+                                                    ]
+                                    },
+                                    {
+                                        "key":  "calibration_max_diff_steps",
+                                        "label":  "Max Calibration Difference (steps)",
+                                        "type":  "number",
+                                        "description":  "Maximum allowed on-the-fly limit-switch position error before a full recalibration is triggered.",
+                                        "required":  false,
+                                        "default":  5,
+                                        "placeholder":  null,
+                                        "advanced":  false,
+                                        "options":  [
+
                                                     ]
                                     }
                                 ],
@@ -301,7 +329,7 @@
                                                        "routine_id":  "move_gantry_z",
                                                        "controller_role":  "builder_board",
                                                        "source":  "firmware/main.ino",
-                                                       "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+                                                       "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedRpm\u003e \u003ctrapezoidFlag\u003e \u003caccelerationRpmPerSecond\u003e \u003conTheFlyFlag\u003e \u003cmaxDiffSteps\u003e.",
                                                        "entry_point":  "move_gantry_z",
                                                        "required_device_ids":  [
                                                                                    "left-z-motor",
@@ -316,7 +344,11 @@
                                                ]
                  },
     "firmware_entry_file":  "firmware/main.ino",
-    "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+    "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedRpm\u003e \u003ctrapezoidFlag\u003e \u003caccelerationRpmPerSecond\u003e.",
     "notes":  "Moves the two Z sides together while keeping independent pin and limit assignments.",
-    "schema_version":  1
+    "schema_version":  1,
+    "inputs":  [
+
+               ],
+    "version":  "0.3.0"
 }

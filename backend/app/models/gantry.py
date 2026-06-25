@@ -7,6 +7,10 @@ GantryCalibrationSpeedProfile = Literal["safe", "normal"]
 GantryLimitMode = Literal["2", "4"]
 ToolChangeAction = Literal["get_tool", "drop_tool"]
 
+GANTRY_WORKSPACE_X_CM = 115.0
+GANTRY_WORKSPACE_Y_CM = 60.0
+GANTRY_WORKSPACE_Z_CM = 60.0
+
 
 def _validate_distinct_pins(assignments: dict[str, int], message_prefix: str) -> None:
     pins_to_labels: dict[int, list[str]] = {}
@@ -26,16 +30,30 @@ class GantryXYMoveRequest(BaseModel):
     tool_port: str | None = None
     x_cm: float = Field(default=0.0)
     y_cm: float = Field(default=0.0)
+    z_cm: float = Field(default=0.0)
     speed_profile: GantrySpeedProfile = "normal"
+    speed_rpm: int = Field(default=240, gt=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=600, gt=0)
+    on_the_fly_calibration: bool = Field(default=True)
+    calibration_max_diff_steps: int = Field(default=5, ge=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
     y_dir_pin: int = Field(default=19, ge=0)
+    z_left_step_pin: int = Field(default=32, ge=0)
+    z_left_dir_pin: int = Field(default=33, ge=0)
+    z_right_step_pin: int = Field(default=32, ge=0)
+    z_right_dir_pin: int = Field(default=33, ge=0)
     limit_switch_mode: GantryLimitMode = "4"
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=25, ge=0)
+    z_left_min_limit_pin: int = Field(default=12, ge=0)
+    z_left_max_limit_pin: int = Field(default=13, ge=0)
+    z_right_min_limit_pin: int = Field(default=12, ge=0)
+    z_right_max_limit_pin: int = Field(default=13, ge=0)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -54,8 +72,14 @@ class GantryXYMoveRequest(BaseModel):
 
         _validate_distinct_pins(
             assigned_pins,
-            "Each active XY driver/limit input must use a distinct GPIO pin. Conflicts",
+            "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
         )
+        if not 0.0 <= self.x_cm <= GANTRY_WORKSPACE_X_CM:
+            raise ValueError(f"x_cm must be between 0 and {GANTRY_WORKSPACE_X_CM} cm.")
+        if not 0.0 <= self.y_cm <= GANTRY_WORKSPACE_Y_CM:
+            raise ValueError(f"y_cm must be between 0 and {GANTRY_WORKSPACE_Y_CM} cm.")
+        if not 0.0 <= self.z_cm <= GANTRY_WORKSPACE_Z_CM:
+            raise ValueError(f"z_cm must be between 0 and {GANTRY_WORKSPACE_Z_CM} cm.")
         return self
 
 
@@ -63,6 +87,11 @@ class GantryXYMoveResponse(BaseModel):
     port: str
     baud_rate: int
     speed_profile: GantrySpeedProfile
+    speed_rpm: int
+    trapezoidal_speed: bool
+    acceleration_rpm_per_s: int
+    on_the_fly_calibration: bool
+    calibration_max_diff_steps: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False
@@ -79,9 +108,12 @@ class GantryXYMoveResponse(BaseModel):
 
 class GantryXYCalibrationRequest(BaseModel):
     tool_port: str | None = None
-    x_track_length_cm: float = Field(default=100.0, gt=0)
-    y_track_length_cm: float = Field(default=100.0, gt=0)
+    x_track_length_cm: float = Field(default=GANTRY_WORKSPACE_X_CM, gt=0)
+    y_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Y_CM, gt=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
+    speed_rpm: int = Field(default=100, gt=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=300, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -103,6 +135,9 @@ class GantryXYCalibrationResponse(BaseModel):
     port: str
     baud_rate: int
     calibration_speed_profile: GantryCalibrationSpeedProfile
+    speed_rpm: int
+    trapezoidal_speed: bool
+    acceleration_rpm_per_s: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False
@@ -122,6 +157,11 @@ class GantryZMoveRequest(BaseModel):
     z_left_cm: float = Field(default=0.0)
     z_right_cm: float = Field(default=0.0)
     speed_profile: GantrySpeedProfile = "normal"
+    speed_rpm: int = Field(default=240, gt=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=600, gt=0)
+    on_the_fly_calibration: bool = Field(default=True)
+    calibration_max_diff_steps: int = Field(default=5, ge=0)
     z_left_step_pin: int = Field(default=32, ge=0)
     z_left_dir_pin: int = Field(default=33, ge=0)
     z_right_step_pin: int = Field(default=4, ge=0)
@@ -151,6 +191,10 @@ class GantryZMoveRequest(BaseModel):
             assigned_pins,
             "Each active Z driver/limit input must use a distinct GPIO pin. Conflicts",
         )
+        if not 0.0 <= self.z_left_cm <= GANTRY_WORKSPACE_Z_CM:
+            raise ValueError(f"z_left_cm must be between 0 and {GANTRY_WORKSPACE_Z_CM} cm.")
+        if not 0.0 <= self.z_right_cm <= GANTRY_WORKSPACE_Z_CM:
+            raise ValueError(f"z_right_cm must be between 0 and {GANTRY_WORKSPACE_Z_CM} cm.")
         return self
 
 
@@ -158,6 +202,11 @@ class GantryZMoveResponse(BaseModel):
     port: str
     baud_rate: int
     speed_profile: GantrySpeedProfile
+    speed_rpm: int
+    trapezoidal_speed: bool
+    acceleration_rpm_per_s: int
+    on_the_fly_calibration: bool
+    calibration_max_diff_steps: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False
@@ -174,9 +223,12 @@ class GantryZMoveResponse(BaseModel):
 
 class GantryZCalibrationRequest(BaseModel):
     tool_port: str | None = None
-    z_left_track_length_cm: float = Field(default=40.0, gt=0)
-    z_right_track_length_cm: float = Field(default=40.0, gt=0)
+    z_left_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
+    z_right_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
+    speed_rpm: int = Field(default=100, gt=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=300, gt=0)
     z_left_step_pin: int = Field(default=32, ge=0)
     z_left_dir_pin: int = Field(default=33, ge=0)
     z_right_step_pin: int = Field(default=4, ge=0)
@@ -198,6 +250,9 @@ class GantryZCalibrationResponse(BaseModel):
     port: str
     baud_rate: int
     calibration_speed_profile: GantryCalibrationSpeedProfile
+    speed_rpm: int
+    trapezoidal_speed: bool
+    acceleration_rpm_per_s: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False
@@ -221,22 +276,22 @@ class ToolChangeRequest(BaseModel):
     backoff_y_cm: float = Field(default=2.0, gt=0)
     slot_1_x_cm: float = 2.0
     slot_1_y_cm: float = 55.0
-    slot_1_z_cm: float = 70.0
+    slot_1_z_cm: float = GANTRY_WORKSPACE_Z_CM
     slot_2_x_cm: float = 2.0
     slot_2_y_cm: float = 45.0
-    slot_2_z_cm: float = 70.0
+    slot_2_z_cm: float = GANTRY_WORKSPACE_Z_CM
     slot_3_x_cm: float = 2.0
     slot_3_y_cm: float = 35.0
-    slot_3_z_cm: float = 70.0
+    slot_3_z_cm: float = GANTRY_WORKSPACE_Z_CM
     slot_4_x_cm: float = 2.0
     slot_4_y_cm: float = 25.0
-    slot_4_z_cm: float = 70.0
+    slot_4_z_cm: float = GANTRY_WORKSPACE_Z_CM
     slot_5_x_cm: float = 2.0
     slot_5_y_cm: float = 15.0
-    slot_5_z_cm: float = 70.0
+    slot_5_z_cm: float = GANTRY_WORKSPACE_Z_CM
     slot_6_x_cm: float = 2.0
     slot_6_y_cm: float = 5.0
-    slot_6_z_cm: float = 70.0
+    slot_6_z_cm: float = GANTRY_WORKSPACE_Z_CM
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)

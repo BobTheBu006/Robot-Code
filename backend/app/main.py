@@ -2,6 +2,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.camera import router as camera_router
+from app.api.routes.emergency_stop import router as emergency_stop_router
 from app.api.routes.esp32_builder import router as esp32_builder_router
 from app.api.routes.functions import router as functions_router
 from app.api.routes.hardware_map import router as hardware_map_router
@@ -29,6 +30,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(robot_router)
 app.include_router(camera_router)
+app.include_router(emergency_stop_router)
 app.include_router(esp32_builder_router)
 app.include_router(hardware_map_router)
 app.include_router(functions_router)

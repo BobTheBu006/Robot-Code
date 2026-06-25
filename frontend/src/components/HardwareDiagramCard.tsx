@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 import {
   Background,
@@ -11,6 +11,7 @@ import {
   SelectionMode,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -291,24 +292,77 @@ const nodeTypes: NodeTypes = {
   hardwareNode: HardwareDiagramNode,
 };
 
-function mergeDetectedBoards(hardwareMap: HardwareMap, detectedBoards: Esp32BoardSummary[]): HardwareMap {
-  const existingBoardKeys = new Set(
-    hardwareMap.boards.flatMap((board) => [board.id, board.usb_port].filter(Boolean)),
-  );
+function useControlKeyPressed(): boolean {
+  const [isPressed, setIsPressed] = useState(false);
 
-  const missingBoards = detectedBoards
-    .filter((board) => !existingBoardKeys.has(board.board_id) && (!board.port || !existingBoardKeys.has(board.port)))
-    .map<HardwareBoardMapping>((board) => ({
-      id: board.board_id,
-      label: board.display_name,
-      usb_port: board.port ?? board.board_id,
-      notes: board.connected ? "Detected from the Pi." : "Workspace exists, but the board is currently offline.",
-    }));
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsPressed(true);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Control") {
+        setIsPressed(false);
+      }
+    };
+    const handleBlur = () => setIsPressed(false);
 
-  return {
-    ...hardwareMap,
-    boards: [...hardwareMap.boards, ...missingBoards],
-  };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
+  return isPressed;
+}
+
+function shouldIgnoreControlDragPan(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && Boolean(target.closest(".react-flow__controls, .react-flow__minimap, input, textarea, select, button, a"));
+}
+
+function useControlDragPan() {
+  const reactFlow = useReactFlow();
+
+  return useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    if (!event.ctrlKey || event.button !== 0 || shouldIgnoreControlDragPan(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startViewport = reactFlow.getViewport();
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      reactFlow.setViewport(
+        {
+          x: startViewport.x + moveEvent.clientX - startX,
+          y: startViewport.y + moveEvent.clientY - startY,
+          zoom: startViewport.zoom,
+        },
+        { duration: 0 },
+      );
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+  }, [reactFlow]);
 }
 
 function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
@@ -687,6 +741,8 @@ function deviceFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hard
 }
 
 function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps) {
+  const controlKeyPressed = useControlKeyPressed();
+  const handleControlDragPan = useControlDragPan();
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [hardwareMap, setHardwareMap] = useState<HardwareMap>(EMPTY_HARDWARE_MAP);
@@ -751,7 +807,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     setDetectedBoards(nextDetectedBoards);
 
     if (hardwareMapResult.status === "fulfilled") {
-      setHardwareMap(cleanHardwareMap(mergeDetectedBoards(hardwareMapResult.value, nextDetectedBoards)));
+      setHardwareMap(cleanHardwareMap(hardwareMapResult.value));
       setStatus("success");
       setSaveState("idle");
       setSaveMessage(null);
@@ -1561,6 +1617,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
                 setContextMenu(null);
               }}
               onNodesChange={onNodesChange}
+              onPointerDownCapture={handleControlDragPan}
               onPaneClick={() => {
                 setSelectedNodeId(RASPBERRY_NODE_ID);
                 setContextMenu(null);
@@ -1571,6 +1628,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
                 }
               }}
               onSelectionContextMenu={(event) => openHardwareContextMenu(event)}
+              nodesDraggable={!controlKeyPressed}
               panActivationKeyCode="Control"
               panOnDrag={false}
               selectionMode={SelectionMode.Partial}

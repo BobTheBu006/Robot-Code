@@ -25,6 +25,17 @@ const WORKFLOW_SCHEMA_VERSION = 1;
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
+export interface EmergencyStopResponse {
+  ok: boolean;
+  message: string;
+  results: Array<{
+    ok: boolean;
+    tool: string;
+    tool_port: string | null;
+    message: string;
+  }>;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const hasBody = options?.body !== undefined;
 
@@ -208,6 +219,12 @@ export function cancelFunction(
   return request<FunctionCancelResponse>(`/api/functions/${functionId}/cancel`, {
     method: "POST",
     body: JSON.stringify({ inputs }),
+  });
+}
+
+export function emergencyStop(): Promise<EmergencyStopResponse> {
+  return request<EmergencyStopResponse>("/api/emergency-stop", {
+    method: "POST",
   });
 }
 

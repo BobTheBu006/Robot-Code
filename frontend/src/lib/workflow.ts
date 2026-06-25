@@ -541,21 +541,6 @@ export function mapDiscoveredFunctionToBlock(
   esp32Boards: Esp32BoardSummary[] = [],
   hardwareMap: HardwareMap | null = null,
 ): WorkflowBlockDefinition {
-  const hardwareBoardOptions = (hardwareMap?.boards ?? [])
-    .filter((board) => Boolean(board.usb_port))
-    .map((board) => ({
-      label: `${board.label} (${board.usb_port})`,
-      value: board.usb_port,
-    }));
-  const hardwareBoardPorts = new Set(hardwareBoardOptions.map((option) => option.value));
-  const detectedBoardOptions = esp32Boards
-    .filter((board) => Boolean(board.port) && !hardwareBoardPorts.has(board.port as string))
-    .map((board) => ({
-      label: `${board.display_name}${board.port ? ` (${board.port})` : ""}`,
-      value: board.port as string,
-    }));
-  const toolPortOptions = [...hardwareBoardOptions, ...detectedBoardOptions];
-  const pinOptions = buildHardwarePinOptions(hardwareMap);
   const flowOutputs = discoveredFunction.manifest.outputs.filter((output) => output.type === "flow");
   const hardwareDevices = discoveredFunction.manifest.hardware_devices ?? [];
   const referencedBasicBlockIds = hardwareDevices
@@ -563,34 +548,25 @@ export function mapDiscoveredFunctionToBlock(
     .filter((blockId): blockId is string => Boolean(blockId));
 
   const mapInput = (input: WorkflowInputDefinition): WorkflowInputDefinition => {
-    if (input.key === "tool_port" && toolPortOptions.length > 0) {
-      const defaultValue = String(input.default ?? toolPortOptions[0]?.value ?? "");
+    if (input.key === "tool_port") {
       return {
         ...input,
-        label: "Selected ESP32",
-        type: "select",
-        options: toolPortOptions,
-        default: toolPortOptions.some((option) => option.value === defaultValue)
-          ? defaultValue
-          : toolPortOptions[0]?.value ?? defaultValue,
+        hidden: true,
+        resolvedFrom: "hardware_map",
+        options: [],
       };
     }
 
-    if (!input.key.includes("pin") || pinOptions.length === 0) {
-      return input;
+    if (input.key.includes("pin")) {
+      return {
+        ...input,
+        hidden: true,
+        resolvedFrom: "hardware_map",
+        options: [],
+      };
     }
 
-    const exactOptions = pinOptions.filter((option) => option.inputKey === input.key);
-    const options = exactOptions.length > 0 ? exactOptions : pinOptions;
-    const defaultValue = String(input.default ?? options[0]?.value ?? "");
-    return {
-      ...input,
-      type: "select",
-      options,
-      default: options.some((option) => option.value === defaultValue)
-        ? defaultValue
-        : options[0]?.value ?? defaultValue,
-    };
+    return input;
   };
 
   return {

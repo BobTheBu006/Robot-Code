@@ -3,627 +3,22 @@
   "boards": [
     {
       "id": "ttyUSB0",
-      "label": "Syringe ESP32",
+      "label": "7 Syringe Dispenser Controller",
       "usb_port": "/dev/ttyUSB0",
-      "notes": "Default syringe controller mapping. Edit this if the Pi assigns a different USB device."
+      "notes": "Auto-created because 7 Syringe Dispenser declares hardware devices."
     },
     {
       "id": "ttyUSB1",
-      "label": "Gantry ESP32",
+      "label": "Calibrate Gantry XY Controller",
       "usb_port": "/dev/ttyUSB1",
-      "notes": "Default gantry controller mapping. Edit this if the Pi assigns a different USB device."
+      "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
     }
   ],
   "devices": [
     {
-      "id": "syringe-head-a",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head A",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-a-dir",
-          "signal": "direction",
-          "gpio": "32",
-          "function_input_key": "head_a_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-a-step",
-          "signal": "step",
-          "gpio": "33",
-          "function_input_key": "head_a_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-joprxm",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-pn5ik8",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-avwvg0",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-uoxy69",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-b",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head B",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-b-dir",
-          "signal": "direction",
-          "gpio": "4",
-          "function_input_key": "head_b_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-b-step",
-          "signal": "step",
-          "gpio": "25",
-          "function_input_key": "head_b_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-ixahuw",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-nm7ezh",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-h72fsv",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-vgq8r2",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-c",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head C",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-c-dir",
-          "signal": "direction",
-          "gpio": "5",
-          "function_input_key": "head_c_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-c-step",
-          "signal": "step",
-          "gpio": "26",
-          "function_input_key": "head_c_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-21u9ga",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-s5n8qc",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-53r909",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-3patal",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-d",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head D",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-d-dir",
-          "signal": "direction",
-          "gpio": "18",
-          "function_input_key": "head_d_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-d-step",
-          "signal": "step",
-          "gpio": "27",
-          "function_input_key": "head_d_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-lwalsw",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-39opwz",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-k7ruz9",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-cnadqb",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-e",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head E",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-e-dir",
-          "signal": "direction",
-          "gpio": "19",
-          "function_input_key": "head_e_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-e-step",
-          "signal": "step",
-          "gpio": "14",
-          "function_input_key": "head_e_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-pp780z",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-40n0ve",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-od1xrq",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-2d1iep",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-f",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head F",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-f-dir",
-          "signal": "direction",
-          "gpio": "21",
-          "function_input_key": "head_f_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-f-step",
-          "signal": "step",
-          "gpio": "12",
-          "function_input_key": "head_f_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-tkoxs0",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-rafgn6",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-6w9my5",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-fvx50k",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-g",
-      "board_id": "ttyUSB0",
-      "name": "Syringe Head G",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-g-dir",
-          "signal": "direction",
-          "gpio": "22",
-          "function_input_key": "head_g_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-g-step",
-          "signal": "step",
-          "gpio": "13",
-          "function_input_key": "head_g_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-h77tzd",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-b13y0o",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-3iu76a",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-agowpx",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "suction-pump",
-      "board_id": "ttyUSB0",
-      "name": "Suction Pump",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": 1.0,
-      "pins": [
-        {
-          "id": "suction-pump-dir",
-          "signal": "direction",
-          "gpio": "-",
-          "function_input_key": "suction_pump_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "suction-pump-step",
-          "signal": "step",
-          "gpio": "-",
-          "function_input_key": "suction_pump_step_pin",
-          "notes": null
-        },
-        {
-          "id": "suction-pump-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "suction-pump-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "suction-pump-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "suction-pump-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
-    },
-    {
-      "id": "beads-medium-pump",
-      "board_id": "ttyUSB0",
-      "name": "Beads Medium Pump",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": 1.0,
-      "pins": [
-        {
-          "id": "beads-medium-pump-dir",
-          "signal": "direction",
-          "gpio": "-",
-          "function_input_key": "beads_medium_pump_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-medium-pump-step",
-          "signal": "step",
-          "gpio": "-",
-          "function_input_key": "beads_medium_pump_step_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-medium-pump-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-medium-pump-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-medium-pump-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-medium-pump-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
-    },
-    {
-      "id": "beads-creation-pump",
-      "board_id": "ttyUSB0",
-      "name": "Beads Creation Pump",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": 1.0,
-      "pins": [
-        {
-          "id": "beads-creation-pump-dir",
-          "signal": "direction",
-          "gpio": "-",
-          "function_input_key": "beads_creation_pump_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-creation-pump-step",
-          "signal": "step",
-          "gpio": "-",
-          "function_input_key": "beads_creation_pump_step_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-creation-pump-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-creation-pump-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-creation-pump-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-creation-pump-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
-    },
-    {
-      "id": "beads-solution-pump",
-      "board_id": "ttyUSB0",
-      "name": "Beads Solution Pump",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": 1.0,
-      "pins": [
-        {
-          "id": "beads-solution-pump-dir",
-          "signal": "direction",
-          "gpio": "-",
-          "function_input_key": "beads_solution_pump_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-solution-pump-step",
-          "signal": "step",
-          "gpio": "-",
-          "function_input_key": "beads_solution_pump_step_pin",
-          "notes": null
-        },
-        {
-          "id": "beads-solution-pump-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-solution-pump-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-solution-pump-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "beads-solution-pump-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
-    },
-    {
       "id": "x-axis-motor",
       "board_id": "raspberry-pi",
-      "name": "X Axis Motor",
+      "name": "CoreXY A Motor",
       "kind": "stepper_motor",
       "sensor_kind": null,
       "rotation_min_deg": null,
@@ -673,12 +68,12 @@
           "notes": null
         }
       ],
-      "notes": null
+      "notes": "Stable ID kept for compatibility; this is CoreXY motor A, not an independent X-only gantry motor."
     },
     {
       "id": "y-axis-motor",
       "board_id": "raspberry-pi",
-      "name": "Y Axis Motor",
+      "name": "CoreXY B Motor",
       "kind": "stepper_motor",
       "sensor_kind": null,
       "rotation_min_deg": null,
@@ -728,137 +123,7 @@
           "notes": null
         }
       ],
-      "notes": null
-    },
-    {
-      "id": "left-z-motor",
-      "board_id": "ttyUSB1",
-      "name": "Left Z Motor",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-left-dir",
-          "signal": "direction",
-          "gpio": "33",
-          "function_input_key": "z_left_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "z-left-step",
-          "signal": "step",
-          "gpio": "32",
-          "function_input_key": "z_left_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-u9evru",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-qgrrs6",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-tm34xu",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-9ab5j2",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "right-z-motor",
-      "board_id": "ttyUSB1",
-      "name": "Right Z Motor",
-      "kind": "stepper_motor",
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-right-dir",
-          "signal": "direction",
-          "gpio": "5",
-          "function_input_key": "z_right_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "z-right-step",
-          "signal": "step",
-          "gpio": "4",
-          "function_input_key": "z_right_step_pin",
-          "notes": null
-        },
-        {
-          "id": "pin-3-coo1pk",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-4-7nibcb",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-5-q6qy46",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "pin-6-2h9azd",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "xy-limit-switches",
-      "board_id": "raspberry-pi",
-      "name": "XY Limit Switches",
-      "kind": "sensor",
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "pin-1-x5718q",
-          "signal": "signal",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
+      "notes": "Stable ID kept for compatibility; this is CoreXY motor B, not an independent Y-only gantry motor."
     },
     {
       "id": "x-min-limit-switch",
@@ -935,6 +200,501 @@
           "signal": "signal",
           "gpio": "13",
           "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-a",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head A",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-a-dir",
+          "signal": "direction",
+          "gpio": "32",
+          "function_input_key": "head_a_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-step",
+          "signal": "step",
+          "gpio": "33",
+          "function_input_key": "head_a_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-b",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head B",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-b-dir",
+          "signal": "direction",
+          "gpio": "4",
+          "function_input_key": "head_b_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-step",
+          "signal": "step",
+          "gpio": "25",
+          "function_input_key": "head_b_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-c",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head C",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-c-dir",
+          "signal": "direction",
+          "gpio": "5",
+          "function_input_key": "head_c_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-step",
+          "signal": "step",
+          "gpio": "26",
+          "function_input_key": "head_c_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-d",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head D",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-d-dir",
+          "signal": "direction",
+          "gpio": "18",
+          "function_input_key": "head_d_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-step",
+          "signal": "step",
+          "gpio": "27",
+          "function_input_key": "head_d_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-e",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head E",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-e-dir",
+          "signal": "direction",
+          "gpio": "19",
+          "function_input_key": "head_e_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-step",
+          "signal": "step",
+          "gpio": "14",
+          "function_input_key": "head_e_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-f",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head F",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-f-dir",
+          "signal": "direction",
+          "gpio": "21",
+          "function_input_key": "head_f_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-step",
+          "signal": "step",
+          "gpio": "12",
+          "function_input_key": "head_f_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-g",
+      "board_id": "ttyUSB0",
+      "name": "Syringe Head G",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-g-dir",
+          "signal": "direction",
+          "gpio": "22",
+          "function_input_key": "head_g_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-step",
+          "signal": "step",
+          "gpio": "13",
+          "function_input_key": "head_g_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "left-z-motor",
+      "board_id": "ttyUSB1",
+      "name": "Z Axis Motor",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-dir",
+          "signal": "direction",
+          "gpio": "33",
+          "function_input_key": "z_left_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-step",
+          "signal": "step",
+          "gpio": "32",
+          "function_input_key": "z_left_step_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-left-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": "Single Z axis motor. Stable legacy ID kept for compatibility."
+    },
+    {
+      "id": "right-z-motor",
+      "board_id": "ttyUSB1",
+      "name": "Legacy Right Z Motor",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-dir",
+          "signal": "direction",
+          "gpio": "5",
+          "function_input_key": "z_right_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-step",
+          "signal": "step",
+          "gpio": "4",
+          "function_input_key": "z_right_step_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "z-right-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
           "notes": null
         }
       ],
@@ -1019,38 +779,11 @@
         }
       ],
       "notes": null
-    },
-    {
-      "id": "raspberry-aht20",
-      "board_id": "raspberry-pi",
-      "name": "Raspberry AHT20 Temperature + Humidity",
-      "kind": "sensor",
-      "sensor_kind": "aht20_temperature_humidity",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "raspberry-aht20-scl",
-          "signal": "scl",
-          "gpio": "3",
-          "function_input_key": null,
-          "notes": "Raspberry Pi I2C SCL1."
-        },
-        {
-          "id": "raspberry-aht20-sda",
-          "signal": "sda",
-          "gpio": "2",
-          "function_input_key": null,
-          "notes": "Raspberry Pi I2C SDA1."
-        }
-      ],
-      "notes": "AHT20 development board connected directly to Raspberry Pi I2C."
     }
   ],
   "groups": [
     {
-      "id": "group-4zqf5l",
+      "id": "group-n86u8c",
       "name": "Hardware Group 1",
       "member_ids": [
         "ttyUSB0",
@@ -1065,5 +798,5 @@
       "notes": null
     }
   ],
-  "updated_at": "2026-06-25T13:02:15.269465Z"
+  "updated_at": "2026-06-25T21:30:21.198736Z"
 }

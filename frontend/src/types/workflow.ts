@@ -18,6 +18,8 @@ export interface WorkflowInputDefinition {
   default?: WorkflowParameterValue | null;
   placeholder?: string | null;
   advanced?: boolean;
+  hidden?: boolean;
+  resolvedFrom?: "hardware_map";
   options: WorkflowInputOption[];
 }
 

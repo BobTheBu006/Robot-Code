@@ -31,6 +31,26 @@ CALIBRATION_SPEED_PROFILE_TO_RPM = {
 }
 
 
+def _effective_move_rpm(request) -> int:
+    return int(getattr(request, "speed_rpm", SPEED_PROFILE_TO_RPM[getattr(request, "speed_profile", "normal")]))
+
+
+def _effective_calibration_rpm(request) -> int:
+    return int(getattr(
+        request,
+        "speed_rpm",
+        CALIBRATION_SPEED_PROFILE_TO_RPM[getattr(request, "calibration_speed_profile", "safe")],
+    ))
+
+
+def _trapezoid_flag(request) -> int:
+    return 1 if bool(getattr(request, "trapezoidal_speed", True)) else 0
+
+
+def _acceleration_rpm_per_s(request) -> int:
+    return int(getattr(request, "acceleration_rpm_per_s", 0))
+
+
 class GantryControllerError(RuntimeError):
     pass
 
@@ -121,11 +141,38 @@ class GantryControllerService:
             }
 
         session.cancel_requested = True
+        if not session.stop_sent:
+            with session.io_lock:
+                session.serial_port.write(b"STOP\n")
+                session.serial_port.flush()
+            session.stop_sent = True
         return {
             "ok": True,
-            "message": f"Cancellation requested for the active gantry command on {port}.",
+            "message": f"STOP sent to the active gantry command on {port}.",
             "tool_port": port,
         }
+
+    def emergency_stop(self) -> list[dict[str, object]]:
+        with self._active_sessions_guard:
+            active_sessions = list(self._active_sessions.items())
+
+        results: list[dict[str, object]] = []
+        for port, session in active_sessions:
+            session.cancel_requested = True
+            try:
+                if not session.stop_sent:
+                    with session.io_lock:
+                        session.serial_port.write(b"STOP\n")
+                        session.serial_port.flush()
+                    session.stop_sent = True
+                results.append({"ok": True, "tool": "gantry", "tool_port": port, "message": "STOP sent."})
+            except Exception as exc:
+                results.append({"ok": False, "tool": "gantry", "tool_port": port, "message": str(exc)})
+
+        if not results:
+            results.append({"ok": True, "tool": "gantry", "tool_port": None, "message": "No active gantry command."})
+
+        return results
 
     def _reply_contains_prefix(self, reply: str | None, prefixes: tuple[str, ...]) -> bool:
         if not reply:
@@ -196,8 +243,8 @@ class GantryControllerService:
         *,
         port: str,
         baud_rate: int,
-        pin_command: str,
-        limit_command: str,
+        pin_command: str | list[str],
+        limit_command: str | list[str],
         action_command: str,
         action_prefix: str,
         action_deadline: float,
@@ -216,29 +263,39 @@ class GantryControllerService:
                         if active_session.cancel_requested:
                             raise GantryControllerError("Gantry command was cancelled.")
 
-                        pin_reply, pin_completed = self._send_command(
-                            serial_port,
-                            pin_command,
-                            terminal_prefixes=("OK XY PINS", "OK Z PINS", "ERR "),
-                            deadline_seconds=self._command_deadline(),
-                            active_session=active_session,
-                        )
-                        if not pin_completed or not self._reply_contains_prefix(pin_reply, ("OK XY PINS", "OK Z PINS")):
-                            raise GantryControllerError(
-                                f"ESP32 did not acknowledge gantry pin configuration. Reply: {pin_reply}"
+                        pin_replies: list[str] = []
+                        for next_pin_command in self._command_list(pin_command):
+                            pin_reply, pin_completed = self._send_command(
+                                serial_port,
+                                next_pin_command,
+                                terminal_prefixes=("OK XY PINS", "OK Z PINS", "ERR "),
+                                deadline_seconds=self._command_deadline(),
+                                active_session=active_session,
                             )
+                            if not pin_completed or not self._reply_contains_prefix(pin_reply, ("OK XY PINS", "OK Z PINS")):
+                                raise GantryControllerError(
+                                    f"ESP32 did not acknowledge gantry pin configuration. Reply: {pin_reply}"
+                                )
+                            if pin_reply:
+                                pin_replies.append(pin_reply)
+                        pin_reply = "\n".join(pin_replies) if pin_replies else None
 
-                        limit_reply, limit_completed = self._send_command(
-                            serial_port,
-                            limit_command,
-                            terminal_prefixes=("OK XY LIMITS", "OK Z LIMITS", "ERR "),
-                            deadline_seconds=self._command_deadline(),
-                            active_session=active_session,
-                        )
-                        if not limit_completed or not self._reply_contains_prefix(limit_reply, ("OK XY LIMITS", "OK Z LIMITS")):
-                            raise GantryControllerError(
-                                f"ESP32 did not acknowledge gantry limit configuration. Reply: {limit_reply}"
+                        limit_replies: list[str] = []
+                        for next_limit_command in self._command_list(limit_command):
+                            limit_reply, limit_completed = self._send_command(
+                                serial_port,
+                                next_limit_command,
+                                terminal_prefixes=("OK XY LIMITS", "OK Z LIMITS", "ERR "),
+                                deadline_seconds=self._command_deadline(),
+                                active_session=active_session,
                             )
+                            if not limit_completed or not self._reply_contains_prefix(limit_reply, ("OK XY LIMITS", "OK Z LIMITS")):
+                                raise GantryControllerError(
+                                    f"ESP32 did not acknowledge gantry limit configuration. Reply: {limit_reply}"
+                                )
+                            if limit_reply:
+                                limit_replies.append(limit_reply)
+                        limit_reply = "\n".join(limit_replies) if limit_replies else None
 
                         action_reply, action_completed = self._send_command(
                             serial_port,
@@ -262,6 +319,9 @@ class GantryControllerService:
 
         return pin_reply, limit_reply, action_reply
 
+    def _command_list(self, command: str | list[str]) -> list[str]:
+        return command if isinstance(command, list) else [command]
+
     def _build_xy_pin_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
         return (
             f"SET XY PINS {request.x_step_pin} {request.x_dir_pin} "
@@ -275,71 +335,92 @@ class GantryControllerService:
         )
 
     def _build_move_xy_command(self, request: GantryXYMoveRequest) -> str:
-        return f"MOVE XY {request.x_cm:.3f} {request.y_cm:.3f} {request.speed_profile}"
+        return (
+            f"MOVE XYZ {request.x_cm:.3f} {request.y_cm:.3f} {request.z_cm:.3f} "
+            f"{_effective_move_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
+            f"{1 if request.on_the_fly_calibration else 0} {request.calibration_max_diff_steps}"
+        )
 
     def _build_calibrate_xy_command(self, request: GantryXYCalibrationRequest) -> str:
         return (
             f"CALIBRATE XY {request.x_track_length_cm:.3f} "
-            f"{request.y_track_length_cm:.3f} {request.calibration_speed_profile}"
+            f"{request.y_track_length_cm:.3f} "
+            f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
         )
 
-    def _build_z_pin_command(self, request: GantryZMoveRequest | GantryZCalibrationRequest) -> str:
+    def _build_z_pin_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:
         return (
             f"SET Z PINS {request.z_left_step_pin} {request.z_left_dir_pin} "
             f"{request.z_right_step_pin} {request.z_right_dir_pin}"
         )
 
-    def _build_z_limit_command(self, request: GantryZMoveRequest | GantryZCalibrationRequest) -> str:
+    def _build_z_limit_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:
         return (
             f"SET Z LIMITS {request.limit_switch_mode} {request.z_left_min_limit_pin} "
             f"{request.z_left_max_limit_pin} {request.z_right_min_limit_pin} {request.z_right_max_limit_pin}"
         )
 
     def _build_move_z_command(self, request: GantryZMoveRequest) -> str:
-        return f"MOVE Z {request.z_left_cm:.3f} {request.z_right_cm:.3f} {request.speed_profile}"
+        return (
+            f"MOVE Z {request.z_left_cm:.3f} {request.z_right_cm:.3f} "
+            f"{_effective_move_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
+            f"{1 if request.on_the_fly_calibration else 0} {request.calibration_max_diff_steps}"
+        )
 
     def _build_calibrate_z_command(self, request: GantryZCalibrationRequest) -> str:
         return (
             f"CALIBRATE Z {request.z_left_track_length_cm:.3f} "
-            f"{request.z_right_track_length_cm:.3f} {request.calibration_speed_profile}"
+            f"{request.z_right_track_length_cm:.3f} "
+            f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
         )
 
     def move_xy(self, request: GantryXYMoveRequest) -> GantryXYMoveResponse:
         port = self._selected_port(request.tool_port)
         baud_rate = request.baud_rate or self._baud_rate()
-        pin_command = self._build_xy_pin_command(request)
-        limit_command = self._build_xy_limit_command(request)
+        pin_command = [self._build_xy_pin_command(request), self._build_z_pin_command(request)]
+        limit_command = [self._build_xy_limit_command(request), self._build_z_limit_command(request)]
         move_command = self._build_move_xy_command(request)
-        dominant_steps = max(abs(request.x_cm) * XY_STEPS_PER_CM, abs(request.y_cm) * XY_STEPS_PER_CM)
+        dominant_steps = max(
+            abs(request.x_cm) * XY_STEPS_PER_CM,
+            abs(request.y_cm) * XY_STEPS_PER_CM,
+            abs(request.z_cm) * Z_STEPS_PER_CM,
+        )
         pin_reply, limit_reply, move_reply = self._send_config_and_action(
             port=port,
             baud_rate=baud_rate,
             pin_command=pin_command,
             limit_command=limit_command,
             action_command=move_command,
-            action_prefix="OK MOVE XY",
-            action_deadline=self._move_deadline(dominant_steps, SPEED_PROFILE_TO_RPM[request.speed_profile]),
+            action_prefix="OK MOVE XYZ",
+            action_deadline=self._move_deadline(dominant_steps, _effective_move_rpm(request)),
         )
 
         return GantryXYMoveResponse(
             port=port,
             baud_rate=baud_rate,
             speed_profile=request.speed_profile,
-            pin_command_sent=pin_command,
+            speed_rpm=_effective_move_rpm(request),
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+            on_the_fly_calibration=request.on_the_fly_calibration,
+            calibration_max_diff_steps=request.calibration_max_diff_steps,
+            pin_command_sent="\n".join(pin_command),
             pin_reply=pin_reply,
             pins_applied=True,
-            limit_command_sent=limit_command,
+            limit_command_sent="\n".join(limit_command),
             limit_reply=limit_reply,
             limits_applied=True,
             move_command_sent=move_command,
             move_reply=move_reply,
             move_applied=True,
-            target={"x_cm": request.x_cm, "y_cm": request.y_cm},
+            target={"x_cm": request.x_cm, "y_cm": request.y_cm, "z_cm": request.z_cm},
             configured_pins={
                 "x_step_pin": request.x_step_pin,
                 "x_dir_pin": request.x_dir_pin,
                 "y_step_pin": request.y_step_pin,
                 "y_dir_pin": request.y_dir_pin,
+                "z_step_pin": request.z_left_step_pin,
+                "z_dir_pin": request.z_left_dir_pin,
             },
             configured_limits={
                 "limit_switch_mode": request.limit_switch_mode,
@@ -347,7 +428,13 @@ class GantryControllerService:
                 "x_max_limit_pin": request.x_max_limit_pin,
                 "y_min_limit_pin": request.y_min_limit_pin,
                 "y_max_limit_pin": request.y_max_limit_pin,
-                "speed_rpm": SPEED_PROFILE_TO_RPM[request.speed_profile],
+                "z_min_limit_pin": request.z_left_min_limit_pin,
+                "z_max_limit_pin": request.z_left_max_limit_pin,
+                "speed_rpm": _effective_move_rpm(request),
+                "trapezoidal_speed": request.trapezoidal_speed,
+                "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+                "on_the_fly_calibration": request.on_the_fly_calibration,
+                "calibration_max_diff_steps": request.calibration_max_diff_steps,
             },
         )
 
@@ -370,7 +457,7 @@ class GantryControllerService:
             action_prefix="OK CALIBRATE XY",
             action_deadline=self._move_deadline(
                 dominant_steps * 3.0,
-                CALIBRATION_SPEED_PROFILE_TO_RPM[request.calibration_speed_profile],
+                _effective_calibration_rpm(request),
             ),
         )
 
@@ -378,6 +465,9 @@ class GantryControllerService:
             port=port,
             baud_rate=baud_rate,
             calibration_speed_profile=request.calibration_speed_profile,
+            speed_rpm=_effective_calibration_rpm(request),
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
@@ -403,7 +493,9 @@ class GantryControllerService:
                 "x_max_limit_pin": request.x_max_limit_pin,
                 "y_min_limit_pin": request.y_min_limit_pin,
                 "y_max_limit_pin": request.y_max_limit_pin,
-                "speed_rpm": CALIBRATION_SPEED_PROFILE_TO_RPM[request.calibration_speed_profile],
+                "speed_rpm": _effective_calibration_rpm(request),
+                "trapezoidal_speed": request.trapezoidal_speed,
+                "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
             },
         )
 
@@ -421,13 +513,18 @@ class GantryControllerService:
             limit_command=limit_command,
             action_command=move_command,
             action_prefix="OK MOVE Z",
-            action_deadline=self._move_deadline(dominant_steps, SPEED_PROFILE_TO_RPM[request.speed_profile]),
+            action_deadline=self._move_deadline(dominant_steps, _effective_move_rpm(request)),
         )
 
         return GantryZMoveResponse(
             port=port,
             baud_rate=baud_rate,
             speed_profile=request.speed_profile,
+            speed_rpm=_effective_move_rpm(request),
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+            on_the_fly_calibration=request.on_the_fly_calibration,
+            calibration_max_diff_steps=request.calibration_max_diff_steps,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
@@ -450,7 +547,11 @@ class GantryControllerService:
                 "z_left_max_limit_pin": request.z_left_max_limit_pin,
                 "z_right_min_limit_pin": request.z_right_min_limit_pin,
                 "z_right_max_limit_pin": request.z_right_max_limit_pin,
-                "speed_rpm": SPEED_PROFILE_TO_RPM[request.speed_profile],
+                "speed_rpm": _effective_move_rpm(request),
+                "trapezoidal_speed": request.trapezoidal_speed,
+                "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+                "on_the_fly_calibration": request.on_the_fly_calibration,
+                "calibration_max_diff_steps": request.calibration_max_diff_steps,
             },
         )
 
@@ -473,7 +574,7 @@ class GantryControllerService:
             action_prefix="OK CALIBRATE Z",
             action_deadline=self._move_deadline(
                 dominant_steps * 3.0,
-                CALIBRATION_SPEED_PROFILE_TO_RPM[request.calibration_speed_profile],
+                _effective_calibration_rpm(request),
             ),
         )
 
@@ -481,6 +582,9 @@ class GantryControllerService:
             port=port,
             baud_rate=baud_rate,
             calibration_speed_profile=request.calibration_speed_profile,
+            speed_rpm=_effective_calibration_rpm(request),
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
@@ -506,7 +610,9 @@ class GantryControllerService:
                 "z_left_max_limit_pin": request.z_left_max_limit_pin,
                 "z_right_min_limit_pin": request.z_right_min_limit_pin,
                 "z_right_max_limit_pin": request.z_right_max_limit_pin,
-                "speed_rpm": CALIBRATION_SPEED_PROFILE_TO_RPM[request.calibration_speed_profile],
+                "speed_rpm": _effective_calibration_rpm(request),
+                "trapezoidal_speed": request.trapezoidal_speed,
+                "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
             },
         )
 
