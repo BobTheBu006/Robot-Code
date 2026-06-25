@@ -51,6 +51,7 @@ The API will be available at `http://127.0.0.1:8000`.
 - `GET /api/camera/stream`
 - `GET /api/functions`
 - `POST /api/functions/{function_id}/test`
+- `POST /api/esp32-builder/workflow-firmware/plan`
 - `GET /api/tools/syringe/status`
 - `POST /api/tools/syringe/dispense`
 
@@ -132,6 +133,8 @@ The Workflow Editor separates blocks into three groups:
 - Compound functions: directly connected canvas blocks collapsed through the canvas context menu. Compound functions preserve their external flow outputs and can be expanded back into editable blocks.
 
 Advanced function manifests may declare `hardware_devices`. Each declared motor, servo, or sensor is synchronized into the Hardware Map using stable device IDs and `function_input_key` pin links. The Workflow Editor then generates the matching basic hardware block from the Hardware Map, so a custom function and its basic move/read block point at the same physical USB controller and GPIO pins.
+
+Advanced function manifests may also declare `firmware_requirements`. These identify the ESP32 routines, source files, protocols, and required logical devices that workflow-aware firmware planning collects per controller before flashing. The planner endpoint validates that referenced firmware sources stay inside the selected board workspace and exist before the workflow runner starts flashing boards.
 
 ## Mock update example
 

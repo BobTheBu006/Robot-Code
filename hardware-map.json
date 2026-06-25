@@ -23,6 +23,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-a-dir",
@@ -77,6 +78,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-b-dir",
@@ -131,6 +133,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-c-dir",
@@ -185,6 +188,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-d-dir",
@@ -239,6 +243,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-e-dir",
@@ -293,6 +298,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-f-dir",
@@ -347,6 +353,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-g-dir",
@@ -394,25 +401,246 @@
       "notes": null
     },
     {
+      "id": "suction-pump",
+      "board_id": "ttyUSB0",
+      "name": "Suction Pump",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "suction-pump-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "suction_pump_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "suction-pump-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "suction_pump_step_pin",
+          "notes": null
+        },
+        {
+          "id": "suction-pump-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "suction-pump-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "suction-pump-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "suction-pump-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
+    },
+    {
+      "id": "beads-medium-pump",
+      "board_id": "ttyUSB0",
+      "name": "Beads Medium Pump",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "beads-medium-pump-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "beads_medium_pump_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-medium-pump-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "beads_medium_pump_step_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-medium-pump-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-medium-pump-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-medium-pump-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-medium-pump-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
+    },
+    {
+      "id": "beads-creation-pump",
+      "board_id": "ttyUSB0",
+      "name": "Beads Creation Pump",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "beads-creation-pump-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "beads_creation_pump_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-creation-pump-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "beads_creation_pump_step_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-creation-pump-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-creation-pump-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-creation-pump-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-creation-pump-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
+    },
+    {
+      "id": "beads-solution-pump",
+      "board_id": "ttyUSB0",
+      "name": "Beads Solution Pump",
+      "kind": "stepper_motor",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "beads-solution-pump-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "beads_solution_pump_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-solution-pump-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "beads_solution_pump_step_pin",
+          "notes": null
+        },
+        {
+          "id": "beads-solution-pump-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-solution-pump-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-solution-pump-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "beads-solution-pump-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": "Peristaltic pump stepper. Calibrate by entering mL per 200 full steps."
+    },
+    {
       "id": "x-axis-motor",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "X Axis Motor",
       "kind": "stepper_motor",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-dir",
           "signal": "direction",
-          "gpio": "17",
+          "gpio": "27",
           "function_input_key": "x_dir_pin",
           "notes": null
         },
         {
           "id": "x-step",
           "signal": "step",
-          "gpio": "16",
+          "gpio": "17",
           "function_input_key": "x_step_pin",
           "notes": null
         },
@@ -449,24 +677,25 @@
     },
     {
       "id": "y-axis-motor",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "Y Axis Motor",
       "kind": "stepper_motor",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-dir",
           "signal": "direction",
-          "gpio": "19",
+          "gpio": "24",
           "function_input_key": "y_dir_pin",
           "notes": null
         },
         {
           "id": "y-step",
           "signal": "step",
-          "gpio": "18",
+          "gpio": "23",
           "function_input_key": "y_step_pin",
           "notes": null
         },
@@ -509,6 +738,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-dir",
@@ -563,6 +793,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-dir",
@@ -611,12 +842,13 @@
     },
     {
       "id": "xy-limit-switches",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "XY Limit Switches",
       "kind": "sensor",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "pin-1-x5718q",
@@ -629,37 +861,19 @@
       "notes": null
     },
     {
-      "id": "z-limit-switches",
-      "board_id": "ttyUSB1",
-      "name": "Z Limit Switches",
-      "kind": "sensor",
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "pins": [
-        {
-          "id": "pin-1-5j8vt4",
-          "signal": "signal",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
       "id": "x-min-limit-switch",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "X Min Limit Switch",
       "kind": "sensor",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-min-limit",
           "signal": "signal",
-          "gpio": "21",
+          "gpio": "5",
           "function_input_key": "x_min_limit_pin",
           "notes": null
         }
@@ -668,17 +882,18 @@
     },
     {
       "id": "x-max-limit-switch",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "X Max Limit Switch",
       "kind": "sensor",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-max-limit",
           "signal": "signal",
-          "gpio": "22",
+          "gpio": "6",
           "function_input_key": "x_max_limit_pin",
           "notes": null
         }
@@ -687,17 +902,18 @@
     },
     {
       "id": "y-min-limit-switch",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "Y Min Limit Switch",
       "kind": "sensor",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-min-limit",
           "signal": "signal",
-          "gpio": "23",
+          "gpio": "12",
           "function_input_key": "y_min_limit_pin",
           "notes": null
         }
@@ -706,17 +922,18 @@
     },
     {
       "id": "y-max-limit-switch",
-      "board_id": "ttyUSB1",
+      "board_id": "raspberry-pi",
       "name": "Y Max Limit Switch",
       "kind": "sensor",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-max-limit",
           "signal": "signal",
-          "gpio": "25",
+          "gpio": "13",
           "function_input_key": "y_max_limit_pin",
           "notes": null
         }
@@ -731,6 +948,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-min-limit",
@@ -750,6 +968,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-max-limit",
@@ -769,6 +988,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-min-limit",
@@ -788,6 +1008,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-max-limit",
@@ -798,6 +1019,33 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "raspberry-aht20",
+      "board_id": "raspberry-pi",
+      "name": "Raspberry AHT20 Temperature + Humidity",
+      "kind": "sensor",
+      "sensor_kind": "aht20_temperature_humidity",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "raspberry-aht20-scl",
+          "signal": "scl",
+          "gpio": "3",
+          "function_input_key": null,
+          "notes": "Raspberry Pi I2C SCL1."
+        },
+        {
+          "id": "raspberry-aht20-sda",
+          "signal": "sda",
+          "gpio": "2",
+          "function_input_key": null,
+          "notes": "Raspberry Pi I2C SDA1."
+        }
+      ],
+      "notes": "AHT20 development board connected directly to Raspberry Pi I2C."
     }
   ],
   "groups": [
@@ -817,5 +1065,5 @@
       "notes": null
     }
   ],
-  "updated_at": "2026-06-22T14:23:41.226758Z"
+  "updated_at": "2026-06-25T13:02:15.269465Z"
 }

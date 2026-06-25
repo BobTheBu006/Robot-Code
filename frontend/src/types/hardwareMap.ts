@@ -24,6 +24,7 @@ export interface HardwareDeviceMapping {
   sensor_kind?: HardwareSensorKind | null;
   rotation_min_deg?: number | null;
   rotation_max_deg?: number | null;
+  calibration_ml_per_200_steps?: number | null;
   pins: HardwarePinMapping[];
   notes?: string | null;
 }

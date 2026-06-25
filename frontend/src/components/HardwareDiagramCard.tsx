@@ -40,6 +40,7 @@ type HardwareContextMenuState = {
   x: number;
   y: number;
   nodeId: string | null;
+  edgeId?: string | null;
 } | null;
 
 interface HardwareDiagramCardProps {
@@ -56,6 +57,7 @@ interface HardwareNodeData extends Record<string, unknown> {
 }
 
 const RASPBERRY_NODE_ID = "raspberry-pi";
+const RASPBERRY_CONTROLLER_LABEL = "Raspberry Pi GPIO / I2C";
 const EMPTY_HARDWARE_MAP: HardwareMap = {
   version: 1,
   boards: [],
@@ -86,6 +88,18 @@ const SIGNAL_LABELS: Record<string, string> = {
   scl: "SCL",
   sda: "SDA",
 };
+
+function isRaspberryBoardId(boardId: string | null | undefined): boolean {
+  return boardId === RASPBERRY_NODE_ID;
+}
+
+function hardwareConnectionLabel(device: HardwareDeviceMapping): string {
+  if (isRaspberryBoardId(device.board_id)) {
+    return normalizeSensorKind(device.sensor_kind) === "aht20_temperature_humidity" ? "I2C" : "GPIO";
+  }
+
+  return deviceKindLabel(normalizeDeviceKind(device.kind));
+}
 
 function makeId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
@@ -145,6 +159,7 @@ function normalizePinSignal(signal: string): string {
 function pinTemplateForDevice(
   kind: HardwareDeviceKind,
   sensorKind: HardwareSensorKind = "position_limit_switch",
+  boardId: string | null = null,
 ): Array<Pick<HardwarePinMapping, "signal" | "gpio" | "function_input_key">> {
   if (kind === "stepper_motor") {
     return STEPPER_SIGNALS.map((signal) => ({
@@ -159,6 +174,13 @@ function pinTemplateForDevice(
   }
 
   if (sensorKind === "aht20_temperature_humidity") {
+    if (isRaspberryBoardId(boardId)) {
+      return [
+        { signal: "scl", gpio: "3", function_input_key: null },
+        { signal: "sda", gpio: "2", function_input_key: null },
+      ];
+    }
+
     return [
       { signal: "scl", gpio: "-", function_input_key: null },
       { signal: "sda", gpio: "-", function_input_key: null },
@@ -172,10 +194,11 @@ function pinsForDevice(
   kind: HardwareDeviceKind,
   sensorKind: HardwareSensorKind = "position_limit_switch",
   existingPins: HardwarePinMapping[] = [],
+  boardId: string | null = null,
 ): HardwarePinMapping[] {
   const existingBySignal = new Map(existingPins.map((pin) => [normalizePinSignal(pin.signal), pin]));
 
-  return pinTemplateForDevice(kind, sensorKind).map((template, index) => {
+  return pinTemplateForDevice(kind, sensorKind, boardId).map((template, index) => {
     const existing = existingBySignal.get(template.signal);
     return {
       id: existing?.id ?? makeId(`pin-${index + 1}`),
@@ -192,8 +215,18 @@ function normalizeServoRangeValue(value: number | string | null | undefined, fal
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizePositiveNumberValue(value: number | string | null | undefined): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function deviceKindLabel(kind: HardwareDeviceKind): string {
   return DEVICE_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
+}
+
+function isCalibratedStepperPump(device: HardwareDeviceMapping): boolean {
+  return normalizeDeviceKind(device.kind) === "stepper_motor"
+    && normalizePositiveNumberValue(device.calibration_ml_per_200_steps) !== null;
 }
 
 function sensorKindLabel(sensorKind: HardwareSensorKind | null | undefined): string {
@@ -288,27 +321,30 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
       notes: board.notes?.trim() || null,
     }))
     .filter((board) => board.id && board.label && board.usb_port);
-  const boardIds = new Set(boards.map((board) => board.id));
-  const fallbackBoardId = boards[0]?.id ?? "";
+  const boardIds = new Set([RASPBERRY_NODE_ID, ...boards.map((board) => board.id)]);
   const devices = hardwareMap.devices
     .map((device) => {
       const kind = normalizeDeviceKind(device.kind);
       const sensorKind = kind === "sensor" ? normalizeSensorKind(device.sensor_kind) : null;
-      const pins = pinsForDevice(kind, sensorKind ?? "position_limit_switch", device.pins);
+      const pins = pinsForDevice(kind, sensorKind ?? "position_limit_switch", device.pins, device.board_id);
+      const boardId = device.board_id.trim();
 
         return {
           ...device,
-          board_id: boardIds.has(device.board_id.trim()) ? device.board_id.trim() : fallbackBoardId,
+          board_id: boardIds.has(boardId) ? boardId : "",
           name: device.name.trim(),
           kind,
           sensor_kind: sensorKind,
           rotation_min_deg: kind === "servo" ? normalizeServoRangeValue(device.rotation_min_deg, -5) : null,
           rotation_max_deg: kind === "servo" ? normalizeServoRangeValue(device.rotation_max_deg, 175) : null,
+          calibration_ml_per_200_steps: kind === "stepper_motor"
+            ? normalizePositiveNumberValue(device.calibration_ml_per_200_steps)
+            : null,
           notes: device.notes?.trim() || null,
           pins,
         };
     })
-    .filter((device) => boardIds.has(device.board_id) && device.name);
+    .filter((device) => device.name);
   const itemIds = new Set([
     RASPBERRY_NODE_ID,
     ...boards.map((board) => board.id),
@@ -366,6 +402,14 @@ function nodePositionForId(
 
   const deviceIndex = deviceIndexById.get(nodeId);
   if (deviceIndex) {
+    if (deviceIndex.boardIndex === -2) {
+      return { x: 680, y: 80 + deviceIndex.deviceIndex * 110 };
+    }
+
+    if (deviceIndex.boardIndex < 0) {
+      return { x: 350, y: 250 + deviceIndex.deviceIndex * 110 };
+    }
+
     const boardY = 80 + deviceIndex.boardIndex * Math.max(190, Math.max(deviceIndex.boardDeviceCount, 1) * 110);
     return { x: 680, y: boardY + deviceIndex.deviceIndex * 110 };
   }
@@ -384,8 +428,16 @@ function buildHardwareNodes(
   for (const device of hardwareMap.devices) {
     devicesByBoard.set(device.board_id, [...(devicesByBoard.get(device.board_id) ?? []), device]);
   }
+  const raspberryDevices = devicesByBoard.get(RASPBERRY_NODE_ID) ?? [];
+  const unconnectedDevices = devicesByBoard.get("") ?? [];
   const boardIndexById = new Map(hardwareMap.boards.map((board, index) => [board.id, index]));
   const deviceIndexById = new Map<string, { boardIndex: number; deviceIndex: number; boardDeviceCount: number }>();
+  unconnectedDevices.forEach((device, deviceIndex) => {
+    deviceIndexById.set(device.id, { boardIndex: -2, deviceIndex, boardDeviceCount: unconnectedDevices.length });
+  });
+  raspberryDevices.forEach((device, deviceIndex) => {
+    deviceIndexById.set(device.id, { boardIndex: -1, deviceIndex, boardDeviceCount: raspberryDevices.length });
+  });
   hardwareMap.boards.forEach((board, boardIndex) => {
     const boardDevices = devicesByBoard.get(board.id) ?? [];
     boardDevices.forEach((device, deviceIndex) => {
@@ -423,13 +475,62 @@ function buildHardwareNodes(
       data: {
         kind: "raspberry",
         title: "Raspberry Pi",
-        detail: "USB host",
-        meta: `${hardwareMap.boards.length} controller${hardwareMap.boards.length === 1 ? "" : "s"}`,
+        detail: "USB host + GPIO/I2C",
+        meta: `${hardwareMap.boards.length} controller${hardwareMap.boards.length === 1 ? "" : "s"}, ${raspberryDevices.length} direct device${raspberryDevices.length === 1 ? "" : "s"}`,
         accent: "#175c96",
         status: "source",
       },
     },
   );
+
+  unconnectedDevices.forEach((device, deviceIndex) => {
+    if (groupedMemberIds.has(device.id)) {
+      return;
+    }
+
+    nodes.push({
+      id: device.id,
+      type: "hardwareNode",
+      position: previousPositionById.get(device.id) ?? { x: 680, y: 80 + deviceIndex * 110 },
+      data: {
+        kind: "device",
+        title: device.name,
+        detail: normalizeDeviceKind(device.kind) === "sensor"
+          ? sensorKindLabel(device.sensor_kind)
+          : isCalibratedStepperPump(device)
+            ? "Peristaltic pump"
+            : deviceKindLabel(normalizeDeviceKind(device.kind)),
+        meta: "unconnected",
+        accent: "#6b7280",
+        status: "unconnected",
+      },
+    });
+  });
+
+  raspberryDevices.forEach((device, deviceIndex) => {
+    if (groupedMemberIds.has(device.id)) {
+      return;
+    }
+
+    nodes.push({
+      id: device.id,
+      type: "hardwareNode",
+      position: previousPositionById.get(device.id) ?? { x: 350, y: 250 + deviceIndex * 110 },
+      data: {
+        kind: "device",
+        title: device.name,
+        detail: normalizeDeviceKind(device.kind) === "sensor"
+          ? sensorKindLabel(device.sensor_kind)
+          : isCalibratedStepperPump(device)
+            ? "Peristaltic pump"
+            : deviceKindLabel(normalizeDeviceKind(device.kind)),
+        meta: isCalibratedStepperPump(device)
+          ? `${device.calibration_ml_per_200_steps} mL / 200 steps`
+          : `${device.pins.length} pin${device.pins.length === 1 ? "" : "s"}`,
+        accent: deviceAccent(device),
+      },
+    });
+  });
 
   hardwareMap.boards.forEach((board, boardIndex) => {
     if (groupedMemberIds.has(board.id)) {
@@ -468,8 +569,12 @@ function buildHardwareNodes(
           title: device.name,
           detail: normalizeDeviceKind(device.kind) === "sensor"
             ? sensorKindLabel(device.sensor_kind)
-            : deviceKindLabel(normalizeDeviceKind(device.kind)),
-          meta: `${device.pins.length} pin${device.pins.length === 1 ? "" : "s"}`,
+            : isCalibratedStepperPump(device)
+              ? "Peristaltic pump"
+              : deviceKindLabel(normalizeDeviceKind(device.kind)),
+          meta: isCalibratedStepperPump(device)
+            ? `${device.calibration_ml_per_200_steps} mL / 200 steps`
+            : `${device.pins.length} pin${device.pins.length === 1 ? "" : "s"}`,
           accent: deviceAccent(device),
         },
       });
@@ -481,6 +586,7 @@ function buildHardwareNodes(
 
 function buildHardwareEdges(hardwareMap: HardwareMap): Edge[] {
   const groupedMemberIds = new Set((hardwareMap.groups ?? []).flatMap((group) => group.member_ids));
+  const boardById = new Map(hardwareMap.boards.map((board) => [board.id, board]));
   const groupByMemberId = new Map<string, HardwareGroupMapping>();
   for (const group of hardwareMap.groups ?? []) {
     for (const memberId of group.member_ids) {
@@ -522,6 +628,21 @@ function buildHardwareEdges(hardwareMap: HardwareMap): Edge[] {
   }
 
   for (const device of hardwareMap.devices) {
+    if (!device.board_id) {
+      continue;
+    }
+
+    if (isRaspberryBoardId(device.board_id)) {
+      const targetGroup = groupByMemberId.get(device.id);
+      addEdge(
+        RASPBERRY_NODE_ID,
+        targetGroup?.id ?? device.id,
+        hardwareConnectionLabel(device),
+        true,
+      );
+      continue;
+    }
+
     const sourceGroup = groupByMemberId.get(device.board_id);
     const targetGroup = groupByMemberId.get(device.id);
     if (sourceGroup && targetGroup && sourceGroup.id === targetGroup.id) {
@@ -531,8 +652,17 @@ function buildHardwareEdges(hardwareMap: HardwareMap): Edge[] {
     addEdge(
       sourceGroup?.id ?? device.board_id,
       targetGroup?.id ?? device.id,
-      deviceKindLabel(normalizeDeviceKind(device.kind)),
+      hardwareConnectionLabel(device),
     );
+
+    if (sourceGroup && !targetGroup) {
+      addEdge(
+        RASPBERRY_NODE_ID,
+        device.id,
+        boardById.get(device.board_id)?.usb_port ?? "USB",
+        true,
+      );
+    }
   }
 
   return edges.filter((edge) =>
@@ -717,7 +847,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     setSaveState("idle");
   }
 
-  function addDevice(boardId = hardwareMap.boards[0]?.id) {
+  function addDevice(boardId = hardwareMap.boards[0]?.id ?? RASPBERRY_NODE_ID) {
     if (!boardId) {
       addBoard();
       return;
@@ -736,7 +866,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           sensor_kind: null,
           rotation_min_deg: null,
           rotation_max_deg: null,
-          pins: pinsForDevice("stepper_motor"),
+          calibration_ml_per_200_steps: null,
+          pins: pinsForDevice("stepper_motor", "position_limit_switch", [], boardId),
           notes: null,
         },
       ],
@@ -774,7 +905,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     const device = deviceFromNodeId(hardwareMap, deviceId);
     if (device) {
       updateDevice(device.id, {
-        pins: pinsForDevice(normalizeDeviceKind(device.kind), normalizeSensorKind(device.sensor_kind), device.pins),
+        pins: pinsForDevice(normalizeDeviceKind(device.kind), normalizeSensorKind(device.sensor_kind), device.pins, device.board_id),
       });
       return;
     }
@@ -833,12 +964,69 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
 
     const targetDevice = deviceFromNodeId(hardwareMap, connection.target);
     const sourceBoard = boardFromNodeId(hardwareMap, connection.source);
-    if (!targetDevice || !sourceBoard) {
+    if (!targetDevice) {
       return;
     }
 
-    updateDevice(targetDevice.id, { board_id: sourceBoard.id });
+    if (connection.source === RASPBERRY_NODE_ID) {
+      updateDevice(targetDevice.id, {
+        board_id: RASPBERRY_NODE_ID,
+        pins: pinsForDevice(
+          normalizeDeviceKind(targetDevice.kind),
+          normalizeSensorKind(targetDevice.sensor_kind),
+          targetDevice.pins,
+          RASPBERRY_NODE_ID,
+        ),
+      });
+      setSelectedNodeId(targetDevice.id);
+      return;
+    }
+
+    if (!sourceBoard) {
+      return;
+    }
+
+    updateDevice(targetDevice.id, {
+      board_id: sourceBoard.id,
+      pins: pinsForDevice(
+        normalizeDeviceKind(targetDevice.kind),
+        normalizeSensorKind(targetDevice.sensor_kind),
+        targetDevice.pins,
+        sourceBoard.id,
+      ),
+    });
     setSelectedNodeId(targetDevice.id);
+  }
+
+  function disconnectHardwareEdge(edge: Pick<Edge, "source" | "target">) {
+    const sourceGroup = groupFromNodeId(hardwareMap, edge.source);
+    const targetGroup = groupFromNodeId(hardwareMap, edge.target);
+    const sourceIds = new Set(sourceGroup?.member_ids ?? [edge.source]);
+    const targetIds = new Set(targetGroup?.member_ids ?? [edge.target]);
+
+    setHardwareMap((currentMap) => ({
+      ...currentMap,
+      devices: currentMap.devices.map((device) => {
+        const deviceIsTarget = targetIds.has(device.id);
+        const sourceIsCurrentBoard = sourceIds.has(device.board_id);
+        if (!deviceIsTarget || !sourceIsCurrentBoard) {
+          return device;
+        }
+
+        return {
+          ...device,
+          board_id: "",
+        };
+      }),
+    }));
+    setContextMenu(null);
+    setSaveState("idle");
+  }
+
+  function handleEdgesDelete(deletedEdges: Edge[]) {
+    for (const edge of deletedEdges) {
+      disconnectHardwareEdge(edge);
+    }
   }
 
   function getSelectedHardwareNodeIds(fallbackNodeId: string | null = null): string[] {
@@ -952,11 +1140,25 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     });
   }
 
+  function openHardwareEdgeContextMenu(
+    event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number },
+    edge: Edge,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: null,
+      edgeId: edge.id,
+    });
+  }
+
   async function handleSave() {
     const cleanedMap = cleanHardwareMap(hardwareMap);
-    if (cleanedMap.boards.length === 0) {
+    if (cleanedMap.boards.length === 0 && cleanedMap.devices.length === 0) {
       setSaveState("error");
-      setSaveMessage("Add at least one controller before saving the hardware map.");
+      setSaveMessage("Add at least one controller or Raspberry Pi GPIO/I2C device before saving the hardware map.");
       return;
     }
 
@@ -976,6 +1178,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
 
   function renderSettings() {
     if (selectedKind === "raspberry") {
+      const raspberryDevices = devicesByBoard.get(RASPBERRY_NODE_ID) ?? [];
       return (
         <div className="hardware-settings__body">
           <div className="hardware-settings__stat">
@@ -983,9 +1186,12 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
             <strong>{hardwareMap.boards.length}</strong>
           </div>
           <div className="hardware-settings__stat">
-            <span>IoT devices</span>
-            <strong>{hardwareMap.devices.length}</strong>
+            <span>Direct GPIO/I2C devices</span>
+            <strong>{raspberryDevices.length}</strong>
           </div>
+          <button className="workflow-editor__action" onClick={() => addDevice(RASPBERRY_NODE_ID)} type="button">
+            Add GPIO/I2C device
+          </button>
           <button className="workflow-editor__action workflow-editor__action--primary" onClick={addBoard} type="button">
             Add controller
           </button>
@@ -1130,7 +1336,10 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
                   sensor_kind: nextSensorKind,
                   rotation_min_deg: nextKind === "servo" ? selectedDevice.rotation_min_deg ?? -5 : null,
                   rotation_max_deg: nextKind === "servo" ? selectedDevice.rotation_max_deg ?? 175 : null,
-                  pins: pinsForDevice(nextKind, nextSensorKind ?? "position_limit_switch", selectedDevice.pins),
+                  calibration_ml_per_200_steps: nextKind === "stepper_motor"
+                    ? selectedDevice.calibration_ml_per_200_steps ?? null
+                    : null,
+                  pins: pinsForDevice(nextKind, nextSensorKind ?? "position_limit_switch", selectedDevice.pins, selectedDevice.board_id),
                 });
               }}
               value={normalizeDeviceKind(selectedDevice.kind)}
@@ -1145,9 +1354,21 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           <label className="hardware-settings__field">
             <span>Controller</span>
             <select
-              onChange={(event) => updateDevice(selectedDevice.id, { board_id: event.target.value })}
+              onChange={(event) => {
+                const nextBoardId = event.target.value;
+                updateDevice(selectedDevice.id, {
+                  board_id: nextBoardId,
+                  pins: pinsForDevice(
+                    normalizeDeviceKind(selectedDevice.kind),
+                    normalizeSensorKind(selectedDevice.sensor_kind),
+                    selectedDevice.pins,
+                    nextBoardId,
+                  ),
+                });
+              }}
               value={selectedDevice.board_id}
             >
+              <option value={RASPBERRY_NODE_ID}>{RASPBERRY_CONTROLLER_LABEL}</option>
               {hardwareMap.boards.map((board) => (
                 <option key={board.id} value={board.id}>
                   {board.label}
@@ -1164,7 +1385,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
                 const nextSensorKind = event.target.value as HardwareSensorKind;
                 updateDevice(selectedDevice.id, {
                   sensor_kind: nextSensorKind,
-                  pins: pinsForDevice("sensor", nextSensorKind, selectedDevice.pins),
+                  pins: pinsForDevice("sensor", nextSensorKind, selectedDevice.pins, selectedDevice.board_id),
                 });
               }}
               value={normalizeSensorKind(selectedDevice.sensor_kind)}
@@ -1202,6 +1423,22 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               />
             </label>
           </div>
+        ) : null}
+        {normalizeDeviceKind(selectedDevice.kind) === "stepper_motor" ? (
+          <label className="hardware-settings__field">
+            <span>Calibration (mL / 200 steps)</span>
+            <input
+              min="0"
+              onChange={(event) =>
+                updateDevice(selectedDevice.id, {
+                  calibration_ml_per_200_steps: normalizePositiveNumberValue(event.target.value),
+                })}
+              placeholder="Leave blank for normal motion stepper"
+              step="0.001"
+              type="number"
+              value={selectedDevice.calibration_ml_per_200_steps ?? ""}
+            />
+          </label>
         ) : null}
         <label className="hardware-settings__field">
           <span>Notes</span>
@@ -1314,6 +1551,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               nodeTypes={nodeTypes}
               nodes={nodes}
               onConnect={handleConnect}
+              onEdgeContextMenu={openHardwareEdgeContextMenu}
+              onEdgesDelete={handleEdgesDelete}
               onEdgesChange={onEdgesChange}
               onNodeContextMenu={(event, node) => openHardwareContextMenu(event, node.id)}
               onNodeClick={(event, node) => {
@@ -1349,12 +1588,25 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
                   top: contextMenu.y,
                 }}
               >
-                {contextMenu.nodeId && groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
+                {contextMenu.edgeId ? (
+                  <button
+                    onClick={() => {
+                      const edge = edges.find((candidate) => candidate.id === contextMenu.edgeId);
+                      if (edge) {
+                        disconnectHardwareEdge(edge);
+                      }
+                    }}
+                    type="button"
+                  >
+                    Disconnect
+                  </button>
+                ) : null}
+                {!contextMenu.edgeId && contextMenu.nodeId && groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
                   <button onClick={() => ungroup(contextMenu.nodeId as string)} type="button">
                     Ungroup
                   </button>
                 ) : null}
-                {!contextMenu.nodeId || !groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
+                {!contextMenu.edgeId && (!contextMenu.nodeId || !groupFromNodeId(hardwareMap, contextMenu.nodeId)) ? (
                   <button onClick={() => handleCreateGroup(contextMenu.nodeId)} type="button">
                     Create hardware group
                   </button>

@@ -97,6 +97,11 @@ function getServoRange(device: HardwareDeviceMapping): { min: number; max: numbe
   };
 }
 
+function getPumpCalibrationMlPer200Steps(device: HardwareDeviceMapping): number | null {
+  const calibration = Number(device.calibration_ml_per_200_steps);
+  return Number.isFinite(calibration) && calibration > 0 ? calibration : null;
+}
+
 function getHardwareBasicBlockId(device: Pick<HardwareDeviceMapping, "id" | "kind">): string | null {
   if (device.kind === "stepper_motor") {
     return `basic-stepper-${device.id}`;
@@ -439,6 +444,32 @@ export function createHardwareBasicBlocks(hardwareMap: HardwareMap | null): Work
     const board = boardLookup.get(device.board_id);
 
     if (device.kind === "stepper_motor") {
+      const pumpCalibration = getPumpCalibrationMlPer200Steps(device);
+      if (pumpCalibration !== null) {
+        return [{
+          id: `basic-stepper-${device.id}`,
+          displayName: `Pump ${device.name}`,
+          category: BASIC_BLOCK_CATEGORY,
+          description: `Run ${device.name} as a peristaltic pump${board ? ` on ${board.label}` : ""}.`,
+          version: "1.0.0",
+          kind: "basic",
+          acceptsInput: true,
+          accent: "#a85d13",
+          inputs: [
+            buildInput("volume_ml", "Volume (mL)", "number", 1, "Volume to pump. Positive values run the configured pump direction."),
+            buildInput("calibration_ml_per_200_steps", "mL / 200 steps", "number", pumpCalibration, "Measured pump volume per one full 200-step motor rotation."),
+          ],
+          advancedInputs: [
+            buildInput("speed_steps_per_second", "Speed (steps/s)", "number", 800, "Step pulse speed used by the pump."),
+          ],
+          outputs: [buildOutput("next", "Next", "flow", "Continue when the pump move completes.")],
+          hardwareDeviceId: device.id,
+          hardwareDeviceKind: "stepper_motor",
+          hardwareBoardId: device.board_id,
+          hardwareCalibrationMlPer200Steps: pumpCalibration,
+        }];
+      }
+
       return [{
         id: `basic-stepper-${device.id}`,
         displayName: `Move ${device.name}`,
@@ -458,6 +489,7 @@ export function createHardwareBasicBlocks(hardwareMap: HardwareMap | null): Work
         hardwareDeviceId: device.id,
         hardwareDeviceKind: "stepper_motor",
         hardwareBoardId: device.board_id,
+        hardwareCalibrationMlPer200Steps: null,
       }];
     }
 
@@ -587,6 +619,7 @@ export function mapDiscoveredFunctionToBlock(
     builderFirmwareEntryFile: discoveredFunction.manifest.builder_firmware_entry_file ?? null,
     builderBaseFunctionId: discoveredFunction.manifest.builder_base_function_id ?? null,
     hardwareDevices,
+    firmwareRequirements: discoveredFunction.manifest.firmware_requirements ?? [],
     referencedBasicBlockIds,
   };
 }
@@ -798,6 +831,15 @@ export function runBuiltInBlockTest(
   }
 
   if (block.hardwareDeviceKind === "stepper_motor") {
+    const calibrationMlPer200Steps = Number(parameters.calibration_ml_per_200_steps ?? block.hardwareCalibrationMlPer200Steps);
+    const volumeMl = Number(parameters.volume_ml);
+    const isPumpMove = Number.isFinite(calibrationMlPer200Steps)
+      && calibrationMlPer200Steps > 0
+      && Number.isFinite(volumeMl);
+    const amountSteps = isPumpMove
+      ? Math.round((volumeMl / calibrationMlPer200Steps) * 200)
+      : Number(parameters.amount_steps ?? 0);
+
     return {
       function_id: block.id,
       ok: true,
@@ -805,10 +847,12 @@ export function runBuiltInBlockTest(
       input_data: inputData ?? null,
       result: {
         status: "simulated",
-        action: "move_stepper",
+        action: isPumpMove ? "run_peristaltic_pump" : "move_stepper",
         device_id: block.hardwareDeviceId,
         board_id: block.hardwareBoardId,
-        amount_steps: parameters.amount_steps ?? 0,
+        amount_steps: amountSteps,
+        volume_ml: isPumpMove ? volumeMl : undefined,
+        calibration_ml_per_200_steps: isPumpMove ? calibrationMlPer200Steps : undefined,
         speed_steps_per_second: parameters.speed_steps_per_second ?? 800,
         next_output: "next",
       },

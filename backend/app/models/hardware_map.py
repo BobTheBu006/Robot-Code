@@ -30,6 +30,7 @@ class HardwareDeviceMapping(BaseModel):
     sensor_kind: HardwareSensorKind | None = None
     rotation_min_deg: float | None = None
     rotation_max_deg: float | None = None
+    calibration_ml_per_200_steps: float | None = None
     pins: list[HardwarePinMapping] = Field(default_factory=list)
     notes: str | None = None
 

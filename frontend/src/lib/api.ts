@@ -7,6 +7,8 @@ import type {
   Esp32CustomBlockSaveResponse,
   Esp32FirmwareActionResponse,
   Esp32FileSaveResponse,
+  Esp32WorkflowFirmwarePlanRequestItem,
+  Esp32WorkflowFirmwarePlanResponse,
 } from "../types/esp32Builder";
 import type {
   FunctionCancelResponse,
@@ -119,6 +121,15 @@ export function buildEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareA
 export function flashEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareActionResponse> {
   return request<Esp32FirmwareActionResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/flash`, {
     method: "POST",
+  });
+}
+
+export function planWorkflowFirmware(
+  items: Esp32WorkflowFirmwarePlanRequestItem[],
+): Promise<Esp32WorkflowFirmwarePlanResponse> {
+  return request<Esp32WorkflowFirmwarePlanResponse>("/api/esp32-builder/workflow-firmware/plan", {
+    method: "POST",
+    body: JSON.stringify({ items }),
   });
 }
 

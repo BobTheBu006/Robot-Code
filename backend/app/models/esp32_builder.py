@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.function_manifest import FunctionInputDefinition, FunctionManifest
+from app.models.function_manifest import FunctionFirmwareRequirement, FunctionInputDefinition, FunctionManifest
 
 ESP32_FUNCTION_BLUEPRINT_SCHEMA_VERSION = 1
 
@@ -73,6 +73,47 @@ class Esp32FirmwareActionResponse(BaseModel):
     log: str
     auto_reset_attempted: bool = False
     auto_reset_note: str
+
+
+class Esp32WorkflowFirmwarePlanRoutine(BaseModel):
+    routine_id: str
+    controller_role: str
+    source: str | None = None
+    protocol: str | None = None
+    entry_point: str | None = None
+    required_device_ids: list[str] = Field(default_factory=list)
+    description: str | None = None
+    source_path: str | None = None
+    source_exists: bool = False
+    block_ids: list[str] = Field(default_factory=list)
+
+
+class Esp32WorkflowFirmwareBoardPlan(BaseModel):
+    board_id: str
+    workspace_path: str | None = None
+    firmware_entry_file: str | None = None
+    routines: list[Esp32WorkflowFirmwarePlanRoutine] = Field(default_factory=list)
+    missing_sources: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class Esp32WorkflowFirmwarePlanRequestItem(BaseModel):
+    block_id: str
+    block_name: str | None = None
+    board_id: str
+    requirements: list[FunctionFirmwareRequirement] = Field(default_factory=list)
+
+
+class Esp32WorkflowFirmwarePlanRequest(BaseModel):
+    items: list[Esp32WorkflowFirmwarePlanRequestItem] = Field(default_factory=list)
+
+
+class Esp32WorkflowFirmwarePlanResponse(BaseModel):
+    ok: bool
+    boards: list[Esp32WorkflowFirmwareBoardPlan] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
 
 
 class Esp32FileSaveRequest(BaseModel):

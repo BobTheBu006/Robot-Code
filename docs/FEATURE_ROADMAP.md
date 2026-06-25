@@ -12,13 +12,18 @@ This file tracks the larger feature ideas that came from architecture planning. 
    - Remaining: add backend-side validation summaries and direct repair actions for missing hardware map references.
 
 2. Firmware requirement contract
-   - Add a real `firmware_requirements` field to function manifests and frontend types.
-   - Let each block declare the routines it needs on an ESP32.
+   - Status: implemented as manifest/block metadata
+   - Added a real `firmware_requirements` field to function manifests and frontend types.
+   - Blocks now carry the routines they need on an ESP32.
+   - Remaining: use these requirements during workflow-aware firmware assembly.
 
 3. Workflow-aware firmware assembly
+   - Status: implemented as pre-run firmware planning and source validation
    - Before running a workflow, collect every block used in the run.
    - Group requirements by controller.
-   - Build/flash one controller image containing all required routines for that workflow.
+   - The Workflow Editor now sends the collected requirements to the backend before flashing.
+   - The backend returns a per-controller routine plan and blocks the run if required source files are missing or unsafe.
+   - Remaining: generate or assemble one controller image containing all required routines for that workflow.
 
 4. Explicit advanced-to-basic hardware links
    - Make advanced functions machine-reference the generated basic blocks they depend on.

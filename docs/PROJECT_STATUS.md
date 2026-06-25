@@ -29,13 +29,18 @@ The system is a local Raspberry Pi coordinated robot-control app:
 The Hardware Map currently models:
 
 - Raspberry Pi coordinator block.
+- Devices wired directly to Raspberry Pi GPIO or I2C using `board_id: raspberry-pi`.
+- Hardware map connections can be disconnected from the canvas; disconnected devices stay visible as unconnected blocks until the operator reconnects them to the Raspberry Pi or a controller.
 - ESP32 controller blocks with USB port selection.
 - Devices connected to controllers.
 - Device types:
   - stepper motor with direction, step, enable, and three micro-step signals
+  - calibrated peristaltic pump steppers using mL per 200 full steps
   - servo with one signal pin and min/max rotation fields
   - position/limit switch sensor
   - AHT20 temperature/humidity sensor with SCL and SDA signals
+- Default Raspberry Pi AHT20 I2C device using SCL GPIO 3 and SDA GPIO 2.
+- X/Y axis motors and X/Y min/max limit switches may be mapped directly to Raspberry Pi GPIO. Current saved map uses X step/dir GPIO 17/27, Y step/dir GPIO 23/24, and XY limit switch inputs GPIO 5/6/12/13.
 - Hardware groups that collapse selected controller/device assemblies into one block while keeping a visible Raspberry Pi connection.
 
 The Hardware Map is the source of truth for USB ports, logical device IDs, pin assignments, and hardware groups.
@@ -45,7 +50,9 @@ The Hardware Map is the source of truth for USB ports, logical device IDs, pin a
 The Workflow Editor currently has:
 
 - Basic blocks for trigger, logic, and hardware-map generated device actions.
+- Calibrated peristaltic pump basic blocks generated from stepper devices with `calibration_ml_per_200_steps`.
 - Advanced functions discovered from backend function manifests.
+- Tool Change advanced function for six editable rack slots along the top-left work-area edge.
 - Compound functions created from directly connected selected blocks.
 - A separate compound-function editing canvas.
 - Individual hide/unhide behavior for palette blocks.
@@ -67,7 +74,11 @@ The same physical hardware map can support multiple code routines. A 7-syringe p
 
 ## Firmware Status
 
-Current behavior flashes ESP32 boards used by a workflow before running it.
+Current behavior prepares a workflow firmware plan before flashing ESP32 boards used by a workflow.
+
+Function manifests now expose `firmware_requirements`. Each requirement has a stable `routine_id`, controller role, optional source file, protocol, entry point, required hardware device IDs, and description. ESP32 workflow-function blueprints carry the same field under `manifest.firmware_requirements`, and generated backend manifests preserve it.
+
+Before `Run all` flashes boards, the Workflow Editor collects firmware requirements from all blocks in the run, including inner blocks inside compound functions. It sends them to the backend ESP32 builder planner. The planner groups routines by controller, resolves each source file inside that controller workspace, deduplicates repeated routine requirements, and rejects missing or unsafe source paths before flashing starts.
 
 Target architecture: firmware flashed to a controller should include every routine needed by all workflow blocks that target that controller. A workflow may call different routines on the same controller at different times. Firmware generation should be based on:
 

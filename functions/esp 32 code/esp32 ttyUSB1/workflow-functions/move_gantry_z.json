@@ -1,302 +1,322 @@
 {
-  "manifest": {
-    "id": "move_gantry_z",
-    "display_name": "Move Gantry Z",
-    "category": "Robot Actions",
-    "description": "Move the two independent Z axes to absolute positions from the calibrated origin.",
-    "version": "0.2.0",
-    "inputs": [
-      {
-        "key": "tool_port",
-        "label": "Selected ESP32",
-        "type": "file/path",
-        "description": "Connected ESP32 board that should receive the Z-axis command.",
-        "required": true,
-        "default": "/dev/ttyUSB1",
-        "placeholder": "/dev/ttyUSB1"
-      },
-      {
-        "key": "z_left_cm",
-        "label": "Left Z Position (cm)",
-        "type": "number",
-        "description": "Target left Z position measured from the calibrated origin.",
-        "required": true,
-        "default": 0
-      },
-      {
-        "key": "z_right_cm",
-        "label": "Right Z Position (cm)",
-        "type": "number",
-        "description": "Target right Z position measured from the calibrated origin.",
-        "required": true,
-        "default": 0
-      },
-      {
-        "key": "speed_profile",
-        "label": "Speed Profile",
-        "type": "select",
-        "description": "Named speed preset for the Z motion controller.",
-        "required": true,
-        "default": "normal",
-        "options": [
-          {
-            "label": "Slow",
-            "value": "slow"
-          },
-          {
-            "label": "Normal",
-            "value": "normal"
-          },
-          {
-            "label": "Fast",
-            "value": "fast"
-          }
-        ]
-      }
-    ],
-    "advanced_inputs": [
-      {
-        "key": "z_left_step_pin",
-        "label": "Left Z Step Pin",
-        "type": "number",
-        "description": "Runtime GPIO step pin for the left Z axis driver.",
-        "required": false,
-        "default": 32,
-        "advanced": true
-      },
-      {
-        "key": "z_left_dir_pin",
-        "label": "Left Z Dir Pin",
-        "type": "number",
-        "description": "Runtime GPIO direction pin for the left Z axis driver.",
-        "required": false,
-        "default": 33,
-        "advanced": true
-      },
-      {
-        "key": "z_right_step_pin",
-        "label": "Right Z Step Pin",
-        "type": "number",
-        "description": "Runtime GPIO step pin for the right Z axis driver.",
-        "required": false,
-        "default": 4,
-        "advanced": true
-      },
-      {
-        "key": "z_right_dir_pin",
-        "label": "Right Z Dir Pin",
-        "type": "number",
-        "description": "Runtime GPIO direction pin for the right Z axis driver.",
-        "required": false,
-        "default": 5,
-        "advanced": true
-      },
-      {
-        "key": "limit_switch_mode",
-        "label": "Limit Switch Layout",
-        "type": "select",
-        "description": "Choose whether the Z gantry uses 2 shared/home switches or 4 independent end-stop switches.",
-        "required": false,
-        "default": "4",
-        "advanced": true,
-        "options": [
-          {
-            "label": "2 Limit Switches",
-            "value": "2"
-          },
-          {
-            "label": "4 Limit Switches",
-            "value": "4"
-          }
-        ]
-      },
-      {
-        "key": "z_left_min_limit_pin",
-        "label": "Left Z Min Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the left Z minimum/home limit switch.",
-        "required": false,
-        "default": 12,
-        "advanced": true
-      },
-      {
-        "key": "z_left_max_limit_pin",
-        "label": "Left Z Max Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the left Z maximum limit switch.",
-        "required": false,
-        "default": 13,
-        "advanced": true
-      },
-      {
-        "key": "z_right_min_limit_pin",
-        "label": "Right Z Min Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the right Z minimum/home limit switch.",
-        "required": false,
-        "default": 14,
-        "advanced": true
-      },
-      {
-        "key": "z_right_max_limit_pin",
-        "label": "Right Z Max Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the right Z maximum limit switch.",
-        "required": false,
-        "default": 15,
-        "advanced": true
-      }
-    ],
-    "outputs": [
-      {
-        "key": "next",
-        "label": "Next",
-        "type": "flow",
-        "description": "Continue when the Z move completes."
-      }
-    ],
-    "hardware_devices": [
-      {
-        "id": "left-z-motor",
-        "name": "Left Z Motor",
-        "kind": "stepper_motor",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-stepper-left-z-motor",
-        "pins": [
-          {
-            "id": "z-left-dir",
-            "signal": "direction",
-            "function_input_key": "z_left_dir_pin"
-          },
-          {
-            "id": "z-left-step",
-            "signal": "step",
-            "function_input_key": "z_left_step_pin"
-          },
-          {
-            "id": "z-left-enable",
-            "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "z-left-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "z-left-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "z-left-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
-          }
-        ]
-      },
-      {
-        "id": "right-z-motor",
-        "name": "Right Z Motor",
-        "kind": "stepper_motor",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-stepper-right-z-motor",
-        "pins": [
-          {
-            "id": "z-right-dir",
-            "signal": "direction",
-            "function_input_key": "z_right_dir_pin"
-          },
-          {
-            "id": "z-right-step",
-            "signal": "step",
-            "function_input_key": "z_right_step_pin"
-          },
-          {
-            "id": "z-right-enable",
-            "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "z-right-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "z-right-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "z-right-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
-          }
-        ]
-      },
-      {
-        "id": "z-left-min-limit-switch",
-        "name": "Left Z Min Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-z-left-min-limit-switch",
-        "pins": [
-          {
-            "id": "z-left-min-limit",
-            "signal": "signal",
-            "function_input_key": "z_left_min_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "z-left-max-limit-switch",
-        "name": "Left Z Max Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-z-left-max-limit-switch",
-        "pins": [
-          {
-            "id": "z-left-max-limit",
-            "signal": "signal",
-            "function_input_key": "z_left_max_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "z-right-min-limit-switch",
-        "name": "Right Z Min Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-z-right-min-limit-switch",
-        "pins": [
-          {
-            "id": "z-right-min-limit",
-            "signal": "signal",
-            "function_input_key": "z_right_min_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "z-right-max-limit-switch",
-        "name": "Right Z Max Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-z-right-max-limit-switch",
-        "pins": [
-          {
-            "id": "z-right-max-limit",
-            "signal": "signal",
-            "function_input_key": "z_right_max_limit_pin"
-          }
-        ]
-      }
-    ]
-  },
-  "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z <leftCm> <rightCm> <speedProfile>.",
-  "notes": "Moves the two Z sides together while keeping independent pin and limit assignments."
+    "manifest":  {
+                     "id":  "move_gantry_z",
+                     "display_name":  "Move Gantry Z",
+                     "category":  "Robot Actions",
+                     "description":  "Move the two independent Z axes to absolute positions from the calibrated origin.",
+                     "version":  "0.2.0",
+                     "inputs":  [
+                                    {
+                                        "key":  "tool_port",
+                                        "label":  "Selected ESP32",
+                                        "type":  "file/path",
+                                        "description":  "Connected ESP32 board that should receive the Z-axis command.",
+                                        "required":  true,
+                                        "default":  "/dev/ttyUSB1",
+                                        "placeholder":  "/dev/ttyUSB1"
+                                    },
+                                    {
+                                        "key":  "z_left_cm",
+                                        "label":  "Left Z Position (cm)",
+                                        "type":  "number",
+                                        "description":  "Target left Z position measured from the calibrated origin.",
+                                        "required":  true,
+                                        "default":  0
+                                    },
+                                    {
+                                        "key":  "z_right_cm",
+                                        "label":  "Right Z Position (cm)",
+                                        "type":  "number",
+                                        "description":  "Target right Z position measured from the calibrated origin.",
+                                        "required":  true,
+                                        "default":  0
+                                    },
+                                    {
+                                        "key":  "speed_profile",
+                                        "label":  "Speed Profile",
+                                        "type":  "select",
+                                        "description":  "Named speed preset for the Z motion controller.",
+                                        "required":  true,
+                                        "default":  "normal",
+                                        "options":  [
+                                                        {
+                                                            "label":  "Slow",
+                                                            "value":  "slow"
+                                                        },
+                                                        {
+                                                            "label":  "Normal",
+                                                            "value":  "normal"
+                                                        },
+                                                        {
+                                                            "label":  "Fast",
+                                                            "value":  "fast"
+                                                        }
+                                                    ]
+                                    }
+                                ],
+                     "advanced_inputs":  [
+                                             {
+                                                 "key":  "z_left_step_pin",
+                                                 "label":  "Left Z Step Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO step pin for the left Z axis driver.",
+                                                 "required":  false,
+                                                 "default":  32,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_left_dir_pin",
+                                                 "label":  "Left Z Dir Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO direction pin for the left Z axis driver.",
+                                                 "required":  false,
+                                                 "default":  33,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_right_step_pin",
+                                                 "label":  "Right Z Step Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO step pin for the right Z axis driver.",
+                                                 "required":  false,
+                                                 "default":  4,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_right_dir_pin",
+                                                 "label":  "Right Z Dir Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO direction pin for the right Z axis driver.",
+                                                 "required":  false,
+                                                 "default":  5,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "limit_switch_mode",
+                                                 "label":  "Limit Switch Layout",
+                                                 "type":  "select",
+                                                 "description":  "Choose whether the Z gantry uses 2 shared/home switches or 4 independent end-stop switches.",
+                                                 "required":  false,
+                                                 "default":  "4",
+                                                 "advanced":  true,
+                                                 "options":  [
+                                                                 {
+                                                                     "label":  "2 Limit Switches",
+                                                                     "value":  "2"
+                                                                 },
+                                                                 {
+                                                                     "label":  "4 Limit Switches",
+                                                                     "value":  "4"
+                                                                 }
+                                                             ]
+                                             },
+                                             {
+                                                 "key":  "z_left_min_limit_pin",
+                                                 "label":  "Left Z Min Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the left Z minimum/home limit switch.",
+                                                 "required":  false,
+                                                 "default":  12,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_left_max_limit_pin",
+                                                 "label":  "Left Z Max Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the left Z maximum limit switch.",
+                                                 "required":  false,
+                                                 "default":  13,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_right_min_limit_pin",
+                                                 "label":  "Right Z Min Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the right Z minimum/home limit switch.",
+                                                 "required":  false,
+                                                 "default":  14,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "z_right_max_limit_pin",
+                                                 "label":  "Right Z Max Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the right Z maximum limit switch.",
+                                                 "required":  false,
+                                                 "default":  15,
+                                                 "advanced":  true
+                                             }
+                                         ],
+                     "outputs":  [
+                                     {
+                                         "key":  "next",
+                                         "label":  "Next",
+                                         "type":  "flow",
+                                         "description":  "Continue when the Z move completes."
+                                     }
+                                 ],
+                     "hardware_devices":  [
+                                              {
+                                                  "id":  "left-z-motor",
+                                                  "name":  "Left Z Motor",
+                                                  "kind":  "stepper_motor",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-stepper-left-z-motor",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-left-dir",
+                                                                   "signal":  "direction",
+                                                                   "function_input_key":  "z_left_dir_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "z-left-step",
+                                                                   "signal":  "step",
+                                                                   "function_input_key":  "z_left_step_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "z-left-enable",
+                                                                   "signal":  "enable",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-left-ms1",
+                                                                   "signal":  "micro_step_1",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-left-ms2",
+                                                                   "signal":  "micro_step_2",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-left-ms3",
+                                                                   "signal":  "micro_step_3",
+                                                                   "gpio":  "-"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "right-z-motor",
+                                                  "name":  "Right Z Motor",
+                                                  "kind":  "stepper_motor",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-stepper-right-z-motor",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-right-dir",
+                                                                   "signal":  "direction",
+                                                                   "function_input_key":  "z_right_dir_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "z-right-step",
+                                                                   "signal":  "step",
+                                                                   "function_input_key":  "z_right_step_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "z-right-enable",
+                                                                   "signal":  "enable",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-right-ms1",
+                                                                   "signal":  "micro_step_1",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-right-ms2",
+                                                                   "signal":  "micro_step_2",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "z-right-ms3",
+                                                                   "signal":  "micro_step_3",
+                                                                   "gpio":  "-"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "z-left-min-limit-switch",
+                                                  "name":  "Left Z Min Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-z-left-min-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-left-min-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "z_left_min_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "z-left-max-limit-switch",
+                                                  "name":  "Left Z Max Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-z-left-max-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-left-max-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "z_left_max_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "z-right-min-limit-switch",
+                                                  "name":  "Right Z Min Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-z-right-min-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-right-min-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "z_right_min_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "z-right-max-limit-switch",
+                                                  "name":  "Right Z Max Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-z-right-max-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "z-right-max-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "z_right_max_limit_pin"
+                                                               }
+                                                           ]
+                                              }
+                                          ],
+                     "schema_version":  1,
+                     "firmware_requirements":  [
+                                                   {
+                                                       "routine_id":  "move_gantry_z",
+                                                       "controller_role":  "builder_board",
+                                                       "source":  "firmware/main.ino",
+                                                       "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+                                                       "entry_point":  "move_gantry_z",
+                                                       "required_device_ids":  [
+                                                                                   "left-z-motor",
+                                                                                   "right-z-motor",
+                                                                                   "z-left-min-limit-switch",
+                                                                                   "z-left-max-limit-switch",
+                                                                                   "z-right-min-limit-switch",
+                                                                                   "z-right-max-limit-switch"
+                                                                               ],
+                                                       "description":  "Firmware routine required by Move Gantry Z."
+                                                   }
+                                               ]
+                 },
+    "firmware_entry_file":  "firmware/main.ino",
+    "protocol":  "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z \u003cleftCm\u003e \u003crightCm\u003e \u003cspeedProfile\u003e.",
+    "notes":  "Moves the two Z sides together while keeping independent pin and limit assignments.",
+    "schema_version":  1
 }

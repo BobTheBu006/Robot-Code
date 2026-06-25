@@ -47,9 +47,22 @@ export interface WorkflowHardwareDeviceReference {
   sensor_kind?: WorkflowHardwareSensorKind | null;
   rotation_min_deg?: number | null;
   rotation_max_deg?: number | null;
+  calibration_ml_per_200_steps?: number | null;
   pins: WorkflowHardwarePinReference[];
   basic_block_id?: string | null;
   notes?: string | null;
+}
+
+export type WorkflowFirmwareControllerRole = "builder_board" | "device_board" | "raspberry_pi" | "any_controller";
+
+export interface WorkflowFirmwareRequirement {
+  routine_id: string;
+  controller_role: WorkflowFirmwareControllerRole;
+  source?: string | null;
+  protocol?: string | null;
+  entry_point?: string | null;
+  required_device_ids: string[];
+  description?: string | null;
 }
 
 export interface WorkflowCompoundOutputDefinition extends WorkflowOutputDefinition {
@@ -67,6 +80,7 @@ export interface FunctionManifest {
   inputs: WorkflowInputDefinition[];
   advanced_inputs?: WorkflowInputDefinition[];
   hardware_devices?: WorkflowHardwareDeviceReference[];
+  firmware_requirements?: WorkflowFirmwareRequirement[];
   outputs: Array<{
     key: string;
     label: string;
@@ -137,7 +151,9 @@ export interface WorkflowBlockDefinition {
   hardwareDeviceId?: string | null;
   hardwareDeviceKind?: "stepper_motor" | "servo" | "sensor" | null;
   hardwareBoardId?: string | null;
+  hardwareCalibrationMlPer200Steps?: number | null;
   hardwareDevices?: WorkflowHardwareDeviceReference[];
+  firmwareRequirements?: WorkflowFirmwareRequirement[];
   referencedBasicBlockIds?: string[];
   compound?: WorkflowCompoundDefinition | null;
   builderBoardId?: string | null;

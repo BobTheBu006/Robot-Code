@@ -7,13 +7,19 @@ These contracts are intended to stay stable from the public `v0.1 beta` release 
 The Hardware Map owns physical wiring and grouping:
 
 - USB port to controller
+- Raspberry Pi GPIO/I2C direct device wiring
 - controller to device
 - device kind
 - device logical ID
 - device pins and signal names
+- device calibration metadata such as pump mL per 200 motor steps
 - controller/device groups
 
 Functions, firmware, and workflow blocks must not treat private pin maps as the source of truth. They may provide defaults or requirements, but the Hardware Map resolves the actual physical setup.
+
+Devices wired directly to the Pi use `board_id: raspberry-pi`. This is a virtual controller ID and must not create a duplicate ESP32/controller block.
+
+Devices with an empty `board_id` are intentionally unconnected. The UI must keep them visible so they can be reconnected instead of silently deleting or reassigning them.
 
 ## Contract 2: Logical Device IDs Are Stable
 
@@ -39,6 +45,7 @@ Each declared device should include:
 - optional `sensor_kind`
 - optional `board_id`
 - required signal rows in `pins`
+- optional calibration metadata such as `calibration_ml_per_200_steps` for peristaltic pump steppers
 - optional `function_input_key` links for fields that can be configured by function inputs
 - optional `basic_block_id` for the generated primitive block
 
@@ -105,9 +112,13 @@ The firmware build/flash step should be driven by:
 - blocks used by that workflow
 - hardware devices referenced by those blocks
 - Hardware Map pin assignments
-- firmware requirements declared by modules/functions
+- `firmware_requirements` declared by modules/functions
 
 The backend should build or assemble one firmware image per controller and flash each used controller before workflow execution. The image must include every routine needed by that controller during the workflow, not only the first block that uses it.
+
+Each firmware requirement should carry a stable `routine_id`, controller targeting role, source file or fragment, protocol, optional entry point, and any required logical device IDs.
+
+Current implementation note: `POST /api/esp32-builder/workflow-firmware/plan` is the backend boundary for collecting and validating per-controller requirements before flashing. Future code generation should extend this plan into actual assembled firmware images instead of introducing a separate path.
 
 ## Contract 9: Missing References Stay Visible
 

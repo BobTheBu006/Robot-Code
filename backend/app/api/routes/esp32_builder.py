@@ -9,6 +9,8 @@ from app.models.esp32_builder import (
     Esp32FirmwareActionResponse,
     Esp32FileSaveRequest,
     Esp32FileSaveResponse,
+    Esp32WorkflowFirmwarePlanRequest,
+    Esp32WorkflowFirmwarePlanResponse,
 )
 from app.services.esp32_builder import Esp32BuilderError, esp32_builder_service
 
@@ -52,6 +54,16 @@ def build_esp32_board_firmware(board_id: str) -> Esp32FirmwareActionResponse:
 def flash_esp32_board_firmware(board_id: str) -> Esp32FirmwareActionResponse:
     try:
         return esp32_builder_service.flash_firmware(board_id)
+    except Esp32BuilderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/workflow-firmware/plan", response_model=Esp32WorkflowFirmwarePlanResponse)
+def plan_workflow_firmware(
+    request: Esp32WorkflowFirmwarePlanRequest,
+) -> Esp32WorkflowFirmwarePlanResponse:
+    try:
+        return esp32_builder_service.plan_workflow_firmware(request)
     except Esp32BuilderError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

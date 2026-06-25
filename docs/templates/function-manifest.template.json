@@ -36,6 +36,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "example-stepper-dir",
@@ -88,7 +89,13 @@
     {
       "routine_id": "example_stepper_move",
       "controller_role": "device_board",
-      "source": "firmware/example_stepper_move.ino"
+      "source": "firmware/example_stepper_move.ino",
+      "protocol": "serial-text",
+      "entry_point": "example_stepper_move",
+      "required_device_ids": [
+        "example-stepper"
+      ],
+      "description": "Firmware routine that moves the example stepper."
     }
   ],
   "builder_board_id": null,

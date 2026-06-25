@@ -27,6 +27,7 @@ import {
   fetchHardwareMap,
   fetchSavedWorkflow,
   flashEsp32BoardFirmware,
+  planWorkflowFirmware,
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
@@ -60,12 +61,13 @@ import type {
   WorkflowCanvasNode,
   WorkflowExecutionStatus,
   WorkflowFailureMode,
+  WorkflowFirmwareRequirement,
   WorkflowInputDefinition,
   WorkflowNodeData,
   WorkflowParameterValue,
   WorkflowOutputDefinition,
 } from "../../types/workflow";
-import type { Esp32CustomBlockSaveResponse } from "../../types/esp32Builder";
+import type { Esp32CustomBlockSaveResponse, Esp32WorkflowFirmwarePlanRequestItem } from "../../types/esp32Builder";
 import type { Esp32BoardSummary } from "../../types/esp32Builder";
 import type { HardwareMap } from "../../types/hardwareMap";
 import { Panel } from "../Panel";
@@ -98,6 +100,11 @@ type CompoundOutputBuild = WorkflowOutputDefinition & {
   sourceNodeId: string;
   sourceHandle?: string | null;
 };
+const RASPBERRY_BOARD_ID = "raspberry-pi";
+
+function isEsp32WorkflowBoardId(boardId: string | null | undefined): boardId is string {
+  return Boolean(boardId) && boardId !== RASPBERRY_BOARD_ID;
+}
 
 function isClientExecutedBlock(block: WorkflowBlockDefinition): boolean {
   return block.kind === "basic" || block.kind === "built-in" || block.kind === "compound" || block.kind === "broken";
@@ -1787,11 +1794,11 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     block: WorkflowBlockDefinition,
     boardIds: Set<string>,
   ) {
-    if (block.builderBoardId) {
+    if (isEsp32WorkflowBoardId(block.builderBoardId)) {
       boardIds.add(block.builderBoardId);
     }
 
-    if (block.hardwareBoardId) {
+    if (isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
 
@@ -1813,6 +1820,157 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     }
 
     return Array.from(boardIds);
+  }
+
+  function addHardwareDeviceBoardIds(
+    block: WorkflowBlockDefinition,
+    deviceIds: string[],
+    boardIds: Set<string>,
+  ) {
+    for (const deviceId of deviceIds) {
+      const blockDevice = block.hardwareDevices?.find((device) => device.id === deviceId);
+      if (isEsp32WorkflowBoardId(blockDevice?.board_id)) {
+        boardIds.add(blockDevice.board_id);
+        continue;
+      }
+
+      const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceId);
+      if (isEsp32WorkflowBoardId(mappedDevice?.board_id)) {
+        boardIds.add(mappedDevice.board_id);
+      }
+    }
+  }
+
+  function getBoardIdsForFirmwareRequirement(
+    block: WorkflowBlockDefinition,
+    requirement: WorkflowFirmwareRequirement,
+  ): string[] {
+    if (requirement.controller_role === "raspberry_pi") {
+      return [];
+    }
+
+    const boardIds = new Set<string>();
+
+    if (requirement.controller_role === "device_board") {
+      addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
+      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+        boardIds.add(block.hardwareBoardId);
+      }
+      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.builderBoardId)) {
+        boardIds.add(block.builderBoardId);
+      }
+      return Array.from(boardIds);
+    }
+
+    if (requirement.controller_role === "builder_board") {
+      if (isEsp32WorkflowBoardId(block.builderBoardId)) {
+        boardIds.add(block.builderBoardId);
+      }
+      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+        boardIds.add(block.hardwareBoardId);
+      }
+      if (boardIds.size === 0) {
+        addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
+      }
+      return Array.from(boardIds);
+    }
+
+    if (isEsp32WorkflowBoardId(block.builderBoardId)) {
+      boardIds.add(block.builderBoardId);
+    }
+    if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+      boardIds.add(block.hardwareBoardId);
+    }
+    if (boardIds.size === 0) {
+      addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
+    }
+
+    return Array.from(boardIds);
+  }
+
+  function addWorkflowFirmwarePlanItem(
+    itemsByKey: Map<string, Esp32WorkflowFirmwarePlanRequestItem>,
+    blockId: string,
+    block: WorkflowBlockDefinition,
+    boardId: string,
+    requirement: WorkflowFirmwareRequirement,
+  ) {
+    const itemKey = `${blockId}:${boardId}`;
+    const existingItem = itemsByKey.get(itemKey);
+    if (existingItem) {
+      existingItem.requirements.push(requirement);
+      return;
+    }
+
+    itemsByKey.set(itemKey, {
+      block_id: blockId,
+      block_name: block.displayName,
+      board_id: boardId,
+      requirements: [requirement],
+    });
+  }
+
+  function collectWorkflowFirmwarePlanItemsFromBlock(
+    block: WorkflowBlockDefinition,
+    blockId: string,
+    itemsByKey: Map<string, Esp32WorkflowFirmwarePlanRequestItem>,
+  ) {
+    for (const requirement of block.firmwareRequirements ?? []) {
+      const boardIds = getBoardIdsForFirmwareRequirement(block, requirement);
+      for (const boardId of boardIds) {
+        addWorkflowFirmwarePlanItem(itemsByKey, blockId, block, boardId, requirement);
+      }
+    }
+
+    for (const innerNode of block.compound?.nodes ?? []) {
+      collectWorkflowFirmwarePlanItemsFromBlock(
+        innerNode.data.block,
+        `${blockId}/${innerNode.id}`,
+        itemsByKey,
+      );
+    }
+  }
+
+  function collectWorkflowFirmwarePlanItemsForRun(
+    orderedNodeIds: string[],
+  ): Esp32WorkflowFirmwarePlanRequestItem[] {
+    const itemsByKey = new Map<string, Esp32WorkflowFirmwarePlanRequestItem>();
+
+    for (const nodeId of orderedNodeIds) {
+      const node = nodeLookup.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      collectWorkflowFirmwarePlanItemsFromBlock(node.data.block, nodeId, itemsByKey);
+    }
+
+    return Array.from(itemsByKey.values());
+  }
+
+  function summarizeWorkflowFirmwarePlanFailure(errors: string[], warnings: string[]): string {
+    const details = errors.length > 0 ? errors : warnings;
+    if (details.length === 0) {
+      return "Could not prepare ESP32 firmware for this workflow.";
+    }
+
+    return `Could not prepare ESP32 firmware for this workflow. ${details.slice(0, 4).join(" ")}`;
+  }
+
+  async function prepareEsp32FirmwareForRun(
+    planItems: Esp32WorkflowFirmwarePlanRequestItem[],
+    fallbackBoardIds: string[],
+  ): Promise<string[]> {
+    if (planItems.length === 0) {
+      return fallbackBoardIds;
+    }
+
+    const plan = await planWorkflowFirmware(planItems);
+    if (!plan.ok) {
+      throw new Error(summarizeWorkflowFirmwarePlanFailure(plan.errors, plan.warnings));
+    }
+
+    return Array.from(new Set([...fallbackBoardIds, ...plan.boards.map((board) => board.board_id)]));
   }
 
   async function flashEsp32BoardsForRun(boardIds: string[]) {
@@ -1848,14 +2006,16 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     for (const nodeId of rootNodeIds) {
       collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
     }
-    const boardIdsToFlash = collectEsp32BoardIdsForRun(orderedNodeIds);
+    const fallbackBoardIdsToFlash = collectEsp32BoardIdsForRun(orderedNodeIds);
+    const firmwarePlanItems = collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
+    const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
     setFunctionsError(null);
     setSelectedNodeId(null);
     setOpenedNodeId(null);
     setWorkflowRunState({
       isRunning: true,
-      phase: boardIdsToFlash.length > 0 ? "flashing" : "running",
+      phase: hasEsp32FirmwareWork ? "flashing" : "running",
       orderedNodeIds,
       currentNodeId: null,
       completedNodeIds: [],
@@ -1865,6 +2025,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     const resultsByNodeId = new Map<string, FunctionTestResponse>();
 
     try {
+      const boardIdsToFlash = await prepareEsp32FirmwareForRun(firmwarePlanItems, fallbackBoardIdsToFlash);
       await flashEsp32BoardsForRun(boardIdsToFlash);
       setWorkflowRunState((currentState) => ({
         ...currentState,

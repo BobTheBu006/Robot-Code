@@ -191,6 +191,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-dir",
@@ -246,6 +247,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-dir",
@@ -301,6 +303,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-min-limit",
@@ -321,6 +324,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-left-max-limit",
@@ -341,6 +345,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-min-limit",
@@ -361,6 +366,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "z-right-max-limit",
@@ -372,6 +378,24 @@
       ],
       "basic_block_id": "basic-sensor-z-right-max-limit-switch",
       "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "move_gantry_z",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, MOVE Z <leftCm> <rightCm> <speedProfile>.",
+      "entry_point": "move_gantry_z",
+      "required_device_ids": [
+        "left-z-motor",
+        "right-z-motor",
+        "z-left-min-limit-switch",
+        "z-left-max-limit-switch",
+        "z-right-min-limit-switch",
+        "z-right-max-limit-switch"
+      ],
+      "description": "Firmware routine required by Move Gantry Z."
     }
   ],
   "builder_board_id": "ttyUSB1",

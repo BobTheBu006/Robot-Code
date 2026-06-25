@@ -8,6 +8,7 @@ SUPPORTED_FUNCTION_MANIFEST_SCHEMA_VERSIONS = {1}
 FunctionInputType = Literal["string", "number", "boolean", "select", "file/path"]
 FunctionHardwareDeviceKind = Literal["stepper_motor", "servo", "sensor"]
 FunctionHardwareSensorKind = Literal["position_limit_switch", "aht20_temperature_humidity"]
+FunctionFirmwareControllerRole = Literal["builder_board", "device_board", "raspberry_pi", "any_controller"]
 
 
 class FunctionInputOption(BaseModel):
@@ -56,9 +57,20 @@ class FunctionHardwareDeviceReference(BaseModel):
     sensor_kind: FunctionHardwareSensorKind | None = None
     rotation_min_deg: float | None = None
     rotation_max_deg: float | None = None
+    calibration_ml_per_200_steps: float | None = None
     pins: list[FunctionHardwarePinReference] = Field(default_factory=list)
     basic_block_id: str | None = None
     notes: str | None = None
+
+
+class FunctionFirmwareRequirement(BaseModel):
+    routine_id: str = Field(min_length=1)
+    controller_role: FunctionFirmwareControllerRole = "builder_board"
+    source: str | None = None
+    protocol: str | None = None
+    entry_point: str | None = None
+    required_device_ids: list[str] = Field(default_factory=list)
+    description: str | None = None
 
 
 class FunctionManifest(BaseModel):
@@ -72,6 +84,7 @@ class FunctionManifest(BaseModel):
     advanced_inputs: list[FunctionInputDefinition] = Field(default_factory=list)
     outputs: list[FunctionOutputDefinition] = Field(default_factory=list)
     hardware_devices: list[FunctionHardwareDeviceReference] = Field(default_factory=list)
+    firmware_requirements: list[FunctionFirmwareRequirement] = Field(default_factory=list)
     builder_board_id: str | None = None
     builder_source_path: str | None = None
     builder_workspace_path: str | None = None

@@ -88,6 +88,7 @@ class HardwareMapService:
                     sensor_kind=device_reference.sensor_kind,
                     rotation_min_deg=device_reference.rotation_min_deg,
                     rotation_max_deg=device_reference.rotation_max_deg,
+                    calibration_ml_per_200_steps=device_reference.calibration_ml_per_200_steps,
                     pins=[
                         HardwarePinMapping(
                             id=pin.id,
@@ -200,6 +201,14 @@ class HardwareMapService:
         manifest: FunctionManifest,
         default_port: str | None,
     ) -> tuple[HardwareBoardMapping, bool]:
+        if board_id == "raspberry-pi":
+            return HardwareBoardMapping(
+                id="raspberry-pi",
+                label="Raspberry Pi",
+                usb_port="GPIO/I2C",
+                notes="Virtual controller for devices wired directly to Raspberry Pi GPIO or I2C.",
+            ), False
+
         existing_board = next((board for board in boards if board.id == board_id), None)
         if existing_board:
             return existing_board, False
@@ -284,6 +293,11 @@ class HardwareMapService:
             "sensor_kind": next_device.sensor_kind,
             "rotation_min_deg": existing_device.rotation_min_deg if existing_device.rotation_min_deg is not None else next_device.rotation_min_deg,
             "rotation_max_deg": existing_device.rotation_max_deg if existing_device.rotation_max_deg is not None else next_device.rotation_max_deg,
+            "calibration_ml_per_200_steps": (
+                existing_device.calibration_ml_per_200_steps
+                if existing_device.calibration_ml_per_200_steps is not None
+                else next_device.calibration_ml_per_200_steps
+            ),
             "pins": merged_pins,
             "notes": existing_device.notes or next_device.notes,
         })
@@ -327,6 +341,31 @@ class HardwareMapService:
                 ],
             )
             for head_key, head_label, step_pin, dir_pin in syringe_heads
+        ]
+        peristaltic_pumps = [
+            ("suction-pump", "Suction Pump", "suction_pump"),
+            ("beads-medium-pump", "Beads Medium Pump", "beads_medium_pump"),
+            ("beads-creation-pump", "Beads Creation Pump", "beads_creation_pump"),
+            ("beads-solution-pump", "Beads Solution Pump", "beads_solution_pump"),
+        ]
+        peristaltic_pump_devices = [
+            HardwareDeviceMapping(
+                id=pump_id,
+                board_id=syringe_board.id,
+                name=pump_name,
+                kind="stepper_motor",
+                calibration_ml_per_200_steps=1.0,
+                pins=[
+                    _pin(f"{pump_id}-dir", "direction", "-", f"{input_prefix}_dir_pin"),
+                    _pin(f"{pump_id}-step", "step", "-", f"{input_prefix}_step_pin"),
+                    _pin(f"{pump_id}-enable", "enable", "-", None),
+                    _pin(f"{pump_id}-ms1", "micro_step_1", "-", None),
+                    _pin(f"{pump_id}-ms2", "micro_step_2", "-", None),
+                    _pin(f"{pump_id}-ms3", "micro_step_3", "-", None),
+                ],
+                notes="Peristaltic pump stepper. Calibrate by entering mL per 200 full steps.",
+            )
+            for pump_id, pump_name, input_prefix in peristaltic_pumps
         ]
 
         gantry_devices = [
@@ -388,42 +427,42 @@ class HardwareMapService:
             ),
             HardwareDeviceMapping(
                 id="x-min-limit-switch",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="X Min Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("x-min-limit", "signal", 21, "x_min_limit_pin"),
+                    _pin("x-min-limit", "signal", 5, "x_min_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
                 id="x-max-limit-switch",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="X Max Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("x-max-limit", "signal", 22, "x_max_limit_pin"),
+                    _pin("x-max-limit", "signal", 6, "x_max_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
                 id="y-min-limit-switch",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="Y Min Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("y-min-limit", "signal", 23, "y_min_limit_pin"),
+                    _pin("y-min-limit", "signal", 12, "y_min_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
                 id="y-max-limit-switch",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="Y Max Limit Switch",
                 kind="sensor",
                 sensor_kind="position_limit_switch",
                 pins=[
-                    _pin("y-max-limit", "signal", 25, "y_max_limit_pin"),
+                    _pin("y-max-limit", "signal", 13, "y_max_limit_pin"),
                 ],
             ),
             HardwareDeviceMapping(
@@ -466,12 +505,34 @@ class HardwareMapService:
                     _pin("z-right-max-limit", "signal", 15, "z_right_max_limit_pin"),
                 ],
             ),
+            HardwareDeviceMapping(
+                id="raspberry-aht20",
+                board_id="raspberry-pi",
+                name="Raspberry AHT20 Temperature + Humidity",
+                kind="sensor",
+                sensor_kind="aht20_temperature_humidity",
+                pins=[
+                    HardwarePinMapping(
+                        id="raspberry-aht20-scl",
+                        signal="scl",
+                        gpio="3",
+                        notes="Raspberry Pi I2C SCL1.",
+                    ),
+                    HardwarePinMapping(
+                        id="raspberry-aht20-sda",
+                        signal="sda",
+                        gpio="2",
+                        notes="Raspberry Pi I2C SDA1.",
+                    ),
+                ],
+                notes="AHT20 development board connected directly to Raspberry Pi I2C.",
+            ),
         ]
 
         return HardwareMap(
             version=1,
             boards=[syringe_board, gantry_board],
-            devices=[*syringe_devices, *gantry_devices],
+            devices=[*syringe_devices, *peristaltic_pump_devices, *gantry_devices],
             updated_at=None,
         )
 

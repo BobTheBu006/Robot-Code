@@ -191,6 +191,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-dir",
@@ -246,6 +247,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-dir",
@@ -301,6 +303,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-min-limit",
@@ -321,6 +324,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "x-max-limit",
@@ -341,6 +345,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-min-limit",
@@ -361,6 +366,7 @@
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "y-max-limit",
@@ -372,6 +378,24 @@
       ],
       "basic_block_id": "basic-sensor-y-max-limit-switch",
       "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "move_gantry",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "Serial commands: PING, SET XY PINS <xStep> <xDir> <yStep> <yDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, MOVE XY <xCm> <yCm> <speedProfile>.",
+      "entry_point": "move_gantry",
+      "required_device_ids": [
+        "x-axis-motor",
+        "y-axis-motor",
+        "x-min-limit-switch",
+        "x-max-limit-switch",
+        "y-min-limit-switch",
+        "y-max-limit-switch"
+      ],
+      "description": "Firmware routine required by Move Gantry XY."
     }
   ],
   "builder_board_id": "ttyUSB1",

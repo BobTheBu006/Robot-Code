@@ -312,6 +312,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-a-dir",
@@ -367,6 +368,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-b-dir",
@@ -422,6 +424,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-c-dir",
@@ -477,6 +480,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-d-dir",
@@ -532,6 +536,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-e-dir",
@@ -587,6 +592,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-f-dir",
@@ -642,6 +648,7 @@
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
       "pins": [
         {
           "id": "head-g-dir",
@@ -688,6 +695,25 @@
       ],
       "basic_block_id": "basic-stepper-syringe-head-g",
       "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "dispense",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "serial-text",
+      "entry_point": "dispense",
+      "required_device_ids": [
+        "syringe-head-a",
+        "syringe-head-b",
+        "syringe-head-c",
+        "syringe-head-d",
+        "syringe-head-e",
+        "syringe-head-f",
+        "syringe-head-g"
+      ],
+      "description": "Firmware routine required by 7 Syringe Dispenser."
     }
   ],
   "builder_board_id": "ttyUSB0",

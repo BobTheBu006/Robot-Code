@@ -1,302 +1,322 @@
 {
-  "manifest": {
-    "id": "move_gantry",
-    "display_name": "Move Gantry XY",
-    "category": "Robot Actions",
-    "description": "Move the XY gantry to an absolute position from the calibrated origin.",
-    "version": "0.3.0",
-    "inputs": [
-      {
-        "key": "tool_port",
-        "label": "Selected ESP32",
-        "type": "file/path",
-        "description": "Connected ESP32 board that should receive the XY gantry command.",
-        "required": true,
-        "default": "/dev/ttyUSB1",
-        "placeholder": "/dev/ttyUSB1"
-      },
-      {
-        "key": "x_cm",
-        "label": "X Position (cm)",
-        "type": "number",
-        "description": "Target X position measured from the calibrated origin.",
-        "required": true,
-        "default": 0
-      },
-      {
-        "key": "y_cm",
-        "label": "Y Position (cm)",
-        "type": "number",
-        "description": "Target Y position measured from the calibrated origin.",
-        "required": true,
-        "default": 0
-      },
-      {
-        "key": "speed_profile",
-        "label": "Speed Profile",
-        "type": "select",
-        "description": "Named speed preset for the XY motion controller.",
-        "required": true,
-        "default": "normal",
-        "options": [
-          {
-            "label": "Slow",
-            "value": "slow"
-          },
-          {
-            "label": "Normal",
-            "value": "normal"
-          },
-          {
-            "label": "Fast",
-            "value": "fast"
-          }
-        ]
-      }
-    ],
-    "advanced_inputs": [
-      {
-        "key": "x_step_pin",
-        "label": "X Step Pin",
-        "type": "number",
-        "description": "Runtime GPIO step pin for the X axis driver.",
-        "required": false,
-        "default": 16,
-        "advanced": true
-      },
-      {
-        "key": "x_dir_pin",
-        "label": "X Dir Pin",
-        "type": "number",
-        "description": "Runtime GPIO direction pin for the X axis driver.",
-        "required": false,
-        "default": 17,
-        "advanced": true
-      },
-      {
-        "key": "y_step_pin",
-        "label": "Y Step Pin",
-        "type": "number",
-        "description": "Runtime GPIO step pin for the Y axis driver.",
-        "required": false,
-        "default": 18,
-        "advanced": true
-      },
-      {
-        "key": "y_dir_pin",
-        "label": "Y Dir Pin",
-        "type": "number",
-        "description": "Runtime GPIO direction pin for the Y axis driver.",
-        "required": false,
-        "default": 19,
-        "advanced": true
-      },
-      {
-        "key": "limit_switch_mode",
-        "label": "Limit Switch Layout",
-        "type": "select",
-        "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
-        "required": false,
-        "default": "4",
-        "advanced": true,
-        "options": [
-          {
-            "label": "2 Limit Switches",
-            "value": "2"
-          },
-          {
-            "label": "4 Limit Switches",
-            "value": "4"
-          }
-        ]
-      },
-      {
-        "key": "x_min_limit_pin",
-        "label": "X Min Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the X minimum/home limit switch.",
-        "required": false,
-        "default": 21,
-        "advanced": true
-      },
-      {
-        "key": "x_max_limit_pin",
-        "label": "X Max Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the X maximum limit switch.",
-        "required": false,
-        "default": 22,
-        "advanced": true
-      },
-      {
-        "key": "y_min_limit_pin",
-        "label": "Y Min Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the Y minimum/home limit switch.",
-        "required": false,
-        "default": 23,
-        "advanced": true
-      },
-      {
-        "key": "y_max_limit_pin",
-        "label": "Y Max Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the Y maximum limit switch.",
-        "required": false,
-        "default": 25,
-        "advanced": true
-      }
-    ],
-    "outputs": [
-      {
-        "key": "next",
-        "label": "Next",
-        "type": "flow",
-        "description": "Continue when the XY move completes."
-      }
-    ],
-    "hardware_devices": [
-      {
-        "id": "x-axis-motor",
-        "name": "X Axis Motor",
-        "kind": "stepper_motor",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-stepper-x-axis-motor",
-        "pins": [
-          {
-            "id": "x-dir",
-            "signal": "direction",
-            "function_input_key": "x_dir_pin"
-          },
-          {
-            "id": "x-step",
-            "signal": "step",
-            "function_input_key": "x_step_pin"
-          },
-          {
-            "id": "x-enable",
-            "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
-          }
-        ]
-      },
-      {
-        "id": "y-axis-motor",
-        "name": "Y Axis Motor",
-        "kind": "stepper_motor",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-stepper-y-axis-motor",
-        "pins": [
-          {
-            "id": "y-dir",
-            "signal": "direction",
-            "function_input_key": "y_dir_pin"
-          },
-          {
-            "id": "y-step",
-            "signal": "step",
-            "function_input_key": "y_step_pin"
-          },
-          {
-            "id": "y-enable",
-            "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
-          }
-        ]
-      },
-      {
-        "id": "x-min-limit-switch",
-        "name": "X Min Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-x-min-limit-switch",
-        "pins": [
-          {
-            "id": "x-min-limit",
-            "signal": "signal",
-            "function_input_key": "x_min_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "x-max-limit-switch",
-        "name": "X Max Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-x-max-limit-switch",
-        "pins": [
-          {
-            "id": "x-max-limit",
-            "signal": "signal",
-            "function_input_key": "x_max_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "y-min-limit-switch",
-        "name": "Y Min Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-y-min-limit-switch",
-        "pins": [
-          {
-            "id": "y-min-limit",
-            "signal": "signal",
-            "function_input_key": "y_min_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "y-max-limit-switch",
-        "name": "Y Max Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB1",
-        "basic_block_id": "basic-sensor-y-max-limit-switch",
-        "pins": [
-          {
-            "id": "y-max-limit",
-            "signal": "signal",
-            "function_input_key": "y_max_limit_pin"
-          }
-        ]
-      }
-    ]
-  },
-  "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: PING, SET XY PINS <xStep> <xDir> <yStep> <yDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, MOVE XY <xCm> <yCm> <speedProfile>.",
-  "notes": "This board workspace owns the XY gantry movement function. Runtime pin and limit inputs are sent to the ESP32 before each move."
+    "manifest":  {
+                     "id":  "move_gantry",
+                     "display_name":  "Move Gantry XY",
+                     "category":  "Robot Actions",
+                     "description":  "Move the XY gantry to an absolute position from the calibrated origin.",
+                     "version":  "0.3.0",
+                     "inputs":  [
+                                    {
+                                        "key":  "tool_port",
+                                        "label":  "Selected ESP32",
+                                        "type":  "file/path",
+                                        "description":  "Connected ESP32 board that should receive the XY gantry command.",
+                                        "required":  true,
+                                        "default":  "/dev/ttyUSB1",
+                                        "placeholder":  "/dev/ttyUSB1"
+                                    },
+                                    {
+                                        "key":  "x_cm",
+                                        "label":  "X Position (cm)",
+                                        "type":  "number",
+                                        "description":  "Target X position measured from the calibrated origin.",
+                                        "required":  true,
+                                        "default":  0
+                                    },
+                                    {
+                                        "key":  "y_cm",
+                                        "label":  "Y Position (cm)",
+                                        "type":  "number",
+                                        "description":  "Target Y position measured from the calibrated origin.",
+                                        "required":  true,
+                                        "default":  0
+                                    },
+                                    {
+                                        "key":  "speed_profile",
+                                        "label":  "Speed Profile",
+                                        "type":  "select",
+                                        "description":  "Named speed preset for the XY motion controller.",
+                                        "required":  true,
+                                        "default":  "normal",
+                                        "options":  [
+                                                        {
+                                                            "label":  "Slow",
+                                                            "value":  "slow"
+                                                        },
+                                                        {
+                                                            "label":  "Normal",
+                                                            "value":  "normal"
+                                                        },
+                                                        {
+                                                            "label":  "Fast",
+                                                            "value":  "fast"
+                                                        }
+                                                    ]
+                                    }
+                                ],
+                     "advanced_inputs":  [
+                                             {
+                                                 "key":  "x_step_pin",
+                                                 "label":  "X Step Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO step pin for the X axis driver.",
+                                                 "required":  false,
+                                                 "default":  16,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "x_dir_pin",
+                                                 "label":  "X Dir Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO direction pin for the X axis driver.",
+                                                 "required":  false,
+                                                 "default":  17,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "y_step_pin",
+                                                 "label":  "Y Step Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO step pin for the Y axis driver.",
+                                                 "required":  false,
+                                                 "default":  18,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "y_dir_pin",
+                                                 "label":  "Y Dir Pin",
+                                                 "type":  "number",
+                                                 "description":  "Runtime GPIO direction pin for the Y axis driver.",
+                                                 "required":  false,
+                                                 "default":  19,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "limit_switch_mode",
+                                                 "label":  "Limit Switch Layout",
+                                                 "type":  "select",
+                                                 "description":  "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
+                                                 "required":  false,
+                                                 "default":  "4",
+                                                 "advanced":  true,
+                                                 "options":  [
+                                                                 {
+                                                                     "label":  "2 Limit Switches",
+                                                                     "value":  "2"
+                                                                 },
+                                                                 {
+                                                                     "label":  "4 Limit Switches",
+                                                                     "value":  "4"
+                                                                 }
+                                                             ]
+                                             },
+                                             {
+                                                 "key":  "x_min_limit_pin",
+                                                 "label":  "X Min Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the X minimum/home limit switch.",
+                                                 "required":  false,
+                                                 "default":  21,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "x_max_limit_pin",
+                                                 "label":  "X Max Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the X maximum limit switch.",
+                                                 "required":  false,
+                                                 "default":  22,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "y_min_limit_pin",
+                                                 "label":  "Y Min Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the Y minimum/home limit switch.",
+                                                 "required":  false,
+                                                 "default":  23,
+                                                 "advanced":  true
+                                             },
+                                             {
+                                                 "key":  "y_max_limit_pin",
+                                                 "label":  "Y Max Limit Pin",
+                                                 "type":  "number",
+                                                 "description":  "GPIO pin for the Y maximum limit switch.",
+                                                 "required":  false,
+                                                 "default":  25,
+                                                 "advanced":  true
+                                             }
+                                         ],
+                     "outputs":  [
+                                     {
+                                         "key":  "next",
+                                         "label":  "Next",
+                                         "type":  "flow",
+                                         "description":  "Continue when the XY move completes."
+                                     }
+                                 ],
+                     "hardware_devices":  [
+                                              {
+                                                  "id":  "x-axis-motor",
+                                                  "name":  "X Axis Motor",
+                                                  "kind":  "stepper_motor",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-stepper-x-axis-motor",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "x-dir",
+                                                                   "signal":  "direction",
+                                                                   "function_input_key":  "x_dir_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "x-step",
+                                                                   "signal":  "step",
+                                                                   "function_input_key":  "x_step_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "x-enable",
+                                                                   "signal":  "enable",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "x-ms1",
+                                                                   "signal":  "micro_step_1",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "x-ms2",
+                                                                   "signal":  "micro_step_2",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "x-ms3",
+                                                                   "signal":  "micro_step_3",
+                                                                   "gpio":  "-"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "y-axis-motor",
+                                                  "name":  "Y Axis Motor",
+                                                  "kind":  "stepper_motor",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-stepper-y-axis-motor",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "y-dir",
+                                                                   "signal":  "direction",
+                                                                   "function_input_key":  "y_dir_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "y-step",
+                                                                   "signal":  "step",
+                                                                   "function_input_key":  "y_step_pin"
+                                                               },
+                                                               {
+                                                                   "id":  "y-enable",
+                                                                   "signal":  "enable",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "y-ms1",
+                                                                   "signal":  "micro_step_1",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "y-ms2",
+                                                                   "signal":  "micro_step_2",
+                                                                   "gpio":  "-"
+                                                               },
+                                                               {
+                                                                   "id":  "y-ms3",
+                                                                   "signal":  "micro_step_3",
+                                                                   "gpio":  "-"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "x-min-limit-switch",
+                                                  "name":  "X Min Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-x-min-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "x-min-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "x_min_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "x-max-limit-switch",
+                                                  "name":  "X Max Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-x-max-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "x-max-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "x_max_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "y-min-limit-switch",
+                                                  "name":  "Y Min Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-y-min-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "y-min-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "y_min_limit_pin"
+                                                               }
+                                                           ]
+                                              },
+                                              {
+                                                  "id":  "y-max-limit-switch",
+                                                  "name":  "Y Max Limit Switch",
+                                                  "kind":  "sensor",
+                                                  "sensor_kind":  "position_limit_switch",
+                                                  "board_id":  "ttyUSB1",
+                                                  "basic_block_id":  "basic-sensor-y-max-limit-switch",
+                                                  "pins":  [
+                                                               {
+                                                                   "id":  "y-max-limit",
+                                                                   "signal":  "signal",
+                                                                   "function_input_key":  "y_max_limit_pin"
+                                                               }
+                                                           ]
+                                              }
+                                          ],
+                     "schema_version":  1,
+                     "firmware_requirements":  [
+                                                   {
+                                                       "routine_id":  "move_gantry",
+                                                       "controller_role":  "builder_board",
+                                                       "source":  "firmware/main.ino",
+                                                       "protocol":  "Serial commands: PING, SET XY PINS \u003cxStep\u003e \u003cxDir\u003e \u003cyStep\u003e \u003cyDir\u003e, SET XY LIMITS \u003cmode\u003e \u003cxMin\u003e \u003cxMax\u003e \u003cyMin\u003e \u003cyMax\u003e, MOVE XY \u003cxCm\u003e \u003cyCm\u003e \u003cspeedProfile\u003e.",
+                                                       "entry_point":  "move_gantry",
+                                                       "required_device_ids":  [
+                                                                                   "x-axis-motor",
+                                                                                   "y-axis-motor",
+                                                                                   "x-min-limit-switch",
+                                                                                   "x-max-limit-switch",
+                                                                                   "y-min-limit-switch",
+                                                                                   "y-max-limit-switch"
+                                                                               ],
+                                                       "description":  "Firmware routine required by Move Gantry XY."
+                                                   }
+                                               ]
+                 },
+    "firmware_entry_file":  "firmware/main.ino",
+    "protocol":  "Serial commands: PING, SET XY PINS \u003cxStep\u003e \u003cxDir\u003e \u003cyStep\u003e \u003cyDir\u003e, SET XY LIMITS \u003cmode\u003e \u003cxMin\u003e \u003cxMax\u003e \u003cyMin\u003e \u003cyMax\u003e, MOVE XY \u003cxCm\u003e \u003cyCm\u003e \u003cspeedProfile\u003e.",
+    "notes":  "This board workspace owns the XY gantry movement function. Runtime pin and limit inputs are sent to the ESP32 before each move.",
+    "schema_version":  1
 }

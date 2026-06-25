@@ -349,6 +349,7 @@ export function WorkflowInspector({
       })),
     [block.hardwareDevices, block.referencedBasicBlockIds],
   );
+  const firmwareRequirements = block.firmwareRequirements ?? [];
   const blockPayloadLookup = useMemo(
     () =>
       Object.fromEntries(
@@ -692,6 +693,20 @@ export function WorkflowInspector({
                     </section>
                   ) : null}
 
+                  {firmwareRequirements.length > 0 ? (
+                    <section className="workflow-overlay__hardware-links">
+                      <strong>Firmware routines</strong>
+                      <div>
+                        {firmwareRequirements.map((requirement) => (
+                          <span key={requirement.routine_id}>
+                            {requirement.routine_id}
+                            <small>{requirement.controller_role}</small>
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
                   {block.inputs.map(renderParameterField)}
 
                   {(block.advancedInputs?.length ?? 0) > 0 ? (
@@ -811,6 +826,10 @@ export function WorkflowInspector({
                 <div className="workflow-overlay__setting-row">
                   <span>Version</span>
                   <strong>{block.version}</strong>
+                </div>
+                <div className="workflow-overlay__setting-row">
+                  <span>Firmware routines</span>
+                  <strong>{firmwareRequirements.length}</strong>
                 </div>
                 <div className="workflow-overlay__setting-row">
                   <span>Incoming edges</span>

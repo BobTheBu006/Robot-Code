@@ -1,4 +1,4 @@
-import type { WorkflowInputDefinition } from "./workflow";
+import type { FunctionManifest, WorkflowFirmwareRequirement, WorkflowInputDefinition } from "./workflow";
 
 export interface Esp32BuilderFile {
   relative_path: string;
@@ -11,22 +11,7 @@ export interface Esp32BuilderFile {
 
 export interface Esp32FunctionBlueprint {
   schema_version: number;
-  manifest: {
-    schema_version: number;
-    id: string;
-    display_name: string;
-    category: string;
-    description: string;
-    version: string;
-    inputs: WorkflowInputDefinition[];
-    advanced_inputs?: WorkflowInputDefinition[];
-    outputs: Array<{
-      key: string;
-      label: string;
-      type: string;
-      description?: string | null;
-    }>;
-  };
+  manifest: FunctionManifest;
   advanced_builder_inputs: WorkflowInputDefinition[];
   firmware_entry_file: string;
   protocol: string;
@@ -81,6 +66,43 @@ export interface Esp32FirmwareActionResponse {
   log: string;
   auto_reset_attempted: boolean;
   auto_reset_note: string;
+}
+
+export interface Esp32WorkflowFirmwarePlanRoutine {
+  routine_id: string;
+  controller_role: string;
+  source?: string | null;
+  protocol?: string | null;
+  entry_point?: string | null;
+  required_device_ids: string[];
+  description?: string | null;
+  source_path?: string | null;
+  source_exists: boolean;
+  block_ids: string[];
+}
+
+export interface Esp32WorkflowFirmwareBoardPlan {
+  board_id: string;
+  workspace_path?: string | null;
+  firmware_entry_file?: string | null;
+  routines: Esp32WorkflowFirmwarePlanRoutine[];
+  missing_sources: string[];
+  warnings: string[];
+  errors: string[];
+}
+
+export interface Esp32WorkflowFirmwarePlanRequestItem {
+  block_id: string;
+  block_name?: string | null;
+  board_id: string;
+  requirements: WorkflowFirmwareRequirement[];
+}
+
+export interface Esp32WorkflowFirmwarePlanResponse {
+  ok: boolean;
+  boards: Esp32WorkflowFirmwareBoardPlan[];
+  warnings: string[];
+  errors: string[];
 }
 
 export interface Esp32FileSaveResponse {

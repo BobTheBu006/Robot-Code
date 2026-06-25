@@ -46,6 +46,31 @@ class FunctionManifestSchemaCompatibilityTests(unittest.TestCase):
                 }
             )
 
+    def test_firmware_requirements_are_validated_and_preserved(self) -> None:
+        manifest = FunctionManifest.model_validate(
+            {
+                "schema_version": 1,
+                "id": "example",
+                "display_name": "Example",
+                "category": "Robot Actions",
+                "description": "Manifest with firmware requirements.",
+                "version": "0.1.0",
+                "firmware_requirements": [
+                    {
+                        "routine_id": "example_routine",
+                        "controller_role": "builder_board",
+                        "source": "firmware/main.ino",
+                        "protocol": "serial-text",
+                        "entry_point": "runExample",
+                        "required_device_ids": ["example-stepper"],
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(manifest.firmware_requirements[0].routine_id, "example_routine")
+        self.assertEqual(manifest.firmware_requirements[0].required_device_ids, ["example-stepper"])
+
 
 class WorkflowSchemaCompatibilityTests(unittest.TestCase):
     def test_save_and_load_add_current_schema_version(self) -> None:

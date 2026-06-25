@@ -20,6 +20,10 @@ from app.models.esp32_builder import (
     Esp32FileSaveResponse,
     Esp32FunctionBlueprint,
     Esp32ToolchainStatus,
+    Esp32WorkflowFirmwareBoardPlan,
+    Esp32WorkflowFirmwarePlanRequest,
+    Esp32WorkflowFirmwarePlanResponse,
+    Esp32WorkflowFirmwarePlanRoutine,
 )
 
 
@@ -252,6 +256,120 @@ class Esp32BuilderService:
             auto_reset_attempted=True,
         )
 
+    def plan_workflow_firmware(
+        self,
+        request: Esp32WorkflowFirmwarePlanRequest,
+    ) -> Esp32WorkflowFirmwarePlanResponse:
+        self._ensure_root_structure()
+
+        board_plans: dict[str, Esp32WorkflowFirmwareBoardPlan] = {}
+        routine_lookup: dict[
+            tuple[str, str, str, str | None, str | None, str | None],
+            Esp32WorkflowFirmwarePlanRoutine,
+        ] = {}
+        response_warnings: list[str] = []
+        response_errors: list[str] = []
+
+        for item in request.items:
+            board_id = item.board_id.strip()
+            block_label = item.block_name or item.block_id
+            if not board_id:
+                response_errors.append(f"Block '{block_label}' does not target an ESP32 board.")
+                continue
+
+            workspace_dir = self._resolve_workspace_dir(board_id)
+            board_plan = board_plans.get(board_id)
+            if board_plan is None:
+                metadata = self._load_board_metadata(workspace_dir) if workspace_dir.exists() else {}
+                board_plan = Esp32WorkflowFirmwareBoardPlan(
+                    board_id=board_id,
+                    workspace_path=str(workspace_dir),
+                    firmware_entry_file=self._firmware_entry_file(metadata) if metadata else None,
+                )
+                board_plans[board_id] = board_plan
+
+            if not workspace_dir.exists():
+                message = f"Unknown ESP32 board '{board_id}' referenced by block '{block_label}'."
+                if message not in board_plan.errors:
+                    board_plan.errors.append(message)
+                if message not in response_errors:
+                    response_errors.append(message)
+                continue
+
+            for requirement in item.requirements:
+                source_path, source_exists, source_error = self._resolve_firmware_requirement_source(
+                    workspace_dir,
+                    requirement.source,
+                )
+                if source_error:
+                    message = f"{board_id}: {source_error}"
+                    if message not in board_plan.errors:
+                        board_plan.errors.append(message)
+                    if message not in response_errors:
+                        response_errors.append(message)
+
+                if requirement.source and not source_exists:
+                    missing_source = requirement.source
+                    if missing_source not in board_plan.missing_sources:
+                        board_plan.missing_sources.append(missing_source)
+                    message = (
+                        f"{board_id}: firmware source '{requirement.source}' for routine "
+                        f"'{requirement.routine_id}' was not found."
+                    )
+                    if message not in response_errors:
+                        response_errors.append(message)
+
+                if not requirement.source:
+                    message = (
+                        f"{board_id}: routine '{requirement.routine_id}' has no explicit firmware source yet."
+                    )
+                    if message not in board_plan.warnings:
+                        board_plan.warnings.append(message)
+                    if message not in response_warnings:
+                        response_warnings.append(message)
+
+                routine_key = (
+                    board_id,
+                    requirement.routine_id,
+                    requirement.controller_role,
+                    requirement.source,
+                    requirement.protocol,
+                    requirement.entry_point,
+                )
+                routine = routine_lookup.get(routine_key)
+                if routine is None:
+                    routine = Esp32WorkflowFirmwarePlanRoutine(
+                        routine_id=requirement.routine_id,
+                        controller_role=requirement.controller_role,
+                        source=requirement.source,
+                        protocol=requirement.protocol,
+                        entry_point=requirement.entry_point,
+                        required_device_ids=list(requirement.required_device_ids),
+                        description=requirement.description,
+                        source_path=source_path,
+                        source_exists=source_exists,
+                        block_ids=[item.block_id],
+                    )
+                    routine_lookup[routine_key] = routine
+                    board_plan.routines.append(routine)
+                    continue
+
+                if item.block_id not in routine.block_ids:
+                    routine.block_ids.append(item.block_id)
+                for device_id in requirement.required_device_ids:
+                    if device_id not in routine.required_device_ids:
+                        routine.required_device_ids.append(device_id)
+
+        for board_plan in board_plans.values():
+            board_plan.routines.sort(key=lambda routine: routine.routine_id.lower())
+
+        return Esp32WorkflowFirmwarePlanResponse(
+            ok=not response_errors,
+            boards=list(board_plans.values()),
+            warnings=response_warnings,
+            errors=response_errors,
+        )
+
     def sync_generated_functions(self) -> None:
         self._ensure_root_structure()
 
@@ -273,6 +391,18 @@ class Esp32BuilderService:
                 manifest_data["builder_workspace_path"] = str(workspace_dir)
                 manifest_data["builder_firmware_entry_file"] = blueprint.firmware_entry_file
                 manifest_data["builder_base_function_id"] = blueprint.base_function_id
+                if not manifest_data.get("firmware_requirements"):
+                    manifest_data["firmware_requirements"] = [
+                        self._default_firmware_requirement_for_blueprint(
+                            manifest_id=manifest.id,
+                            firmware_entry_file=blueprint.firmware_entry_file,
+                            protocol=blueprint.protocol,
+                            hardware_device_ids=[
+                                device.id
+                                for device in manifest.hardware_devices
+                            ],
+                        )
+                    ]
 
                 self._write_text_atomic(
                     manifest_path,
@@ -465,6 +595,34 @@ class Esp32BuilderService:
         firmware_entry = self._coerce_nullable_string(metadata.get("firmware_entry_file"))
         return firmware_entry or "firmware/main.ino"
 
+    def _resolve_firmware_requirement_source(
+        self,
+        workspace_dir: Path,
+        source: str | None,
+    ) -> tuple[str | None, bool, str | None]:
+        normalized_source = source.strip() if isinstance(source, str) else None
+        if not normalized_source:
+            return None, False, None
+
+        workspace_path = workspace_dir.resolve()
+        source_candidate = Path(normalized_source)
+        source_path = (
+            source_candidate.resolve()
+            if source_candidate.is_absolute()
+            else (workspace_path / source_candidate).resolve()
+        )
+
+        try:
+            source_path.relative_to(workspace_path)
+        except ValueError:
+            return (
+                str(source_path),
+                False,
+                f"firmware source '{normalized_source}' resolves outside board workspace.",
+            )
+
+        return str(source_path), source_path.exists(), None
+
     def _board_fqbn(self, metadata: dict[str, str | None]) -> str:
         configured = self._coerce_nullable_string(metadata.get("fqbn"))
         return configured or self.DEFAULT_FQBN
@@ -536,16 +694,14 @@ class Esp32BuilderService:
 
     def _write_text_atomic(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            delete=False,
-        ) as temporary_file:
-            temporary_file.write(content)
-            temporary_path = Path(temporary_file.name)
+        if path.exists():
+            try:
+                if path.read_text(encoding="utf-8") == content:
+                    return
+            except UnicodeDecodeError:
+                pass
 
-        temporary_path.replace(path)
+        path.write_text(content, encoding="utf-8")
 
     def _build_board_summary(
         self,
@@ -632,7 +788,7 @@ class Esp32BuilderService:
         for blueprint_path in sorted(blueprint_dir.glob("*.json")):
             try:
                 blueprint = Esp32FunctionBlueprint.model_validate_json(
-                    blueprint_path.read_text(encoding="utf-8")
+                    blueprint_path.read_text(encoding="utf-8-sig")
                 )
             except Exception as exc:
                 errors.append(f"{blueprint_path.name}: {exc}")
@@ -642,6 +798,23 @@ class Esp32BuilderService:
             blueprints.append(blueprint)
 
         return blueprints, errors
+
+    def _default_firmware_requirement_for_blueprint(
+        self,
+        manifest_id: str,
+        firmware_entry_file: str,
+        protocol: str,
+        hardware_device_ids: list[str],
+    ) -> dict[str, object]:
+        return {
+            "routine_id": manifest_id,
+            "controller_role": "builder_board",
+            "source": firmware_entry_file,
+            "protocol": protocol,
+            "entry_point": manifest_id,
+            "required_device_ids": hardware_device_ids,
+            "description": "Generated default firmware routine requirement for this ESP32 workflow function.",
+        }
 
     def _validate_blueprint_content(self, content: str) -> None:
         try:
@@ -1107,7 +1280,9 @@ Each file under `workflow-functions/` should look like:
             })
 
         return {
+            "schema_version": 1,
             "manifest": {
+                "schema_version": 1,
                 "id": "dispense",
                 "display_name": "7 Syringe Dispenser",
                 "category": "Robot Actions",
@@ -1154,6 +1329,20 @@ Each file under `workflow-functions/` should look like:
                 ],
                 "advanced_inputs": advanced_inputs,
                 "hardware_devices": hardware_devices,
+                "firmware_requirements": [
+                    {
+                        "routine_id": "dispense",
+                        "controller_role": "builder_board",
+                        "source": "firmware/main.ino",
+                        "protocol": "serial-text",
+                        "entry_point": "dispense",
+                        "required_device_ids": [
+                            device["id"]
+                            for device in hardware_devices
+                        ],
+                        "description": "Firmware routine that drives the 7-head syringe dispenser.",
+                    }
+                ],
                 "outputs": [
                     {
                         "key": "next",

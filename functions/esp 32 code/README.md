@@ -74,6 +74,7 @@ Each blueprint file should contain:
 - Put runtime parameters in `manifest.inputs`.
 - Use `manifest.outputs` only for control-flow paths. Normal robot actions should have one `next` flow output; use the block settings error path for failures. Do not add outputs for returned data like status text, measurements, or raw controller replies.
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
+- Put required controller routines in `manifest.firmware_requirements`. Use stable routine IDs and point at the firmware source or fragment that must be included when a workflow uses the block.
 - Put every actuator, motor, servo, or sensor the function uses in `manifest.hardware_devices`. Use stable device IDs that match the Hardware Map, and set each pin's `function_input_key` to the matching runtime or advanced input. The Hardware Map creates or updates those devices, and the Workflow Editor generates the matching basic block, for example `basic-stepper-syringe-head-a` for `syringe-head-a`.
 - Advanced functions should reference those generated basic hardware blocks conceptually instead of keeping an unrelated private pin list. If a function moves syringe head A, it should declare/reference the same `syringe-head-a` device that creates the `Move Syringe Head A` basic block.
 - Treat hardware and code as related but separate. The same syringe pump hardware can support multiple firmware routines and workflow functions.
