@@ -27,6 +27,8 @@ fi
 
 echo
 echo "Frontend UI: http://127.0.0.1:5173"
+echo "Network UI:  http://<raspberry-pi-ip>:5173"
+echo "API mode:    same-origin /api requests proxied to http://127.0.0.1:8000"
 echo
 echo "Starting frontend..."
 npm run dev

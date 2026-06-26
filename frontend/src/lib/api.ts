@@ -22,8 +22,7 @@ import type {
 } from "../types/workflow";
 
 const WORKFLOW_SCHEMA_VERSION = 1;
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 export interface EmergencyStopResponse {
   ok: boolean;
@@ -66,6 +65,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const error = new Error(message) as Error & { status?: number };
     error.status = response.status;
     throw error;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const responseText = await response.text();
+    throw new Error(
+      `Expected JSON from ${path}, but received ${contentType || "unknown content type"}. `
+      + `Check that the FastAPI backend is running and that VITE_API_BASE_URL is not pointing at the frontend. `
+      + responseText.slice(0, 80),
+    );
   }
 
   return response.json() as Promise<T>;

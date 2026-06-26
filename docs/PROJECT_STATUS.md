@@ -15,6 +15,7 @@ The system is a local Raspberry Pi coordinated robot-control app:
 - The frontend gives the operator a Hardware Map and Workflow Editor.
 - The backend stores workflows, discovers functions, syncs function hardware dependencies into the Hardware Map, and flashes ESP32 boards before workflow execution.
 - A fixed E-Stop overlay is always visible in the UI and sends immediate STOP commands to active controller sessions.
+- On Raspberry Pi/Linux development runs, the frontend defaults to same-origin `/api` calls through the Vite proxy to the local FastAPI backend. This avoids browser-side `127.0.0.1` resolving to the wrong machine when the UI is opened from another computer on the LAN.
 
 ## Current Implemented Areas
 

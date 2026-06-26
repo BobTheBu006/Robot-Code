@@ -45,8 +45,10 @@ npm.cmd run dev
 ## Environment
 
 ```env
-VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_API_BASE_URL=
 ```
+
+Leave `VITE_API_BASE_URL` blank for normal development. The frontend will call `/api/...` on the same origin, and Vite proxies those requests to the FastAPI backend at `http://127.0.0.1:8000`. This is the correct setup when opening the UI from another computer on the Raspberry Pi network, because browser-side `127.0.0.1` would otherwise point at the other computer.
 
 Once the backend camera route is enabled, the dashboard camera panel will pull its live stream from `/api/camera/stream`.
 
