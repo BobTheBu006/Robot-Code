@@ -1,9 +1,13 @@
 from app.models.gantry import GantryXYCalibrationRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.raspberry_gantry import planned_calibrate_xy_result, xy_hardware_is_on_raspberry_pi
 
 
 def execute(context: dict, inputs: dict) -> dict:
     request = GantryXYCalibrationRequest.model_validate(inputs)
+    if xy_hardware_is_on_raspberry_pi(context):
+        return planned_calibrate_xy_result(context, request)
+
     response = gantry_controller_service.calibrate_xy(request)
 
     return {

@@ -82,6 +82,8 @@ Function inputs such as `tool_port` and `*_pin` fields are treated as hardware-m
 
 Advanced function blocks normalize their hardware-device references from the current Hardware Map before disable and firmware-planning logic runs. If an old function manifest says a device was on an ESP32 but the Hardware Map now places that device on Raspberry Pi GPIO, the Hardware Map wins.
 
+Calibrate Gantry XY and Move Gantry detect when all required XY motors and XY limit switches are mapped to Raspberry Pi GPIO. In that case backend execution skips ESP32 serial communication and reports the resolved GPIO plan instead of opening `/dev/ttyUSB1`. A real Raspberry Pi GPIO stepper execution driver is still required before those Pi-backed blocks physically move hardware.
+
 Disabled hardware is treated as unavailable rather than missing. Old maps without `enabled` fields load as enabled. When a function declares disabled hardware, the frontend disables the block and backend function-default resolution rejects direct execution with a hardware-disabled error.
 
 Function manifests now carry `schema_version` at the backend model boundary. Legacy manifests without the field are treated as schema version 1. Unsupported future manifest schemas are rejected with a validation error instead of being loaded as if they were compatible.

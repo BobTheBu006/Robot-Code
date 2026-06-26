@@ -1,9 +1,13 @@
 from app.models.gantry import GantryXYMoveRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.raspberry_gantry import planned_move_xy_result, xy_hardware_is_on_raspberry_pi
 
 
 def execute(context: dict, inputs: dict) -> dict:
     request = GantryXYMoveRequest.model_validate(inputs)
+    if xy_hardware_is_on_raspberry_pi(context):
+        return planned_move_xy_result(context, request)
+
     response = gantry_controller_service.move_xy(request)
 
     return {
