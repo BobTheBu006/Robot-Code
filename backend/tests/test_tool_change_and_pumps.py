@@ -23,9 +23,9 @@ class PumpHardwareMapTests(unittest.TestCase):
                 ],
                 "devices": [
                     {
-                        "id": "suction-pump",
+                        "id": "beads-medium-pump",
                         "board_id": "ttyUSB0",
-                        "name": "Suction Pump",
+                        "name": "Beads Medium Pump",
                         "kind": "stepper_motor",
                         "calibration_ml_per_200_steps": 1.25,
                         "pins": [],

@@ -38,7 +38,7 @@ The Hardware Map currently models:
 - Devices connected to controllers.
 - Device types:
   - stepper motor with direction, step, enable, and three micro-step signals
-  - calibrated peristaltic pump steppers using mL per 200 full steps
+  - calibrated beads peristaltic pump steppers using mL per 200 full steps
   - servo with one signal pin and min/max rotation fields
   - position/limit switch sensor
   - AHT20 temperature/humidity sensor with SCL and SDA signals

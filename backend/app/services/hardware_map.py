@@ -394,7 +394,6 @@ class HardwareMapService:
             for head_key, head_label, step_pin, dir_pin in syringe_heads
         ]
         peristaltic_pumps = [
-            ("suction-pump", "Suction Pump", "suction_pump"),
             ("beads-medium-pump", "Beads Medium Pump", "beads_medium_pump"),
             ("beads-creation-pump", "Beads Creation Pump", "beads_creation_pump"),
             ("beads-solution-pump", "Beads Solution Pump", "beads_solution_pump"),
