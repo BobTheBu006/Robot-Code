@@ -542,7 +542,29 @@ export function mapDiscoveredFunctionToBlock(
   hardwareMap: HardwareMap | null = null,
 ): WorkflowBlockDefinition {
   const flowOutputs = discoveredFunction.manifest.outputs.filter((output) => output.type === "flow");
-  const hardwareDevices = discoveredFunction.manifest.hardware_devices ?? [];
+  const hardwareDevices = (discoveredFunction.manifest.hardware_devices ?? []).map((deviceReference) => {
+    const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceReference.id);
+    if (!mappedDevice) {
+      return deviceReference;
+    }
+
+    return {
+      ...deviceReference,
+      board_id: mappedDevice.board_id,
+      kind: mappedDevice.kind,
+      sensor_kind: mappedDevice.sensor_kind ?? deviceReference.sensor_kind,
+      rotation_min_deg: mappedDevice.rotation_min_deg ?? deviceReference.rotation_min_deg,
+      rotation_max_deg: mappedDevice.rotation_max_deg ?? deviceReference.rotation_max_deg,
+      calibration_ml_per_200_steps: mappedDevice.calibration_ml_per_200_steps ?? deviceReference.calibration_ml_per_200_steps,
+      pins: mappedDevice.pins.map((pin) => ({
+        id: pin.id,
+        signal: pin.signal,
+        gpio: pin.gpio,
+        function_input_key: pin.function_input_key ?? null,
+        notes: pin.notes ?? null,
+      })),
+    };
+  });
   const referencedBasicBlockIds = hardwareDevices
     .map((device) => device.basic_block_id ?? getHardwareBasicBlockId({ id: device.id, kind: device.kind }))
     .filter((blockId): blockId is string => Boolean(blockId));

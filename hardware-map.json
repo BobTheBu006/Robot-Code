@@ -12,7 +12,7 @@
       "id": "ttyUSB1",
       "label": "Calibrate Gantry XY Controller",
       "usb_port": "/dev/ttyUSB1",
-      "enabled": true,
+      "enabled": false,
       "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
     }
   ],
@@ -820,5 +820,5 @@
       "notes": null
     }
   ],
-  "updated_at": "2026-06-26T08:53:16.771406Z"
+  "updated_at": "2026-06-26T09:16:28.505235Z"
 }

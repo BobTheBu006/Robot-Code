@@ -80,6 +80,8 @@ Function manifests can declare `hardware_devices`. Those devices are synced into
 
 Function inputs such as `tool_port` and `*_pin` fields are treated as hardware-map-resolved internals, not operator-selected block settings. The operator moves devices/controllers and edits pins in the Hardware Map, and workflow blocks inherit the correct controller port and GPIO values from those linked devices.
 
+Advanced function blocks normalize their hardware-device references from the current Hardware Map before disable and firmware-planning logic runs. If an old function manifest says a device was on an ESP32 but the Hardware Map now places that device on Raspberry Pi GPIO, the Hardware Map wins.
+
 Disabled hardware is treated as unavailable rather than missing. Old maps without `enabled` fields load as enabled. When a function declares disabled hardware, the frontend disables the block and backend function-default resolution rejects direct execution with a hardware-disabled error.
 
 Function manifests now carry `schema_version` at the backend model boundary. Legacy manifests without the field are treated as schema version 1. Unsupported future manifest schemas are rejected with a validation error instead of being loaded as if they were compatible.

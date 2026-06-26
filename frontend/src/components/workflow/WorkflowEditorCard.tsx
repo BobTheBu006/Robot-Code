@@ -2135,7 +2135,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       return;
     }
 
-    if (isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+    if (getHardwareDependencyDeviceIds(block).length === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
 
@@ -2207,10 +2207,11 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     }
 
     const boardIds = new Set<string>();
+    const canUseLegacyBoardFallback = requirement.required_device_ids.length === 0;
 
     if (requirement.controller_role === "device_board") {
       addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
-      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+      if (boardIds.size === 0 && canUseLegacyBoardFallback && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
         boardIds.add(block.hardwareBoardId);
       }
       return Array.from(boardIds);
@@ -2218,13 +2219,13 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
 
     if (requirement.controller_role === "builder_board") {
       addHardwareDeviceBoardIds(block, requirement.required_device_ids, boardIds);
-      if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+      if (boardIds.size === 0 && canUseLegacyBoardFallback && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
         boardIds.add(block.hardwareBoardId);
       }
       return Array.from(boardIds);
     }
 
-    if (boardIds.size === 0 && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
+    if (boardIds.size === 0 && canUseLegacyBoardFallback && isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
     if (boardIds.size === 0) {
