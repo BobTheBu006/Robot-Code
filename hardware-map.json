@@ -816,9 +816,9 @@
         "syringe-head-f",
         "syringe-head-g"
       ],
-      "enabled": true,
+      "enabled": false,
       "notes": null
     }
   ],
-  "updated_at": "2026-06-26T09:16:28.505235Z"
+  "updated_at": "2026-06-26T09:36:39.357220Z"
 }

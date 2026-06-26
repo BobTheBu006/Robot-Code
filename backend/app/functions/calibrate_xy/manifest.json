@@ -408,8 +408,8 @@
     }
   ],
   "builder_board_id": "ttyUSB1",
-  "builder_source_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1\\workflow-functions\\calibrate_xy.json",
-  "builder_workspace_path": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB1",
+  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/calibrate_xy.json",
+  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
   "builder_firmware_entry_file": "firmware/main.ino",
   "builder_base_function_id": null
 }
