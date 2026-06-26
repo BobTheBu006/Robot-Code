@@ -40,6 +40,7 @@ class _GPIOExecution:
     status: str
     message: str
     simulated: bool
+    unavailable_reason: str | None = None
 
 
 def _hardware_map_devices(context: dict) -> list[dict]:
@@ -90,9 +91,18 @@ class RaspberryGantryGPIOService:
             self._calibrated = True
             return self._calibration_result(context, request, pins, execution)
 
-        gpio = self._gpio_module()
+        gpio, _ = self._gpio_module()
+        if gpio is None:
+            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during calibration.")
         with self._lock:
-            self._setup_gpio(gpio, pins)
+            try:
+                self._setup_gpio(gpio, pins)
+            except Exception as exc:
+                execution = self._gpio_unavailable_execution(str(exc))
+                self._x_cm = 0.0
+                self._y_cm = 0.0
+                self._calibrated = True
+                return self._calibration_result(context, request, pins, execution)
             try:
                 fast_rpm = request.speed_rpm
                 slow_rpm = max(1.0, request.speed_rpm / 3.0)
@@ -135,9 +145,17 @@ class RaspberryGantryGPIOService:
             self._y_cm = request.y_cm
             return self._move_result(context, request, pins, execution, applied=True)
 
-        gpio = self._gpio_module()
+        gpio, _ = self._gpio_module()
+        if gpio is None:
+            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during move.")
         with self._lock:
-            self._setup_gpio(gpio, pins)
+            try:
+                self._setup_gpio(gpio, pins)
+            except Exception as exc:
+                execution = self._gpio_unavailable_execution(str(exc))
+                self._x_cm = request.x_cm
+                self._y_cm = request.y_cm
+                return self._move_result(context, request, pins, execution, applied=True)
             try:
                 self._assert_limits_clear(gpio, pins, request)
                 dx_cm = request.x_cm - self._x_cm
@@ -151,35 +169,52 @@ class RaspberryGantryGPIOService:
         return self._move_result(context, request, pins, execution, applied=True)
 
     def _execution_mode(self) -> _GPIOExecution:
-        if self._gpio_module() is not None and not _bool_env("ROBOT_GPIO_SIMULATE", False):
+        gpio, unavailable_reason = self._gpio_module()
+        if gpio is not None and not _bool_env("ROBOT_GPIO_SIMULATE", False):
             return _GPIOExecution(
                 status="gpio_executed",
                 message="XY gantry motion was executed directly through Raspberry Pi GPIO step and direction pins.",
                 simulated=False,
             )
 
+        return self._gpio_unavailable_execution(unavailable_reason)
+
+    def _gpio_unavailable_execution(self, unavailable_reason: str | None) -> _GPIOExecution:
+        reason = f" {unavailable_reason}" if unavailable_reason else ""
         if _bool_env("ROBOT_GPIO_REQUIRE_HARDWARE", False):
             raise RuntimeError(
-                "Raspberry Pi GPIO execution was required, but RPi.GPIO is not available. "
-                "Install python3-rpi.gpio on the Pi or unset ROBOT_GPIO_REQUIRE_HARDWARE for simulation."
+                "Raspberry Pi GPIO execution was required, but a compatible GPIO backend is not available."
+                f"{reason} Install a Pi-compatible GPIO package such as rpi-lgpio/python3-rpi-lgpio, "
+                "or unset ROBOT_GPIO_REQUIRE_HARDWARE for simulation."
             )
 
         return _GPIOExecution(
             status="gpio_simulated",
             message=(
-                "XY gantry is mapped to Raspberry Pi GPIO, but RPi.GPIO is not available in this environment. "
+                "XY gantry is mapped to Raspberry Pi GPIO, but a compatible GPIO backend is not available in this environment."
+                f"{reason} "
                 "The backend simulated the command and did not move physical hardware."
             ),
             simulated=True,
+            unavailable_reason=unavailable_reason,
         )
 
-    def _gpio_module(self) -> Any | None:
+    def _gpio_module(self) -> tuple[Any | None, str | None]:
         if _bool_env("ROBOT_GPIO_SIMULATE", False):
-            return None
+            return None, "ROBOT_GPIO_SIMULATE is enabled."
         try:
-            return importlib.import_module("RPi.GPIO")
-        except ImportError:
-            return None
+            gpio = importlib.import_module("RPi.GPIO")
+        except ImportError as exc:
+            return None, str(exc)
+
+        try:
+            gpio.setwarnings(False)
+            gpio.setmode(gpio.BCM)
+            gpio.cleanup()
+        except Exception as exc:
+            return None, str(exc)
+
+        return gpio, None
 
     def _pins_from_request(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> _GPIOPinPlan:
         return _GPIOPinPlan(
@@ -252,7 +287,8 @@ class RaspberryGantryGPIOService:
         stop_limit_pin: int | None = None,
     ) -> bool:
         steps_per_cm = self._steps_per_cm()
-        a_steps = int(round((dx_cm + dy_cm) * steps_per_cm))
+        multiplier = request.motor_a_step_multiplier if request is not None else 1.0
+        a_steps = int(round((dx_cm + dy_cm) * steps_per_cm * multiplier))
         b_steps = int(round((dx_cm - dy_cm) * steps_per_cm))
         return self._move_corexy_steps(gpio, pins, a_steps, b_steps, speed_rpm, request, stop_limit_pin)
 
@@ -411,6 +447,7 @@ class RaspberryGantryGPIOService:
                 "x_dir_pin": pins.a_dir_pin,
                 "y_step_pin": pins.b_step_pin,
                 "y_dir_pin": pins.b_dir_pin,
+                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             "configured_limits": {
                 "limit_switch_mode": request.limit_switch_mode,
@@ -461,6 +498,7 @@ class RaspberryGantryGPIOService:
                 "x_dir_pin": pins.a_dir_pin,
                 "y_step_pin": pins.b_step_pin,
                 "y_dir_pin": pins.b_dir_pin,
+                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             "configured_limits": {
                 "limit_switch_mode": request.limit_switch_mode,

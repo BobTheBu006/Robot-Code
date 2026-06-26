@@ -34,7 +34,7 @@ The Hardware Map currently models:
 - Devices wired directly to Raspberry Pi GPIO or I2C using `board_id: raspberry-pi`.
 - Hardware map connections can be disconnected from the canvas; disconnected devices stay visible as unconnected blocks until the operator reconnects them to the Raspberry Pi or a controller.
 - Detected ESP32 workspaces/ports are shown as connection options, but they are not automatically re-added as controller blocks after the operator deletes them.
-- ESP32 controller blocks with USB port selection.
+- ESP32 controller blocks with USB port selection. The selector lists currently detected connected serial ports first, marks whether each port is available/current/used by another controller, and keeps saved ports visible when a controller is unplugged.
 - Devices connected to controllers.
 - Device types:
   - stepper motor with direction, step, enable, and three micro-step signals
@@ -66,8 +66,10 @@ The Workflow Editor currently has:
 - Right-click actions for creating, editing, and uncompounding compound functions.
 - Pre-run ESP32 flashing for boards referenced by blocks in the workflow.
 - Pre-run flashing is filtered through the Hardware Map: only saved ESP32 controller blocks are flashed, and workflows with no ESP32 controllers skip flashing entirely.
+- Run all has a "Skip ESP32 flash" checkbox for reusing firmware that is already on connected controllers during development/test runs.
 - Advanced function blocks no longer expose a per-block "Selected ESP32" setting. Controller/USB port selection is resolved from the linked hardware devices in the Hardware Map when the block runs.
 - Move Gantry is now a Cartesian XYZ block for the CoreXY gantry. It exposes X, Y, and Z target positions in centimeters, numeric RPM, optional trapezoidal acceleration management, and on-the-fly near-limit calibration settings. X is bounded to 0-115 cm, Y to 0-60 cm, and Z to 0-60 cm from the back-bottom-left origin.
+- Calibrate Gantry XY and Move Gantry expose a Motor A Step Multiplier advanced setting. The current default is 2.0, causing the CoreXY A motor to receive twice the normal step pulses while preserving Cartesian X/Y targets.
 - Broken-reference placeholders for saved blocks whose function, hardware device, or module cannot currently be resolved.
 - Blocks that depend on disabled Hardware Map items render as inactive with the hardware reason shown on the node. They do not run and are excluded from ESP32 firmware planning/flashing while disabled.
 - The fixed E-Stop overlay aborts in-flight workflow requests in the UI and calls the backend emergency stop endpoint.

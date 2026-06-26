@@ -37,6 +37,10 @@ type RequestStatus = "loading" | "success" | "error";
 type SaveState = "idle" | "saving" | "saved" | "error";
 type HardwareNodeKind = "raspberry" | "controller" | "device" | "group";
 type HardwareFlowNode = Node<HardwareNodeData>;
+type ControllerPortOption = {
+  label: string;
+  value: string;
+};
 type HardwareContextMenuState = {
   x: number;
   y: number;
@@ -112,6 +116,15 @@ function normalizeId(value: string, fallback: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || fallback;
+}
+
+function normalizeControllerId(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
   return normalized || fallback;
@@ -440,6 +453,11 @@ function getDetectedBoard(
   return detectedBoards.find((detectedBoard) =>
     detectedBoard.board_id === board.id || detectedBoard.port === board.usb_port,
   ) ?? null;
+}
+
+function detectedPortLabel(board: Esp32BoardSummary): string {
+  const port = board.port ?? board.board_id;
+  return `${port}${board.description ? ` - ${board.description}` : ""}`;
 }
 
 function groupFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): HardwareGroupMapping | null {
@@ -813,27 +831,50 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     }
     return groupedDevices;
   }, [hardwareMap.devices]);
-  const controllerPortOptions = useMemo(() => {
-    const options = detectedBoards
-      .map((board) => ({
-        label: `${board.port ?? board.board_id}${board.description ? ` - ${board.description}` : ""}`,
-        value: board.port ?? board.board_id,
-      }))
-      .filter((option) => option.value);
-    const existingValues = new Set(options.map((option) => option.value));
+  const controllerPortOptions = useMemo<ControllerPortOption[]>(() => {
+    const options: ControllerPortOption[] = [];
+    const existingValues = new Set<string>();
+    const boardByPort = new Map<string, HardwareBoardMapping>();
 
     for (const board of hardwareMap.boards) {
-      if (board.usb_port && !existingValues.has(board.usb_port)) {
-        options.push({
-          label: `${board.usb_port} - manual`,
-          value: board.usb_port,
-        });
-        existingValues.add(board.usb_port);
+      if (board.usb_port) {
+        boardByPort.set(board.usb_port, board);
       }
     }
 
+    const addOption = (value: string | null | undefined, label: string) => {
+      if (!value || existingValues.has(value)) {
+        return;
+      }
+
+      options.push({ value, label });
+      existingValues.add(value);
+    };
+
+    for (const board of detectedBoards.filter((candidate) => candidate.connected)) {
+      const port = board.port ?? board.board_id;
+      const mappedBoard = boardByPort.get(port);
+      const usage = mappedBoard
+        ? mappedBoard.id === selectedBoard?.id
+          ? "current"
+          : `used by ${mappedBoard.label}`
+        : "available";
+      addOption(port, `${detectedPortLabel(board)} - ${usage}`);
+    }
+
+    for (const board of hardwareMap.boards) {
+      const detected = detectedBoards.find((candidate) =>
+        candidate.port === board.usb_port || candidate.board_id === board.id,
+      );
+      const usage = board.id === selectedBoard?.id ? "current saved" : `used by ${board.label}`;
+      addOption(
+        board.usb_port,
+        detected ? `${detectedPortLabel(detected)} - ${usage}` : `${board.usb_port} - ${usage}, not currently detected`,
+      );
+    }
+
     return options;
-  }, [detectedBoards, hardwareMap.boards]);
+  }, [detectedBoards, hardwareMap.boards, selectedBoard?.id]);
 
   async function loadHardwareMap() {
     setStatus("loading");
@@ -1393,7 +1434,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
             <input
               defaultValue={selectedBoard.id}
               key={`${selectedBoard.id}-settings-id`}
-              onBlur={(event) => updateBoard(selectedBoard.id, { id: normalizeId(event.target.value, selectedBoard.id) })}
+              onBlur={(event) => updateBoard(selectedBoard.id, { id: normalizeControllerId(event.target.value, selectedBoard.id) })}
             />
           </label>
           <label className="hardware-settings__check">

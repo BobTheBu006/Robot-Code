@@ -37,6 +37,7 @@ class GantryXYMoveRequest(BaseModel):
     acceleration_rpm_per_s: int = Field(default=600, gt=0)
     on_the_fly_calibration: bool = Field(default=True)
     calibration_max_diff_steps: int = Field(default=5, ge=0)
+    motor_a_step_multiplier: float = Field(default=2.0, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -102,7 +103,7 @@ class GantryXYMoveResponse(BaseModel):
     move_reply: str | None = None
     move_applied: bool = False
     target: dict[str, float]
-    configured_pins: dict[str, int]
+    configured_pins: dict[str, int | float]
     configured_limits: dict[str, int | str]
 
 
@@ -114,6 +115,7 @@ class GantryXYCalibrationRequest(BaseModel):
     speed_rpm: int = Field(default=100, gt=0)
     trapezoidal_speed: bool = Field(default=True)
     acceleration_rpm_per_s: int = Field(default=300, gt=0)
+    motor_a_step_multiplier: float = Field(default=2.0, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -148,7 +150,7 @@ class GantryXYCalibrationResponse(BaseModel):
     calibration_reply: str | None = None
     calibrated: bool = False
     workspace: dict[str, float]
-    configured_pins: dict[str, int]
+    configured_pins: dict[str, int | float]
     configured_limits: dict[str, int | str]
 
 

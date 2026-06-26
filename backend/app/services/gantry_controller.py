@@ -325,7 +325,7 @@ class GantryControllerService:
     def _build_xy_pin_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
         return (
             f"SET XY PINS {request.x_step_pin} {request.x_dir_pin} "
-            f"{request.y_step_pin} {request.y_dir_pin}"
+            f"{request.y_step_pin} {request.y_dir_pin} {request.motor_a_step_multiplier:.6f}"
         )
 
     def _build_xy_limit_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
@@ -419,6 +419,7 @@ class GantryControllerService:
                 "x_dir_pin": request.x_dir_pin,
                 "y_step_pin": request.y_step_pin,
                 "y_dir_pin": request.y_dir_pin,
+                "motor_a_step_multiplier": request.motor_a_step_multiplier,
                 "z_step_pin": request.z_left_step_pin,
                 "z_dir_pin": request.z_left_dir_pin,
             },
@@ -486,6 +487,7 @@ class GantryControllerService:
                 "x_dir_pin": request.x_dir_pin,
                 "y_step_pin": request.y_step_pin,
                 "y_dir_pin": request.y_dir_pin,
+                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             configured_limits={
                 "limit_switch_mode": request.limit_switch_mode,

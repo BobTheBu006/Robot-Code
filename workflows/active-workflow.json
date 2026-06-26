@@ -35,9 +35,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 12,
-        "benchmarkDurationMs": 34,
-        "lastDurationMs": 16
+        "runCount": 22,
+        "benchmarkDurationMs": 26,
+        "lastDurationMs": 0
       },
       "measured": {
         "width": 196,
@@ -391,7 +391,7 @@
               "description": "Continue when the dispense request completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
+          "builderBoardId": null,
           "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
           "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
@@ -401,7 +401,7 @@
               "id": "syringe-head-a",
               "name": "Syringe Head A",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -410,14 +410,14 @@
                 {
                   "id": "head-a-dir",
                   "signal": "direction",
-                  "gpio": "32",
+                  "gpio": null,
                   "function_input_key": "head_a_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-a-step",
                   "signal": "step",
-                  "gpio": "33",
+                  "gpio": null,
                   "function_input_key": "head_a_step_pin",
                   "notes": null
                 },
@@ -457,7 +457,7 @@
               "id": "syringe-head-b",
               "name": "Syringe Head B",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -466,14 +466,14 @@
                 {
                   "id": "head-b-dir",
                   "signal": "direction",
-                  "gpio": "4",
+                  "gpio": null,
                   "function_input_key": "head_b_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-b-step",
                   "signal": "step",
-                  "gpio": "25",
+                  "gpio": null,
                   "function_input_key": "head_b_step_pin",
                   "notes": null
                 },
@@ -513,7 +513,7 @@
               "id": "syringe-head-c",
               "name": "Syringe Head C",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -522,14 +522,14 @@
                 {
                   "id": "head-c-dir",
                   "signal": "direction",
-                  "gpio": "5",
+                  "gpio": null,
                   "function_input_key": "head_c_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-c-step",
                   "signal": "step",
-                  "gpio": "26",
+                  "gpio": null,
                   "function_input_key": "head_c_step_pin",
                   "notes": null
                 },
@@ -569,7 +569,7 @@
               "id": "syringe-head-d",
               "name": "Syringe Head D",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -578,14 +578,14 @@
                 {
                   "id": "head-d-dir",
                   "signal": "direction",
-                  "gpio": "18",
+                  "gpio": null,
                   "function_input_key": "head_d_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-d-step",
                   "signal": "step",
-                  "gpio": "27",
+                  "gpio": null,
                   "function_input_key": "head_d_step_pin",
                   "notes": null
                 },
@@ -625,7 +625,7 @@
               "id": "syringe-head-e",
               "name": "Syringe Head E",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -634,14 +634,14 @@
                 {
                   "id": "head-e-dir",
                   "signal": "direction",
-                  "gpio": "19",
+                  "gpio": null,
                   "function_input_key": "head_e_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-e-step",
                   "signal": "step",
-                  "gpio": "14",
+                  "gpio": null,
                   "function_input_key": "head_e_step_pin",
                   "notes": null
                 },
@@ -681,7 +681,7 @@
               "id": "syringe-head-f",
               "name": "Syringe Head F",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -690,14 +690,14 @@
                 {
                   "id": "head-f-dir",
                   "signal": "direction",
-                  "gpio": "21",
+                  "gpio": null,
                   "function_input_key": "head_f_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-f-step",
                   "signal": "step",
-                  "gpio": "12",
+                  "gpio": null,
                   "function_input_key": "head_f_step_pin",
                   "notes": null
                 },
@@ -737,7 +737,7 @@
               "id": "syringe-head-g",
               "name": "Syringe Head G",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
+              "board_id": "",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -746,14 +746,14 @@
                 {
                   "id": "head-g-dir",
                   "signal": "direction",
-                  "gpio": "22",
+                  "gpio": null,
                   "function_input_key": "head_g_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "head-g-step",
                   "signal": "step",
-                  "gpio": "13",
+                  "gpio": null,
                   "function_input_key": "head_g_step_pin",
                   "notes": null
                 },
@@ -851,14 +851,14 @@
           "failureMode": "separate_path",
           "retryCount": 0
         },
-        "isActive": true,
-        "runCount": 14,
-        "benchmarkDurationMs": 8280,
-        "lastDurationMs": 10745
+        "isActive": false,
+        "runCount": 15,
+        "benchmarkDurationMs": 8214,
+        "lastDurationMs": 7287
       },
       "measured": {
         "width": 196,
-        "height": 231
+        "height": 185
       },
       "selected": false,
       "dragging": false
@@ -887,8 +887,8 @@
               "type": "file/path",
               "description": "Connected ESP32 board that should run the XY calibration routine.",
               "required": true,
-              "default": "/dev/ttyUSB1",
-              "placeholder": "/dev/ttyUSB1",
+              "default": "/dev/ttyUSB0",
+              "placeholder": "/dev/ttyUSB0",
               "advanced": false,
               "options": [],
               "hidden": true,
@@ -1004,6 +1004,17 @@
               "resolvedFrom": "hardware_map"
             },
             {
+              "key": "motor_a_step_multiplier",
+              "label": "Motor A Step Multiplier",
+              "type": "number",
+              "description": "Multiplier applied to CoreXY motor A step pulses. Use 2.0 when motor A needs twice as many step pulses as motor B for X-only motion.",
+              "required": false,
+              "default": 2,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
+            },
+            {
               "key": "limit_switch_mode",
               "label": "Limit Switch Layout",
               "type": "select",
@@ -1084,9 +1095,9 @@
               "description": "Continue when XY calibration completes."
             }
           ],
-          "builderBoardId": "ttyUSB1",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/calibrate_xy.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderBoardId": "ttyUSB0",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null,
           "hardwareDevices": [
@@ -1094,7 +1105,7 @@
               "id": "x-axis-motor",
               "name": "CoreXY A Motor",
               "kind": "stepper_motor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1103,7 +1114,7 @@
                 {
                   "id": "x-dir",
                   "signal": "direction",
-                  "gpio": "27",
+                  "gpio": "16",
                   "function_input_key": "x_dir_pin",
                   "notes": null
                 },
@@ -1150,7 +1161,7 @@
               "id": "y-axis-motor",
               "name": "CoreXY B Motor",
               "kind": "stepper_motor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1159,14 +1170,14 @@
                 {
                   "id": "y-dir",
                   "signal": "direction",
-                  "gpio": "24",
+                  "gpio": "26",
                   "function_input_key": "y_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "y-step",
                   "signal": "step",
-                  "gpio": "23",
+                  "gpio": "25",
                   "function_input_key": "y_step_pin",
                   "notes": null
                 },
@@ -1206,7 +1217,7 @@
               "id": "x-min-limit-switch",
               "name": "X Min Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1215,7 +1226,7 @@
                 {
                   "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "5",
+                  "gpio": "27",
                   "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
@@ -1227,7 +1238,7 @@
               "id": "x-max-limit-switch",
               "name": "X Max Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1236,7 +1247,7 @@
                 {
                   "id": "x-max-limit",
                   "signal": "signal",
-                  "gpio": "6",
+                  "gpio": "14",
                   "function_input_key": "x_max_limit_pin",
                   "notes": null
                 }
@@ -1248,7 +1259,7 @@
               "id": "y-min-limit-switch",
               "name": "Y Min Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1257,7 +1268,7 @@
                 {
                   "id": "y-min-limit",
                   "signal": "signal",
-                  "gpio": "12",
+                  "gpio": "34",
                   "function_input_key": "y_min_limit_pin",
                   "notes": null
                 }
@@ -1269,7 +1280,7 @@
               "id": "y-max-limit-switch",
               "name": "Y Max Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1278,7 +1289,7 @@
                 {
                   "id": "y-max-limit",
                   "signal": "signal",
-                  "gpio": "13",
+                  "gpio": "35",
                   "function_input_key": "y_max_limit_pin",
                   "notes": null
                 }
@@ -1292,7 +1303,7 @@
               "routine_id": "calibrate_xy",
               "controller_role": "builder_board",
               "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch.",
+              "protocol": "Serial commands: SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch.",
               "entry_point": "calibrate_xy",
               "required_device_ids": [
                 "x-axis-motor",
@@ -1315,16 +1326,17 @@
           ]
         },
         "parameters": {
-          "tool_port": "/dev/ttyUSB1",
-          "x_track_length_cm": 110,
-          "y_track_length_cm": 50,
-          "speed_rpm": 10,
+          "tool_port": "/dev/ttyUSB0",
+          "x_track_length_cm": 100,
+          "y_track_length_cm": 100,
+          "speed_rpm": 2000,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 300,
+          "acceleration_rpm_per_s": 2000,
           "x_step_pin": "16",
           "x_dir_pin": "17",
           "y_step_pin": 18,
           "y_dir_pin": 19,
+          "motor_a_step_multiplier": 4,
           "limit_switch_mode": "2",
           "x_min_limit_pin": "21",
           "x_max_limit_pin": "22",
@@ -1337,9 +1349,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 8,
-        "benchmarkDurationMs": 6188,
-        "lastDurationMs": 27253
+        "runCount": 19,
+        "benchmarkDurationMs": 19482,
+        "lastDurationMs": 41137
       },
       "measured": {
         "width": 196,
@@ -1372,8 +1384,8 @@
               "type": "file/path",
               "description": "Controller resolved from the Hardware Map for the CoreXY gantry routine.",
               "required": true,
-              "default": "/dev/ttyUSB1",
-              "placeholder": "/dev/ttyUSB1",
+              "default": "/dev/ttyUSB0",
+              "placeholder": "/dev/ttyUSB0",
               "advanced": false,
               "options": [],
               "hidden": true,
@@ -1520,6 +1532,17 @@
               "options": [],
               "hidden": true,
               "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "motor_a_step_multiplier",
+              "label": "Motor A Step Multiplier",
+              "type": "number",
+              "description": "Multiplier applied to CoreXY motor A step pulses. Use 2.0 when motor A needs twice as many step pulses as motor B for X-only motion.",
+              "required": false,
+              "default": 2,
+              "placeholder": null,
+              "advanced": true,
+              "options": []
             },
             {
               "key": "limit_switch_mode",
@@ -1706,9 +1729,9 @@
               "description": "Continue when the XY move completes."
             }
           ],
-          "builderBoardId": "ttyUSB1",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/move_gantry.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
+          "builderBoardId": "ttyUSB0",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/move_gantry.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null,
           "hardwareDevices": [
@@ -1716,7 +1739,7 @@
               "id": "x-axis-motor",
               "name": "CoreXY A Motor",
               "kind": "stepper_motor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1725,7 +1748,7 @@
                 {
                   "id": "x-dir",
                   "signal": "direction",
-                  "gpio": "27",
+                  "gpio": "16",
                   "function_input_key": "x_dir_pin",
                   "notes": null
                 },
@@ -1772,7 +1795,7 @@
               "id": "y-axis-motor",
               "name": "CoreXY B Motor",
               "kind": "stepper_motor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1781,14 +1804,14 @@
                 {
                   "id": "y-dir",
                   "signal": "direction",
-                  "gpio": "24",
+                  "gpio": "26",
                   "function_input_key": "y_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "y-step",
                   "signal": "step",
-                  "gpio": "23",
+                  "gpio": "25",
                   "function_input_key": "y_step_pin",
                   "notes": null
                 },
@@ -1828,7 +1851,7 @@
               "id": "x-min-limit-switch",
               "name": "X Min Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1837,7 +1860,7 @@
                 {
                   "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "5",
+                  "gpio": "27",
                   "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
@@ -1849,7 +1872,7 @@
               "id": "x-max-limit-switch",
               "name": "X Max Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1858,7 +1881,7 @@
                 {
                   "id": "x-max-limit",
                   "signal": "signal",
-                  "gpio": "6",
+                  "gpio": "14",
                   "function_input_key": "x_max_limit_pin",
                   "notes": null
                 }
@@ -1870,7 +1893,7 @@
               "id": "y-min-limit-switch",
               "name": "Y Min Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1879,7 +1902,7 @@
                 {
                   "id": "y-min-limit",
                   "signal": "signal",
-                  "gpio": "12",
+                  "gpio": "34",
                   "function_input_key": "y_min_limit_pin",
                   "notes": null
                 }
@@ -1891,7 +1914,7 @@
               "id": "y-max-limit-switch",
               "name": "Y Max Limit Switch",
               "kind": "sensor",
-              "board_id": "raspberry-pi",
+              "board_id": "ttyUSB0",
               "sensor_kind": "position_limit_switch",
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1900,7 +1923,7 @@
                 {
                   "id": "y-max-limit",
                   "signal": "signal",
-                  "gpio": "13",
+                  "gpio": "35",
                   "function_input_key": "y_max_limit_pin",
                   "notes": null
                 }
@@ -1912,7 +1935,7 @@
               "id": "left-z-motor",
               "name": "Z Axis Motor",
               "kind": "stepper_motor",
-              "board_id": "ttyUSB1",
+              "board_id": "ttyUSB0",
               "sensor_kind": null,
               "rotation_min_deg": null,
               "rotation_max_deg": null,
@@ -1921,14 +1944,14 @@
                 {
                   "id": "z-left-dir",
                   "signal": "direction",
-                  "gpio": "33",
+                  "gpio": null,
                   "function_input_key": "z_left_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "z-left-step",
                   "signal": "step",
-                  "gpio": "32",
+                  "gpio": null,
                   "function_input_key": "z_left_step_pin",
                   "notes": null
                 },
@@ -1970,7 +1993,7 @@
               "routine_id": "move_gantry",
               "controller_role": "builder_board",
               "source": "firmware/main.ino",
-              "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
+              "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
               "entry_point": "move_gantry",
               "required_device_ids": [
                 "x-axis-motor",
@@ -1995,7 +2018,7 @@
           ]
         },
         "parameters": {
-          "tool_port": "/dev/ttyUSB1",
+          "tool_port": "/dev/ttyUSB0",
           "x_cm": 100,
           "y_cm": 100,
           "z_cm": 0,
@@ -2008,6 +2031,7 @@
           "x_dir_pin": "17",
           "y_step_pin": 18,
           "y_dir_pin": 19,
+          "motor_a_step_multiplier": 2,
           "limit_switch_mode": "2",
           "x_min_limit_pin": 21,
           "x_max_limit_pin": 22,
@@ -2027,14 +2051,14 @@
           "failureMode": "separate_path",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 19,
         "benchmarkDurationMs": 1039,
         "lastDurationMs": 74
       },
       "measured": {
         "width": 196,
-        "height": 260
+        "height": 214
       },
       "selected": false,
       "dragging": false

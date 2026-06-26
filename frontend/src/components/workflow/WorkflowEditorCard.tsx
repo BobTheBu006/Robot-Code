@@ -828,6 +828,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsPath, setSaveAsPath] = useState("");
   const [saveAsName, setSaveAsName] = useState("active-workflow");
+  const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
     phase: "idle",
@@ -2362,8 +2363,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     for (const nodeId of rootNodeIds) {
       collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
     }
-    const fallbackBoardIdsToFlash = filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
-    const firmwarePlanItems = collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
+    const fallbackBoardIdsToFlash = skipEsp32Flashing
+      ? []
+      : filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
+    const firmwarePlanItems = skipEsp32Flashing ? [] : collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
     const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
     setFunctionsError(null);
@@ -2466,6 +2469,15 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           </div>
 
           <div className="workflow-editor__actions">
+            <label className="workflow-editor__skip-flash">
+              <input
+                checked={skipEsp32Flashing}
+                disabled={workflowRunState.isRunning}
+                onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Skip ESP32 flash</span>
+            </label>
             <button
               className="workflow-editor__action workflow-editor__action--primary"
               disabled={workflowRunState.isRunning}

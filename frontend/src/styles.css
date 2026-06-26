@@ -684,8 +684,25 @@ body {
 .workflow-editor__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.workflow-editor__skip-flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: #47675c;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.workflow-editor__skip-flash input {
+  width: 16px;
+  height: 16px;
+  accent-color: #ef8b2c;
 }
 
 .workflow-editor__action,
