@@ -50,7 +50,8 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         )
 
         self.assertEqual(result["controller"], "raspberry-pi")
-        self.assertEqual(result["status"], "gpio_direct_execution_pending")
+        self.assertIn(result["status"], {"gpio_simulated", "gpio_executed"})
+        self.assertTrue(result["calibrated"])
         self.assertIsNone(result["tool_port"])
 
     def test_move_xy_uses_raspberry_gpio_branch_when_xy_devices_are_on_pi(self) -> None:
@@ -72,8 +73,8 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         )
 
         self.assertEqual(result["controller"], "raspberry-pi")
-        self.assertEqual(result["status"], "gpio_direct_execution_pending")
-        self.assertFalse(result["move_applied"])
+        self.assertIn(result["status"], {"gpio_simulated", "gpio_executed"})
+        self.assertTrue(result["move_applied"])
 
 
 if __name__ == "__main__":

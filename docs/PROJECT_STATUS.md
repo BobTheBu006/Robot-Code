@@ -11,7 +11,7 @@ This project is a modular, open-source robotic platform for lab automation. It i
 The system is a local Raspberry Pi coordinated robot-control app:
 
 - The Raspberry Pi runs the backend and frontend.
-- ESP32 boards handle low-level motors, actuators, and sensors.
+- ESP32 boards or Raspberry Pi GPIO handle low-level motors, actuators, and sensors depending on the Hardware Map wiring.
 - The frontend gives the operator a Hardware Map and Workflow Editor.
 - The backend stores workflows, discovers functions, syncs function hardware dependencies into the Hardware Map, and flashes ESP32 boards before workflow execution.
 - A fixed E-Stop overlay is always visible in the UI and sends immediate STOP commands to active controller sessions.
@@ -82,7 +82,7 @@ Function inputs such as `tool_port` and `*_pin` fields are treated as hardware-m
 
 Advanced function blocks normalize their hardware-device references from the current Hardware Map before disable and firmware-planning logic runs. If an old function manifest says a device was on an ESP32 but the Hardware Map now places that device on Raspberry Pi GPIO, the Hardware Map wins.
 
-Calibrate Gantry XY and Move Gantry detect when all required XY motors and XY limit switches are mapped to Raspberry Pi GPIO. In that case backend execution skips ESP32 serial communication and reports the resolved GPIO plan instead of opening `/dev/ttyUSB1`. A real Raspberry Pi GPIO stepper execution driver is still required before those Pi-backed blocks physically move hardware.
+Calibrate Gantry XY and Move Gantry detect when all required XY motors and XY limit switches are mapped to Raspberry Pi GPIO. In that case backend execution skips ESP32 serial communication and uses a Raspberry Pi GPIO CoreXY driver instead of opening `/dev/ttyUSB1`. On non-Pi development machines or when `RPi.GPIO` is unavailable, this path returns a `gpio_simulated` result so tests and UI flows can run without moving physical hardware.
 
 Disabled hardware is treated as unavailable rather than missing. Old maps without `enabled` fields load as enabled. When a function declares disabled hardware, the frontend disables the block and backend function-default resolution rejects direct execution with a hardware-disabled error.
 
