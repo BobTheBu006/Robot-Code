@@ -125,6 +125,10 @@ class HardwareMapService:
         inputs: dict[str, str | float | bool | None],
     ) -> dict[str, str | float | bool | None]:
         hardware_map = self.load_map()
+        disabled_reasons = self._disabled_dependency_reasons(hardware_map, manifest)
+        if disabled_reasons:
+            raise HardwareMapError("Hardware disabled: " + " ".join(disabled_reasons))
+
         resolved_inputs = dict(inputs)
         input_keys = {input_definition.key for input_definition in [*manifest.inputs, *manifest.advanced_inputs]}
 
@@ -137,7 +141,11 @@ class HardwareMapService:
             pin.function_input_key: pin.gpio
             for device in hardware_map.devices
             for pin in device.pins
-            if device.board_id and pin.function_input_key and pin.gpio != "-" and pin.signal != "-"
+            if self._device_is_enabled(hardware_map, device)
+            and device.board_id
+            and pin.function_input_key
+            and pin.gpio != "-"
+            and pin.signal != "-"
         }
 
         for input_key in input_keys:
@@ -153,7 +161,7 @@ class HardwareMapService:
         mapped_board_ids = {
             device.board_id
             for device in hardware_map.devices
-            if device.id in declared_device_ids and device.board_id
+            if device.id in declared_device_ids and self._device_is_enabled(hardware_map, device) and device.board_id
         }
         if len(mapped_board_ids) == 1:
             mapped_board_id = next(iter(mapped_board_ids))
@@ -161,12 +169,12 @@ class HardwareMapService:
                 return None
 
             for board in hardware_map.boards:
-                if board.id == mapped_board_id:
+                if board.id == mapped_board_id and board.enabled:
                     return board
 
         if manifest.builder_board_id:
             for board in hardware_map.boards:
-                if board.id == manifest.builder_board_id:
+                if board.id == manifest.builder_board_id and board.enabled:
                     return board
 
         default_port = next(
@@ -179,10 +187,38 @@ class HardwareMapService:
         )
         if default_port:
             for board in hardware_map.boards:
-                if board.usb_port == str(default_port):
+                if board.usb_port == str(default_port) and board.enabled:
                     return board
 
-        return hardware_map.boards[0] if hardware_map.boards else None
+        return next((board for board in hardware_map.boards if board.enabled), None)
+
+    def _device_is_enabled(self, hardware_map: HardwareMap, device: HardwareDeviceMapping) -> bool:
+        if not device.enabled:
+            return False
+
+        if device.board_id and device.board_id != "raspberry-pi":
+            board = next((candidate for candidate in hardware_map.boards if candidate.id == device.board_id), None)
+            if board and not board.enabled:
+                return False
+
+        for group in hardware_map.groups:
+            if not group.enabled and device.id in group.member_ids:
+                return False
+            if not group.enabled and device.board_id and device.board_id in group.member_ids:
+                return False
+
+        return True
+
+    def _disabled_dependency_reasons(self, hardware_map: HardwareMap, manifest: FunctionManifest) -> list[str]:
+        reasons: list[str] = []
+        declared_device_ids = {device.id for device in manifest.hardware_devices}
+        for device_id in declared_device_ids:
+            device = next((candidate for candidate in hardware_map.devices if candidate.id == device_id), None)
+            if not device:
+                continue
+            if not self._device_is_enabled(hardware_map, device):
+                reasons.append(f"{device.name} is disabled in the Hardware Map.")
+        return reasons
 
     def _input_defaults(self, manifest: FunctionManifest) -> dict[str, str]:
         defaults: dict[str, str] = {}
@@ -386,12 +422,12 @@ class HardwareMapService:
         gantry_devices = [
             HardwareDeviceMapping(
                 id="x-axis-motor",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="CoreXY A Motor",
                 kind="stepper_motor",
                 pins=[
-                    _pin("x-dir", "direction", 17, "x_dir_pin"),
-                    _pin("x-step", "step", 16, "x_step_pin"),
+                    _pin("x-dir", "direction", 27, "x_dir_pin"),
+                    _pin("x-step", "step", 17, "x_step_pin"),
                     _pin("x-enable", "enable", "-", None),
                     _pin("x-ms1", "micro_step_1", "-", None),
                     _pin("x-ms2", "micro_step_2", "-", None),
@@ -401,12 +437,12 @@ class HardwareMapService:
             ),
             HardwareDeviceMapping(
                 id="y-axis-motor",
-                board_id=gantry_board.id,
+                board_id="raspberry-pi",
                 name="CoreXY B Motor",
                 kind="stepper_motor",
                 pins=[
-                    _pin("y-dir", "direction", 19, "y_dir_pin"),
-                    _pin("y-step", "step", 18, "y_step_pin"),
+                    _pin("y-dir", "direction", 24, "y_dir_pin"),
+                    _pin("y-step", "step", 23, "y_step_pin"),
                     _pin("y-enable", "enable", "-", None),
                     _pin("y-ms1", "micro_step_1", "-", None),
                     _pin("y-ms2", "micro_step_2", "-", None),

@@ -55,6 +55,7 @@ interface HardwareNodeData extends Record<string, unknown> {
   meta: string;
   accent: string;
   status?: string;
+  disabled?: boolean;
 }
 
 const RASPBERRY_NODE_ID = "raspberry-pi";
@@ -230,6 +231,10 @@ function isCalibratedStepperPump(device: HardwareDeviceMapping): boolean {
     && normalizePositiveNumberValue(device.calibration_ml_per_200_steps) !== null;
 }
 
+function isHardwareEnabled(item: { enabled?: boolean } | null | undefined): boolean {
+  return item?.enabled !== false;
+}
+
 function sensorKindLabel(sensorKind: HardwareSensorKind | null | undefined): string {
   return SENSOR_KIND_OPTIONS.find((option) => option.value === sensorKind)?.label ?? "Position / limit switch";
 }
@@ -254,6 +259,7 @@ function HardwareDiagramNode({ data, selected }: NodeProps<HardwareFlowNode>) {
         className={[
           "hardware-flow-node",
           "hardware-flow-node--group",
+          data.disabled ? "hardware-flow-node--disabled" : "",
           selected ? "hardware-flow-node--selected" : "",
         ].filter(Boolean).join(" ")}
         style={{ "--hardware-node-accent": data.accent } as CSSProperties}
@@ -273,6 +279,7 @@ function HardwareDiagramNode({ data, selected }: NodeProps<HardwareFlowNode>) {
       className={[
         "hardware-flow-node",
         `hardware-flow-node--${data.kind}`,
+        data.disabled ? "hardware-flow-node--disabled" : "",
         selected ? "hardware-flow-node--selected" : "",
       ].filter(Boolean).join(" ")}
       style={{ "--hardware-node-accent": data.accent } as CSSProperties}
@@ -372,6 +379,7 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
       id: board.id.trim(),
       label: board.label.trim(),
       usb_port: board.usb_port.trim(),
+      enabled: isHardwareEnabled(board),
       notes: board.notes?.trim() || null,
     }))
     .filter((board) => board.id && board.label && board.usb_port);
@@ -388,6 +396,7 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
           board_id: boardIds.has(boardId) ? boardId : "",
           name: device.name.trim(),
           kind,
+          enabled: isHardwareEnabled(device),
           sensor_kind: sensorKind,
           rotation_min_deg: kind === "servo" ? normalizeServoRangeValue(device.rotation_min_deg, -5) : null,
           rotation_max_deg: kind === "servo" ? normalizeServoRangeValue(device.rotation_max_deg, 175) : null,
@@ -410,6 +419,7 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
       id: group.id.trim(),
       name: group.name.trim(),
       member_ids: Array.from(new Set(group.member_ids.map((memberId) => memberId.trim()).filter((memberId) => itemIds.has(memberId)))),
+      enabled: isHardwareEnabled(group),
       notes: group.notes?.trim() || null,
     }))
     .filter((group) => group.id && group.name && group.member_ids.length > 0);
@@ -438,6 +448,26 @@ function groupFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hardw
   }
 
   return (hardwareMap.groups ?? []).find((group) => group.id === nodeId) ?? null;
+}
+
+function isBoardEnabled(hardwareMap: HardwareMap, boardId: string | null | undefined): boolean {
+  if (!boardId || isRaspberryBoardId(boardId)) {
+    return true;
+  }
+
+  const board = hardwareMap.boards.find((candidate) => candidate.id === boardId);
+  return isHardwareEnabled(board);
+}
+
+function isDeviceEnabled(hardwareMap: HardwareMap, device: HardwareDeviceMapping): boolean {
+  if (!isHardwareEnabled(device) || !isBoardEnabled(hardwareMap, device.board_id)) {
+    return false;
+  }
+
+  return !(hardwareMap.groups ?? []).some((group) =>
+    !isHardwareEnabled(group)
+    && (group.member_ids.includes(device.id) || (!!device.board_id && group.member_ids.includes(device.board_id))),
+  );
 }
 
 function nodePositionForId(
@@ -515,8 +545,9 @@ function buildHardwareNodes(
         title: group.name,
         detail: "Hardware group",
         meta: `${group.member_ids.length} block${group.member_ids.length === 1 ? "" : "s"}`,
-        accent: groupIndex % 2 === 0 ? "#6d5bd0" : "#0f6f66",
-        status: "group",
+        accent: isHardwareEnabled(group) ? (groupIndex % 2 === 0 ? "#6d5bd0" : "#0f6f66") : "#6b7280",
+        status: isHardwareEnabled(group) ? "group" : "disabled",
+        disabled: !isHardwareEnabled(group),
       },
     };
   });
@@ -541,6 +572,7 @@ function buildHardwareNodes(
     if (groupedMemberIds.has(device.id)) {
       return;
     }
+    const deviceEnabled = isDeviceEnabled(hardwareMap, device);
 
     nodes.push({
       id: device.id,
@@ -555,8 +587,9 @@ function buildHardwareNodes(
             ? "Peristaltic pump"
             : deviceKindLabel(normalizeDeviceKind(device.kind)),
         meta: "unconnected",
-        accent: "#6b7280",
-        status: "unconnected",
+        accent: deviceEnabled ? "#6b7280" : "#9ca3af",
+        status: deviceEnabled ? "unconnected" : "disabled",
+        disabled: !deviceEnabled,
       },
     });
   });
@@ -565,6 +598,7 @@ function buildHardwareNodes(
     if (groupedMemberIds.has(device.id)) {
       return;
     }
+    const deviceEnabled = isDeviceEnabled(hardwareMap, device);
 
     nodes.push({
       id: device.id,
@@ -581,7 +615,9 @@ function buildHardwareNodes(
         meta: isCalibratedStepperPump(device)
           ? `${device.calibration_ml_per_200_steps} mL / 200 steps`
           : `${device.pins.length} pin${device.pins.length === 1 ? "" : "s"}`,
-        accent: deviceAccent(device),
+        accent: deviceEnabled ? deviceAccent(device) : "#9ca3af",
+        status: deviceEnabled ? undefined : "disabled",
+        disabled: !deviceEnabled,
       },
     });
   });
@@ -594,6 +630,7 @@ function buildHardwareNodes(
     const detectedBoard = getDetectedBoard(board, detectedBoards);
     const boardDevices = devicesByBoard.get(board.id) ?? [];
     const boardY = 80 + boardIndex * Math.max(190, Math.max(boardDevices.length, 1) * 110);
+    const boardEnabled = isHardwareEnabled(board);
 
     nodes.push({
       id: board.id,
@@ -604,8 +641,9 @@ function buildHardwareNodes(
         title: board.label,
         detail: board.usb_port,
         meta: `${boardDevices.length} device${boardDevices.length === 1 ? "" : "s"}`,
-        accent: "#0e7490",
-        status: detectedBoard?.connected ? "connected" : detectedBoard ? "offline" : "manual",
+        accent: boardEnabled ? "#0e7490" : "#6b7280",
+        status: boardEnabled ? (detectedBoard?.connected ? "connected" : detectedBoard ? "offline" : "manual") : "disabled",
+        disabled: !boardEnabled,
       },
     });
 
@@ -613,6 +651,7 @@ function buildHardwareNodes(
       if (groupedMemberIds.has(device.id)) {
         return;
       }
+      const deviceEnabled = isDeviceEnabled(hardwareMap, device);
 
       nodes.push({
         id: device.id,
@@ -629,7 +668,9 @@ function buildHardwareNodes(
           meta: isCalibratedStepperPump(device)
             ? `${device.calibration_ml_per_200_steps} mL / 200 steps`
             : `${device.pins.length} pin${device.pins.length === 1 ? "" : "s"}`,
-          accent: deviceAccent(device),
+          accent: deviceEnabled ? deviceAccent(device) : "#9ca3af",
+          status: deviceEnabled ? undefined : "disabled",
+          disabled: !deviceEnabled,
         },
       });
     });
@@ -879,6 +920,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           id: nextId,
           label: "New Controller",
           usb_port: "/dev/ttyUSB0",
+          enabled: true,
           notes: null,
         },
       ],
@@ -919,6 +961,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           board_id: boardId,
           name: "New IoT Device",
           kind: "stepper_motor",
+          enabled: true,
           sensor_kind: null,
           rotation_min_deg: null,
           rotation_max_deg: null,
@@ -1153,6 +1196,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           id: groupId,
           name: `Hardware Group ${(currentMap.groups ?? []).length + 1}`,
           member_ids: memberIds,
+          enabled: true,
           notes: null,
         },
       ],
@@ -1277,6 +1321,14 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               }}
             />
           </label>
+          <label className="hardware-settings__check">
+            <input
+              checked={isHardwareEnabled(selectedGroup)}
+              onChange={(event) => updateGroup(selectedGroup.id, { enabled: event.target.checked })}
+              type="checkbox"
+            />
+            <span>Enabled</span>
+          </label>
           <div className="hardware-settings__connection-row">
             <span>Members</span>
             <strong>{selectedGroup.member_ids.length} block{selectedGroup.member_ids.length === 1 ? "" : "s"}</strong>
@@ -1344,6 +1396,14 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
               onBlur={(event) => updateBoard(selectedBoard.id, { id: normalizeId(event.target.value, selectedBoard.id) })}
             />
           </label>
+          <label className="hardware-settings__check">
+            <input
+              checked={isHardwareEnabled(selectedBoard)}
+              onChange={(event) => updateBoard(selectedBoard.id, { enabled: event.target.checked })}
+              type="checkbox"
+            />
+            <span>Enabled</span>
+          </label>
           <label className="hardware-settings__field">
             <span>Notes</span>
             <textarea
@@ -1379,6 +1439,14 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
             onChange={(event) => updateDevice(selectedDevice.id, { name: event.target.value })}
             value={selectedDevice.name}
           />
+        </label>
+        <label className="hardware-settings__check">
+          <input
+            checked={isHardwareEnabled(selectedDevice)}
+            onChange={(event) => updateDevice(selectedDevice.id, { enabled: event.target.checked })}
+            type="checkbox"
+          />
+          <span>Enabled</span>
         </label>
         <div className="hardware-settings__field-grid">
           <label className="hardware-settings__field">

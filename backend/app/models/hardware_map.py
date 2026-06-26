@@ -11,6 +11,7 @@ class HardwareBoardMapping(BaseModel):
     id: str = Field(min_length=1)
     label: str = Field(min_length=1)
     usb_port: str = Field(min_length=1)
+    enabled: bool = True
     notes: str | None = None
 
 
@@ -27,6 +28,7 @@ class HardwareDeviceMapping(BaseModel):
     board_id: str = ""
     name: str = Field(min_length=1)
     kind: HardwareDeviceKind = "stepper_motor"
+    enabled: bool = True
     sensor_kind: HardwareSensorKind | None = None
     rotation_min_deg: float | None = None
     rotation_max_deg: float | None = None
@@ -57,6 +59,7 @@ class HardwareGroupMapping(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     member_ids: list[str] = Field(default_factory=list)
+    enabled: bool = True
     notes: str | None = None
 
 

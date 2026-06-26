@@ -14,6 +14,7 @@ The Hardware Map owns physical wiring and grouping:
 - device pins and signal names
 - device calibration metadata such as pump mL per 200 motor steps
 - controller/device groups
+- enabled/disabled state for controllers, devices, and groups
 
 Functions, firmware, and workflow blocks must not treat private pin maps as the source of truth. They may provide defaults or requirements, but the Hardware Map resolves the actual physical setup.
 
@@ -22,6 +23,8 @@ Workflow function blocks must not expose controller selection, USB port selectio
 Devices wired directly to the Pi use `board_id: raspberry-pi`. This is a virtual controller ID and must not create a duplicate ESP32/controller block.
 
 Devices with an empty `board_id` are intentionally unconnected. The UI must keep them visible so they can be reconnected instead of silently deleting or reassigning them.
+
+Disabled hardware is intentionally unavailable but still part of the project. It must stay visible in the Hardware Map and must not be silently removed from workflows. Workflow blocks that depend on disabled hardware should be disabled with a clear reason, skipped from firmware planning/flashing, and blocked from direct execution until the hardware is enabled again.
 
 The current gantry model is CoreXY, not independent left/right or independent X/Y motors. The stable `x-axis-motor` and `y-axis-motor` IDs are compatibility names for CoreXY A and CoreXY B motors. The normal Cartesian gantry coordinate system is X/Y/Z in centimeters from the back-bottom-left origin, with a current nominal work envelope of 115 cm x 60 cm x 60 cm.
 

@@ -163,6 +163,7 @@ export interface WorkflowBlockDefinition {
   builderWorkspacePath?: string | null;
   builderFirmwareEntryFile?: string | null;
   builderBaseFunctionId?: string | null;
+  disabledReason?: string | null;
   missingReference?: {
     originalId: string;
     originalKind: WorkflowBlockKind;

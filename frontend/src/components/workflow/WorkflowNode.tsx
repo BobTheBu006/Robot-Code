@@ -18,6 +18,8 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
   const outputs = getWorkflowNodeOutputs(data);
   const portsHeight = Math.max(outputs.length * 22, 14);
   const isActive = data.isActive !== false;
+  const disabledReason = data.block.disabledReason ?? null;
+  const canRun = isActive && !disabledReason;
   const executionStatus = data.executionStatus ?? "idle";
   const showEstimate = executionStatus === "running" || Boolean(data.benchmarkDurationMs);
   const kindLabel = data.block.kind === "compound"
@@ -31,7 +33,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
 
   return (
     <div
-      className={`workflow-node ${selected ? "workflow-node--selected" : ""} ${isActive ? "" : "workflow-node--inactive"} ${isBroken ? "workflow-node--broken" : ""} ${executionStatus === "running" ? "workflow-node--running" : ""} ${executionStatus === "error" ? "workflow-node--error" : ""}`}
+      className={`workflow-node ${selected ? "workflow-node--selected" : ""} ${canRun ? "" : "workflow-node--inactive"} ${isBroken ? "workflow-node--broken" : ""} ${executionStatus === "running" ? "workflow-node--running" : ""} ${executionStatus === "error" ? "workflow-node--error" : ""}`}
       style={nodeStyle}
     >
       <div className="workflow-node__actions">
@@ -49,7 +51,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
         </button>
         <button
           className="workflow-node__action nodrag nopan"
-          disabled={isBroken || (!isActive && executionStatus !== "running")}
+          disabled={isBroken || (!canRun && executionStatus !== "running")}
           onClick={(event) => {
             event.stopPropagation();
             if (executionStatus === "running") {
@@ -59,7 +61,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
             data.onRun?.();
           }}
           onMouseDown={(event) => event.stopPropagation()}
-          title={isBroken ? "Restore or replace this missing block before running it" : executionStatus === "running" ? "Cancel block test" : "Run block test"}
+          title={isBroken ? "Restore or replace this missing block before running it" : disabledReason ?? (executionStatus === "running" ? "Cancel block test" : "Run block test")}
           type="button"
         >
           {executionStatus === "running" ? "Cancel" : "Run"}
@@ -86,6 +88,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
         <span className="workflow-node__kind">{kindLabel}</span>
         <strong>{data.block.displayName}</strong>
         <p>{data.block.description}</p>
+        {disabledReason ? <p className="workflow-node__disabled-reason">{disabledReason}</p> : null}
         {isBroken ? <p className="workflow-node__repair">{data.block.missingReference?.suggestedFix}</p> : null}
       </div>
 

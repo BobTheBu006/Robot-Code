@@ -5,6 +5,7 @@ export interface HardwareBoardMapping {
   id: string;
   label: string;
   usb_port: string;
+  enabled?: boolean;
   notes?: string | null;
 }
 
@@ -21,6 +22,7 @@ export interface HardwareDeviceMapping {
   board_id: string;
   name: string;
   kind: HardwareDeviceKind;
+  enabled?: boolean;
   sensor_kind?: HardwareSensorKind | null;
   rotation_min_deg?: number | null;
   rotation_max_deg?: number | null;
@@ -33,6 +35,7 @@ export interface HardwareGroupMapping {
   id: string;
   name: string;
   member_ids: string[];
+  enabled?: boolean;
   notes?: string | null;
 }
 

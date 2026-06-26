@@ -404,6 +404,12 @@ body {
   box-shadow: 0 16px 34px rgba(109, 91, 208, 0.16);
 }
 
+.hardware-flow-node--disabled {
+  opacity: 0.55;
+  filter: saturate(0.65);
+  background: #f3f4f6;
+}
+
 .hardware-flow-node__type {
   color: var(--hardware-node-accent);
   font-size: 0.72rem;
@@ -506,6 +512,19 @@ body {
 .hardware-map label {
   display: grid;
   gap: 6px;
+}
+
+.hardware-settings__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: #17322a;
+  font-weight: 800;
+}
+
+.hardware-settings__check input {
+  width: auto;
 }
 
 .hardware-settings__field span,
@@ -1150,6 +1169,13 @@ body {
 .workflow-node--inactive {
   opacity: 0.58;
   filter: saturate(0.7);
+}
+
+.workflow-node__disabled-reason {
+  margin: 8px 0 0;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .workflow-node__actions {

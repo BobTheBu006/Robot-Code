@@ -36,6 +36,8 @@ Before `v0.1 beta`, ensure these files have explicit versions:
 - module manifests: must have `schema_version`
 - firmware protocol descriptors: must have `schema_version`
 
+Hardware map controller, device, and group `enabled` fields are additive. Older hardware maps without those fields load as enabled.
+
 ## Migration Rules
 
 When a schema changes:

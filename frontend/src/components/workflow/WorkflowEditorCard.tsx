@@ -69,7 +69,7 @@ import type {
 } from "../../types/workflow";
 import type { Esp32CustomBlockSaveResponse, Esp32WorkflowFirmwarePlanRequestItem } from "../../types/esp32Builder";
 import type { Esp32BoardSummary } from "../../types/esp32Builder";
-import type { HardwareMap } from "../../types/hardwareMap";
+import type { HardwareDeviceMapping, HardwareMap } from "../../types/hardwareMap";
 import { Panel } from "../Panel";
 import { StatusBadge } from "../StatusBadge";
 import { WorkflowEdge } from "./WorkflowEdge";
@@ -347,6 +347,86 @@ function getBoardIdForBlock(block: WorkflowBlockDefinition, hardwareMap: Hardwar
   return block.hardwareBoardId ?? block.builderBoardId ?? null;
 }
 
+function isHardwareEnabled(item: { enabled?: boolean } | null | undefined): boolean {
+  return item?.enabled !== false;
+}
+
+function getHardwareDependencyDeviceIds(block: WorkflowBlockDefinition): string[] {
+  const deviceIds = new Set((block.hardwareDevices ?? []).map((device) => device.id));
+  if (block.hardwareDeviceId) {
+    deviceIds.add(block.hardwareDeviceId);
+  }
+
+  for (const innerNode of block.compound?.nodes ?? []) {
+    getHardwareDependencyDeviceIds(innerNode.data.block).forEach((deviceId) => deviceIds.add(deviceId));
+  }
+
+  return Array.from(deviceIds);
+}
+
+function getDisabledGroupForDevice(
+  hardwareMap: HardwareMap,
+  device: HardwareDeviceMapping,
+) {
+  return (hardwareMap.groups ?? []).find((group) =>
+    !isHardwareEnabled(group)
+    && (group.member_ids.includes(device.id) || (!!device.board_id && group.member_ids.includes(device.board_id))),
+  ) ?? null;
+}
+
+function isHardwareDeviceEnabled(hardwareMap: HardwareMap, device: HardwareDeviceMapping): boolean {
+  if (!isHardwareEnabled(device) || getDisabledGroupForDevice(hardwareMap, device)) {
+    return false;
+  }
+
+  if (device.board_id && device.board_id !== RASPBERRY_BOARD_ID) {
+    const board = hardwareMap.boards.find((candidate) => candidate.id === device.board_id);
+    return isHardwareEnabled(board);
+  }
+
+  return true;
+}
+
+function getDisabledHardwareReason(block: WorkflowBlockDefinition, hardwareMap: HardwareMap | null): string | null {
+  if (!hardwareMap) {
+    return null;
+  }
+
+  const dependencyDeviceIds = getHardwareDependencyDeviceIds(block);
+  for (const deviceId of dependencyDeviceIds) {
+    const device = hardwareMap.devices.find((candidate) => candidate.id === deviceId);
+    if (!device) {
+      continue;
+    }
+
+    if (!isHardwareEnabled(device)) {
+      return `${device.name} is disabled in the Hardware Map.`;
+    }
+
+    const disabledGroup = getDisabledGroupForDevice(hardwareMap, device);
+    if (disabledGroup) {
+      return `${device.name} is inside disabled hardware group ${disabledGroup.name}.`;
+    }
+
+    if (device.board_id && device.board_id !== RASPBERRY_BOARD_ID) {
+      const board = hardwareMap.boards.find((candidate) => candidate.id === device.board_id);
+      if (board && !isHardwareEnabled(board)) {
+        return `${device.name} is connected to disabled controller ${board.label}.`;
+      }
+    }
+  }
+
+  const boardId = dependencyDeviceIds.length === 0 ? block.hardwareBoardId ?? block.builderBoardId ?? null : null;
+  if (boardId && boardId !== RASPBERRY_BOARD_ID) {
+    const board = hardwareMap.boards.find((candidate) => candidate.id === boardId);
+    if (board && !isHardwareEnabled(board)) {
+      return `${board.label} is disabled in the Hardware Map.`;
+    }
+  }
+
+  return null;
+}
+
 function getHardwareMapPortForBlock(block: WorkflowBlockDefinition, hardwareMap: HardwareMap | null): string | null {
   const boardId = getBoardIdForBlock(block, hardwareMap);
   if (!boardId || boardId === RASPBERRY_BOARD_ID) {
@@ -360,6 +440,10 @@ function getHardwareMapPinParameters(hardwareMap: HardwareMap | null): Record<st
   const pinParameters: Record<string, WorkflowParameterValue> = {};
 
   for (const device of hardwareMap?.devices ?? []) {
+    if (hardwareMap && !isHardwareDeviceEnabled(hardwareMap, device)) {
+      continue;
+    }
+
     for (const pin of device.pins) {
       if (!pin.function_input_key || pin.gpio === "-" || pin.signal === "-") {
         continue;
@@ -801,18 +885,25 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     return estimateNodeDuration(node);
   }
 
-  const renderedNodes = nodes.map((node) => ({
-    ...node,
-    data: {
-      ...node.data,
-      executionStatus: testStateByNodeId[node.id]?.status ?? "idle",
-      executionEtaMs: getNodeExecutionEta(node.id),
-      onDelete: () => handleDeleteNode(node.id),
-      onRun: () => void handleRunTestForNode(node.id),
-      onCancel: () => void handleCancelNodeExecution(node.id),
-      onToggleActive: () => handleToggleNodeActive(node.id),
-    },
-  }));
+  const renderedNodes = nodes.map((node) => {
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        block: {
+          ...node.data.block,
+          disabledReason,
+        },
+        executionStatus: testStateByNodeId[node.id]?.status ?? "idle",
+        executionEtaMs: getNodeExecutionEta(node.id),
+        onDelete: () => handleDeleteNode(node.id),
+        onRun: () => void handleRunTestForNode(node.id),
+        onCancel: () => void handleCancelNodeExecution(node.id),
+        onToggleActive: () => handleToggleNodeActive(node.id),
+      },
+    };
+  });
   const renderedEdges = edges.map((edge) => ({
     ...edge,
     data: {
@@ -1627,6 +1718,21 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     blockResults: Record<string, Record<string, unknown> | null | undefined> = {},
     signal?: AbortSignal,
   ): Promise<FunctionTestResponse> {
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    if (disabledReason) {
+      return {
+        function_id: node.data.block.id,
+        ok: true,
+        inputs: node.data.parameters,
+        input_data: inputData,
+        result: {
+          status: "hardware_disabled",
+          message: disabledReason,
+        },
+        error: null,
+      };
+    }
+
     const resolvedParameters = resolveWorkflowParameters(
       getAllBlockInputs(node.data.block),
       node.data.parameters,
@@ -1753,6 +1859,32 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     const node = nodeLookup.get(nodeId);
     if (!node) {
       throw new Error(`Could not find node '${nodeId}' for execution.`);
+    }
+
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    if (disabledReason) {
+      const disabledResult: FunctionTestResponse = {
+        function_id: node.data.block.id,
+        ok: true,
+        inputs: node.data.parameters,
+        input_data: inputData,
+        result: {
+          status: "hardware_disabled",
+          message: disabledReason,
+        },
+        error: null,
+      };
+
+      updateTestState((currentState) => ({
+        ...currentState,
+        [nodeId]: {
+          status: "success",
+          result: disabledResult,
+          error: null,
+        },
+      }));
+
+      return disabledResult;
     }
 
     if (node.data.isActive === false) {
@@ -1999,6 +2131,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     block: WorkflowBlockDefinition,
     boardIds: Set<string>,
   ) {
+    if (getDisabledHardwareReason(block, hardwareMap)) {
+      return;
+    }
+
     if (isEsp32WorkflowBoardId(block.hardwareBoardId)) {
       boardIds.add(block.hardwareBoardId);
     }
@@ -2024,7 +2160,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   }
 
   function getHardwareMapEsp32BoardIds(): Set<string> {
-    return new Set((hardwareMap?.boards ?? []).map((board) => board.id).filter(isEsp32WorkflowBoardId));
+    return new Set((hardwareMap?.boards ?? [])
+      .filter((board) => isHardwareEnabled(board))
+      .map((board) => board.id)
+      .filter(isEsp32WorkflowBoardId));
   }
 
   function filterBoardIdsToHardwareMap(boardIds: string[]): string[] {
@@ -2043,12 +2182,16 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   ) {
     for (const deviceId of deviceIds) {
       const blockDevice = block.hardwareDevices?.find((device) => device.id === deviceId);
-      if (isEsp32WorkflowBoardId(blockDevice?.board_id)) {
+      const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceId);
+      if (mappedDevice && hardwareMap && !isHardwareDeviceEnabled(hardwareMap, mappedDevice)) {
+        continue;
+      }
+
+      if (!mappedDevice && isEsp32WorkflowBoardId(blockDevice?.board_id)) {
         boardIds.add(blockDevice.board_id);
         continue;
       }
 
-      const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceId);
       if (isEsp32WorkflowBoardId(mappedDevice?.board_id)) {
         boardIds.add(mappedDevice.board_id);
       }
@@ -2118,6 +2261,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     blockId: string,
     itemsByKey: Map<string, Esp32WorkflowFirmwarePlanRequestItem>,
   ) {
+    if (getDisabledHardwareReason(block, hardwareMap)) {
+      return;
+    }
+
     for (const requirement of block.firmwareRequirements ?? []) {
       const boardIds = getBoardIdsForFirmwareRequirement(block, requirement);
       for (const boardId of boardIds) {

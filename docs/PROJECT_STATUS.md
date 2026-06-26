@@ -1,6 +1,6 @@
 # Project Status
 
-Last meaningful update: 2026-06-25
+Last meaningful update: 2026-06-26
 
 ## Mission
 
@@ -46,6 +46,7 @@ The Hardware Map currently models:
 - Stable legacy device IDs are preserved for compatibility: `x-axis-motor` now means CoreXY A, `y-axis-motor` now means CoreXY B, and `left-z-motor` now means the single Z axis. The old right-Z entries are kept as unconnected legacy placeholders.
 - X/Y CoreXY motor pins and X/Y min/max limit switches may be mapped directly to Raspberry Pi GPIO or a controller through the Hardware Map. Current saved map uses CoreXY A step/dir GPIO 17/27, CoreXY B step/dir GPIO 23/24, and XY limit switch inputs GPIO 5/6/12/13.
 - Hardware groups that collapse selected controller/device assemblies into one block while keeping a visible Raspberry Pi connection.
+- Controller, device, and hardware-group blocks can be disabled without deleting wiring. Disabled boards disable their attached devices, disabled groups disable their members, and dependent workflow blocks become disabled until the hardware is enabled again.
 
 The Hardware Map is the source of truth for USB ports, logical device IDs, pin assignments, and hardware groups.
 
@@ -67,6 +68,7 @@ The Workflow Editor currently has:
 - Advanced function blocks no longer expose a per-block "Selected ESP32" setting. Controller/USB port selection is resolved from the linked hardware devices in the Hardware Map when the block runs.
 - Move Gantry is now a Cartesian XYZ block for the CoreXY gantry. It exposes X, Y, and Z target positions in centimeters, numeric RPM, optional trapezoidal acceleration management, and on-the-fly near-limit calibration settings. X is bounded to 0-115 cm, Y to 0-60 cm, and Z to 0-60 cm from the back-bottom-left origin.
 - Broken-reference placeholders for saved blocks whose function, hardware device, or module cannot currently be resolved.
+- Blocks that depend on disabled Hardware Map items render as inactive with the hardware reason shown on the node. They do not run and are excluded from ESP32 firmware planning/flashing while disabled.
 - The fixed E-Stop overlay aborts in-flight workflow requests in the UI and calls the backend emergency stop endpoint.
 
 Workflow outputs are control-flow paths only. Function result data is not a graph output.
@@ -76,6 +78,8 @@ Workflow outputs are control-flow paths only. Function result data is not a grap
 Function manifests can declare `hardware_devices`. Those devices are synced into the Hardware Map using stable IDs and optional `function_input_key` pin links.
 
 Function inputs such as `tool_port` and `*_pin` fields are treated as hardware-map-resolved internals, not operator-selected block settings. The operator moves devices/controllers and edits pins in the Hardware Map, and workflow blocks inherit the correct controller port and GPIO values from those linked devices.
+
+Disabled hardware is treated as unavailable rather than missing. Old maps without `enabled` fields load as enabled. When a function declares disabled hardware, the frontend disables the block and backend function-default resolution rejects direct execution with a hardware-disabled error.
 
 Function manifests now carry `schema_version` at the backend model boundary. Legacy manifests without the field are treated as schema version 1. Unsupported future manifest schemas are rejected with a validation error instead of being loaded as if they were compatible.
 
