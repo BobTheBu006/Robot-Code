@@ -1,6 +1,6 @@
 # Project Status
 
-Last meaningful update: 2026-06-26
+Last meaningful update: 2026-06-28
 
 ## Mission
 
@@ -12,15 +12,15 @@ The system is a local Raspberry Pi coordinated robot-control app:
 
 - The Raspberry Pi runs the backend and frontend.
 - ESP32 boards or Raspberry Pi GPIO handle low-level motors, actuators, and sensors depending on the Hardware Map wiring.
-- The frontend gives the operator a Hardware Map and Workflow Editor.
+- The frontend gives the operator Dashboard, Workflow Editor, Function Map, and Hardware Map pages.
 - The backend stores workflows, discovers functions, syncs function hardware dependencies into the Hardware Map, and flashes ESP32 boards before workflow execution.
-- A fixed E-Stop overlay is always visible in the UI and sends immediate STOP commands to active controller sessions.
+- A sticky app header keeps page selection and E-Stop visible, and E-Stop sends immediate STOP commands to active controller sessions.
 - On Raspberry Pi/Linux development runs, the frontend defaults to same-origin `/api` calls through the Vite proxy to the local FastAPI backend. This avoids browser-side `127.0.0.1` resolving to the wrong machine when the UI is opened from another computer on the LAN.
 
 ## Current Implemented Areas
 
 - `backend/`: FastAPI app with routes for health, robot state, camera, hardware map, workflow storage, function discovery, and ESP32 builder/flash support.
-- `frontend/`: React/Vite app with Hardware Map and Workflow Editor.
+- `frontend/`: React/Vite app with Dashboard, Workflow Editor, Function Map, and Hardware Map pages.
 - `functions/esp 32 code/`: board workspaces with `board.json`, firmware entry files, and workflow-function blueprints.
 - `backend/app/functions/`: backend-discovered advanced function folders with manifests and handlers.
 - `hardware-map.json`: persisted physical map of boards, devices, pins, and hardware groups.
@@ -35,6 +35,8 @@ The Hardware Map currently models:
 - Hardware map connections can be disconnected from the canvas; disconnected devices stay visible as unconnected blocks until the operator reconnects them to the Raspberry Pi or a controller.
 - Detected ESP32 workspaces/ports are shown as connection options, but they are not automatically re-added as controller blocks after the operator deletes them.
 - ESP32 controller blocks with USB port selection. The selector lists currently detected connected serial ports first, marks whether each port is available/current/used by another controller, and keeps saved ports visible when a controller is unplugged.
+- The Hardware Map page is canvas-first and uses most of the viewport: top buttons handle refresh/add/save, and selecting or creating a controller/device opens a right-side settings drawer.
+- A full-page Function Map groups advanced functions by hardware family and lets the operator choose which saved Hardware Map devices each function uses through assignment dropdowns.
 - Devices connected to controllers.
 - Device types:
   - stepper motor with direction, step, enable, and three micro-step signals
@@ -49,7 +51,7 @@ The Hardware Map currently models:
 - Hardware groups that collapse selected controller/device assemblies into one block while keeping a visible Raspberry Pi connection.
 - Controller, device, and hardware-group blocks can be disabled without deleting wiring. Disabled boards disable their attached devices, disabled groups disable their members, and dependent workflow blocks become disabled until the hardware is enabled again.
 
-The Hardware Map is the source of truth for USB ports, logical device IDs, pin assignments, and hardware groups.
+The Hardware Map is the source of truth for USB ports, logical device IDs, function-to-device assignments, pin assignments, and hardware groups.
 
 ## Workflow Editor Status
 
@@ -61,6 +63,7 @@ The Workflow Editor currently has:
 - Tool Change advanced function for six editable rack slots along the top-left work-area edge.
 - Compound functions created from directly connected selected blocks.
 - A separate compound-function editing canvas.
+- The Workflow Editor page is canvas-first: top buttons handle add blocks, run, save/load, and reset; the block palette and selected-block editor open as right-side drawers.
 - Workflow and hardware canvases use drag-select by default and Control-drag for panning.
 - Individual hide/unhide behavior for palette blocks.
 - Right-click actions for creating, editing, and uncompounding compound functions.
@@ -72,13 +75,15 @@ The Workflow Editor currently has:
 - Calibrate Gantry XY and Move Gantry expose a Motor A Step Multiplier advanced setting. The current default is 2.0, causing the CoreXY A motor to receive twice the normal step pulses while preserving Cartesian X/Y targets.
 - Broken-reference placeholders for saved blocks whose function, hardware device, or module cannot currently be resolved.
 - Blocks that depend on disabled Hardware Map items render as inactive with the hardware reason shown on the node. They do not run and are excluded from ESP32 firmware planning/flashing while disabled.
-- The fixed E-Stop overlay aborts in-flight workflow requests in the UI and calls the backend emergency stop endpoint.
+- The sticky header E-Stop aborts in-flight workflow requests in the UI and calls the backend emergency stop endpoint.
 
 Workflow outputs are control-flow paths only. Function result data is not a graph output.
 
 ## Function And Hardware Dependency Status
 
-Function manifests can declare `hardware_devices`. Those devices are synced into the Hardware Map using stable IDs and optional `function_input_key` pin links.
+Function manifests can declare `hardware_devices`. Those devices are synced into the Hardware Map using stable IDs and optional `function_input_key` pin links. If required manifest hardware is missing and has not been assigned to an existing physical device, startup sync creates a disabled, unconnected placeholder device instead of creating or guessing a controller.
+
+Function-to-hardware assignments are stored in the Hardware Map. When an assignment exists, frontend disable checks, firmware planning, and backend default resolution use the selected physical Hardware Map device instead of the manifest placeholder ID.
 
 Function inputs such as `tool_port` and `*_pin` fields are treated as hardware-map-resolved internals, not operator-selected block settings. The operator moves devices/controllers and edits pins in the Hardware Map, and workflow blocks inherit the correct controller port and GPIO values from those linked devices.
 

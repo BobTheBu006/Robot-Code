@@ -3,7 +3,7 @@
   "boards": [
     {
       "id": "ttyUSB0",
-      "label": "Calibrate Gantry XY Controller",
+      "label": "7 Syringe Pump Controller",
       "usb_port": "/dev/ttyUSB0",
       "enabled": true,
       "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
@@ -11,7 +11,7 @@
     {
       "id": "ttyUSB1",
       "label": "Calibrate Gantry XY Controller",
-      "usb_port": "/dev/ttyUSB1",
+      "usb_port": "/dev/ttyUSB0",
       "enabled": true,
       "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
     }
@@ -19,7 +19,7 @@
   "devices": [
     {
       "id": "x-axis-motor",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "CoreXY A Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -75,7 +75,7 @@
     },
     {
       "id": "y-axis-motor",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "CoreXY B Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -131,7 +131,7 @@
     },
     {
       "id": "x-min-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "X Min Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -152,7 +152,7 @@
     },
     {
       "id": "x-max-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "X Max Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -173,7 +173,7 @@
     },
     {
       "id": "y-min-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "Y Min Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -194,7 +194,7 @@
     },
     {
       "id": "y-max-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "ttyUSB1",
       "name": "Y Max Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -802,6 +802,106 @@
       "notes": null
     }
   ],
-  "groups": [],
-  "updated_at": "2026-06-26T11:54:01.340479Z"
+  "groups": [
+    {
+      "id": "group-mg81m1",
+      "name": "7syringe pump Group",
+      "member_ids": [
+        "ttyUSB0",
+        "syringe-head-a",
+        "syringe-head-b",
+        "syringe-head-c",
+        "syringe-head-d",
+        "syringe-head-e",
+        "syringe-head-f",
+        "syringe-head-g"
+      ],
+      "enabled": true,
+      "notes": null
+    },
+    {
+      "id": "group-gn6wn1",
+      "name": "XYZ hardware group",
+      "member_ids": [
+        "ttyUSB1",
+        "x-axis-motor",
+        "y-axis-motor",
+        "x-min-limit-switch",
+        "x-max-limit-switch",
+        "y-min-limit-switch",
+        "y-max-limit-switch",
+        "left-z-motor",
+        "right-z-motor",
+        "z-left-min-limit-switch",
+        "z-left-max-limit-switch",
+        "z-right-min-limit-switch",
+        "z-right-max-limit-switch"
+      ],
+      "enabled": true,
+      "notes": null
+    }
+  ],
+  "function_assignments": [
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "y-max-limit-switch",
+      "hardware_device_id": "y-max-limit-switch"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry",
+      "device_id": "y-max-limit-switch",
+      "hardware_device_id": "y-max-limit-switch"
+    }
+  ],
+  "updated_at": "2026-06-28T13:39:21.394331Z"
 }

@@ -19,9 +19,11 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 
-import { fetchEsp32Boards, fetchHardwareMap, saveHardwareMap } from "../lib/api";
+import { fetchEsp32Boards, fetchFunctions, fetchHardwareMap, saveHardwareMap } from "../lib/api";
 import type { Esp32BoardSummary } from "../types/esp32Builder";
+import type { DiscoveredFunctionDefinition, WorkflowHardwareDeviceReference } from "../types/workflow";
 import type {
+  FunctionHardwareAssignment,
   HardwareBoardMapping,
   HardwareDeviceKind,
   HardwareDeviceMapping,
@@ -50,6 +52,7 @@ type HardwareContextMenuState = {
 
 interface HardwareDiagramCardProps {
   onHardwareMapSaved: () => void;
+  view?: "full" | "function-map" | "hardware-map";
 }
 
 interface HardwareNodeData extends Record<string, unknown> {
@@ -69,6 +72,7 @@ const EMPTY_HARDWARE_MAP: HardwareMap = {
   boards: [],
   devices: [],
   groups: [],
+  function_assignments: [],
   updated_at: null,
 };
 
@@ -426,6 +430,7 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
     ...boards.map((board) => board.id),
     ...devices.map((device) => device.id),
   ]);
+  const deviceIds = new Set(devices.map((device) => device.id));
   const groups = (hardwareMap.groups ?? [])
     .map((group) => ({
       ...group,
@@ -442,8 +447,55 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
     boards,
     devices,
     groups,
+    function_assignments: (hardwareMap.function_assignments ?? []).filter((assignment) =>
+      assignment.function_id.trim()
+      && assignment.device_id.trim()
+      && deviceIds.has(assignment.hardware_device_id),
+    ),
     updated_at: hardwareMap.updated_at ?? null,
   };
+}
+
+function functionHardwareGroupLabel(discoveredFunction: DiscoveredFunctionDefinition): string {
+  const deviceIds = new Set((discoveredFunction.manifest.hardware_devices ?? []).map((device) => device.id));
+  if ([...deviceIds].some((deviceId) => deviceId.startsWith("syringe-head-"))) {
+    return "7 Syringe";
+  }
+  if ([...deviceIds].some((deviceId) => deviceId.includes("z-") || deviceId.includes("z_") || deviceId.includes("z-motor"))) {
+    return "Gantry Z";
+  }
+  if ([...deviceIds].some((deviceId) => deviceId.includes("x-") || deviceId.includes("y-") || deviceId.includes("axis"))) {
+    return "Gantry XY";
+  }
+
+  return discoveredFunction.manifest.category || "Other";
+}
+
+function compatibleHardwareDevices(
+  hardwareMap: HardwareMap,
+  deviceReference: WorkflowHardwareDeviceReference,
+): HardwareDeviceMapping[] {
+  return hardwareMap.devices.filter((device) => {
+    if (normalizeDeviceKind(device.kind) !== normalizeDeviceKind(deviceReference.kind)) {
+      return false;
+    }
+
+    if (normalizeDeviceKind(device.kind) === "sensor") {
+      return normalizeSensorKind(device.sensor_kind) === normalizeSensorKind(deviceReference.sensor_kind);
+    }
+
+    return true;
+  });
+}
+
+function selectedHardwareDeviceId(
+  assignments: FunctionHardwareAssignment[],
+  functionId: string,
+  deviceId: string,
+): string {
+  return assignments.find((assignment) =>
+    assignment.function_id === functionId && assignment.device_id === deviceId,
+  )?.hardware_device_id ?? "";
 }
 
 function getDetectedBoard(
@@ -799,17 +851,19 @@ function deviceFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hard
   return hardwareMap.devices.find((device) => device.id === nodeId) ?? null;
 }
 
-function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps) {
+function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareDiagramCardProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [hardwareMap, setHardwareMap] = useState<HardwareMap>(EMPTY_HARDWARE_MAP);
   const [detectedBoards, setDetectedBoards] = useState<Esp32BoardSummary[]>([]);
+  const [discoveredFunctions, setDiscoveredFunctions] = useState<DiscoveredFunctionDefinition[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
   const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
+  const [hardwareDrawerOpen, setHardwareDrawerOpen] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<HardwareFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -875,18 +929,53 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
 
     return options;
   }, [detectedBoards, hardwareMap.boards, selectedBoard?.id]);
+  const groupedFunctions = useMemo(() => {
+    const groups = new Map<string, DiscoveredFunctionDefinition[]>();
+    for (const discoveredFunction of discoveredFunctions.filter((candidate) => (candidate.manifest.hardware_devices ?? []).length > 0)) {
+      const label = functionHardwareGroupLabel(discoveredFunction);
+      groups.set(label, [...(groups.get(label) ?? []), discoveredFunction]);
+    }
+
+    return Array.from(groups.entries()).sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel));
+  }, [discoveredFunctions]);
+
+  function updateFunctionHardwareAssignment(
+    functionId: string,
+    deviceId: string,
+    hardwareDeviceId: string,
+  ) {
+    setHardwareMap((currentMap) => {
+      const assignments = (currentMap.function_assignments ?? []).filter((assignment) =>
+        !(assignment.function_id === functionId && assignment.device_id === deviceId),
+      );
+      if (hardwareDeviceId) {
+        assignments.push({
+          function_id: functionId,
+          device_id: deviceId,
+          hardware_device_id: hardwareDeviceId,
+        });
+      }
+
+      return {
+        ...currentMap,
+        function_assignments: assignments,
+      };
+    });
+  }
 
   async function loadHardwareMap() {
     setStatus("loading");
     setError(null);
 
-    const [hardwareMapResult, detectedBoardsResult] = await Promise.allSettled([
+    const [hardwareMapResult, detectedBoardsResult, functionsResult] = await Promise.allSettled([
       fetchHardwareMap(),
       fetchEsp32Boards(),
+      fetchFunctions(),
     ]);
 
     const nextDetectedBoards = detectedBoardsResult.status === "fulfilled" ? detectedBoardsResult.value.boards : [];
     setDetectedBoards(nextDetectedBoards);
+    setDiscoveredFunctions(functionsResult.status === "fulfilled" ? functionsResult.value.functions : []);
 
     if (hardwareMapResult.status === "fulfilled") {
       setHardwareMap(cleanHardwareMap(hardwareMapResult.value));
@@ -970,6 +1059,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     setSaveState("idle");
   }
 
+  function handleAddBoard() {
+    addBoard();
+    setHardwareDrawerOpen(true);
+  }
+
   function removeBoard(boardId: string) {
     setHardwareMap((currentMap) => ({
       ...currentMap,
@@ -988,7 +1082,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
 
   function addDevice(boardId = hardwareMap.boards[0]?.id ?? RASPBERRY_NODE_ID) {
     if (!boardId) {
-      addBoard();
+      handleAddBoard();
       return;
     }
 
@@ -1014,6 +1108,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     }));
     setSelectedNodeId(nextId);
     setSaveState("idle");
+  }
+
+  function handleAddDevice(boardId?: string) {
+    addDevice(boardId);
+    setHardwareDrawerOpen(true);
   }
 
   function updateDevice(deviceId: string, updates: Partial<HardwareDeviceMapping>) {
@@ -1330,10 +1429,10 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
             <span>Direct GPIO/I2C devices</span>
             <strong>{raspberryDevices.length}</strong>
           </div>
-          <button className="workflow-editor__action" onClick={() => addDevice(RASPBERRY_NODE_ID)} type="button">
+          <button className="workflow-editor__action" onClick={() => handleAddDevice(RASPBERRY_NODE_ID)} type="button">
             Add GPIO/I2C device
           </button>
-          <button className="workflow-editor__action workflow-editor__action--primary" onClick={addBoard} type="button">
+          <button className="workflow-editor__action workflow-editor__action--primary" onClick={handleAddBoard} type="button">
             Add controller
           </button>
         </div>
@@ -1457,7 +1556,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
             <strong>{boardDevices.length} device{boardDevices.length === 1 ? "" : "s"}</strong>
           </div>
           <div className="hardware-settings__actions">
-            <button className="workflow-editor__action" onClick={() => addDevice(selectedBoard.id)} type="button">
+            <button className="workflow-editor__action" onClick={() => handleAddDevice(selectedBoard.id)} type="button">
               Add IoT device
             </button>
             <button className="workflow-editor__action" onClick={() => removeBoard(selectedBoard.id)} type="button">
@@ -1663,21 +1762,293 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
     );
   }
 
+  function renderFunctionHardwareMap() {
+    const assignments = hardwareMap.function_assignments ?? [];
+
+    return (
+      <section className="function-hardware-map">
+        <div className="function-hardware-map__header">
+          <div>
+            <strong>Function to Hardware Map</strong>
+            <span>Select which Hardware Map devices each function uses.</span>
+          </div>
+        </div>
+        <div className="function-hardware-map__groups">
+          {groupedFunctions.length === 0 ? (
+            <p className="function-hardware-map__empty">No hardware-backed functions discovered.</p>
+          ) : (
+            groupedFunctions.map(([groupLabel, functions]) => (
+              <div className="function-hardware-map__group" key={groupLabel}>
+                <h3>{groupLabel}</h3>
+                {functions.map((discoveredFunction) => (
+                  <div className="function-hardware-map__function" key={discoveredFunction.manifest.id}>
+                    <div className="function-hardware-map__function-title">
+                      <strong>{discoveredFunction.manifest.display_name}</strong>
+                      <span>{discoveredFunction.manifest.id}</span>
+                    </div>
+                    <div className="function-hardware-map__assignments">
+                      {(discoveredFunction.manifest.hardware_devices ?? []).map((deviceReference) => {
+                        const compatibleDevices = compatibleHardwareDevices(hardwareMap, deviceReference);
+                        const selectedDeviceId = selectedHardwareDeviceId(
+                          assignments,
+                          discoveredFunction.manifest.id,
+                          deviceReference.id,
+                        );
+                        return (
+                          <label className="function-hardware-map__assignment" key={`${discoveredFunction.manifest.id}-${deviceReference.id}`}>
+                            <span>{deviceReference.name}</span>
+                            <select
+                              onChange={(event) => updateFunctionHardwareAssignment(
+                                discoveredFunction.manifest.id,
+                                deviceReference.id,
+                                event.target.value,
+                              )}
+                              value={selectedDeviceId}
+                            >
+                              <option value="">Not assigned</option>
+                              {compatibleDevices.map((device) => (
+                                <option key={device.id} value={device.id}>
+                                  {device.name} ({device.id}){device.board_id ? ` - ${device.board_id}` : " - unconnected"}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  function renderHardwareSettingsHeader() {
+    return (
+      <div className="hardware-settings__header">
+        <span>{selectedKind}</span>
+        <strong>
+          {selectedBoard?.label ?? selectedDevice?.name ?? (selectedNodeId === RASPBERRY_NODE_ID ? "Raspberry Pi" : "Settings")}
+        </strong>
+      </div>
+    );
+  }
+
+  function renderHardwareCanvas(settingsMode: "inline" | "drawer") {
+    return (
+      <div className={settingsMode === "drawer" ? "editor-workspace__canvas-frame" : "hardware-map__flow-layout"}>
+        <div className="hardware-map__canvas-shell">
+          <ReactFlow
+            edges={edges}
+            fitView
+            nodeTypes={nodeTypes}
+            nodes={nodes}
+            onConnect={handleConnect}
+            onEdgeContextMenu={openHardwareEdgeContextMenu}
+            onEdgesDelete={handleEdgesDelete}
+            onEdgesChange={onEdgesChange}
+            onNodeContextMenu={(event, node) => openHardwareContextMenu(event, node.id)}
+            onNodeClick={(event, node) => {
+              event.stopPropagation();
+              setSelectedNodeId(node.id);
+              setHardwareDrawerOpen(true);
+              setContextMenu(null);
+            }}
+            onNodesChange={onNodesChange}
+            onPointerDownCapture={handleControlDragPan}
+            onPaneClick={() => {
+              setSelectedNodeId(RASPBERRY_NODE_ID);
+              setHardwareDrawerOpen(false);
+              setContextMenu(null);
+            }}
+            onPaneContextMenu={(event) => {
+              if (getSelectedHardwareNodeIds().length > 0) {
+                openHardwareContextMenu(event);
+              }
+            }}
+            onSelectionContextMenu={(event) => openHardwareContextMenu(event)}
+            nodesDraggable={!controlKeyPressed}
+            panActivationKeyCode="Control"
+            panOnDrag={false}
+            selectionMode={SelectionMode.Partial}
+            selectionOnDrag
+          >
+            <MiniMap pannable zoomable />
+            <Controls />
+            <Background gap={24} size={1} />
+          </ReactFlow>
+          {contextMenu ? (
+            <div
+              className="hardware-context-menu"
+              style={{
+                left: contextMenu.x,
+                top: contextMenu.y,
+              }}
+            >
+              {contextMenu.edgeId ? (
+                <button
+                  onClick={() => {
+                    const edge = edges.find((candidate) => candidate.id === contextMenu.edgeId);
+                    if (edge) {
+                      disconnectHardwareEdge(edge);
+                    }
+                  }}
+                  type="button"
+                >
+                  Disconnect
+                </button>
+              ) : null}
+              {!contextMenu.edgeId && contextMenu.nodeId && groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
+                <button onClick={() => ungroup(contextMenu.nodeId as string)} type="button">
+                  Ungroup
+                </button>
+              ) : null}
+              {!contextMenu.edgeId && (!contextMenu.nodeId || !groupFromNodeId(hardwareMap, contextMenu.nodeId)) ? (
+                <button onClick={() => handleCreateGroup(contextMenu.nodeId)} type="button">
+                  Create hardware group
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {settingsMode === "inline" ? (
+          <aside className="hardware-settings">
+            {renderHardwareSettingsHeader()}
+            {renderSettings()}
+          </aside>
+        ) : hardwareDrawerOpen ? (
+          <aside className="editor-drawer editor-drawer--hardware">
+            <div className="editor-drawer__header">
+              {renderHardwareSettingsHeader()}
+              <button className="editor-drawer__close" onClick={() => setHardwareDrawerOpen(false)} type="button">
+                x
+              </button>
+            </div>
+            <div className="editor-drawer__body">
+              {renderSettings()}
+            </div>
+          </aside>
+        ) : null}
+      </div>
+    );
+  }
+
+  const showFunctionMap = view !== "hardware-map";
+  const showHardwareMap = view !== "function-map";
+  const panelTitle = view === "function-map" ? "Function Map" : "Hardware Map";
+  const panelSubtitle = view === "function-map"
+    ? "Assign discovered function requirements to saved physical devices."
+    : "Build the electronics map as connected blocks. Select a controller or IoT device to edit ports and pins.";
+
+  if (view === "hardware-map") {
+    return (
+      <section className="editor-workspace hardware-map">
+        <div className="editor-workspace__toolbar">
+          <div>
+            <strong>Hardware Map</strong>
+            <p>{hardwareMap.boards.length} controller blocks, {hardwareMap.devices.length} IoT device blocks</p>
+          </div>
+          <div className="workflow-editor__actions">
+            <StatusBadge
+              label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
+              tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
+            />
+            <button className="workflow-editor__action" onClick={() => void loadHardwareMap()} type="button">
+              Refresh
+            </button>
+            <button className="workflow-editor__action" onClick={handleAddBoard} type="button">
+              Add controller
+            </button>
+            <button className="workflow-editor__action" onClick={() => handleAddDevice()} type="button">
+              Add IoT device
+            </button>
+            <button
+              className="workflow-editor__action workflow-editor__action--primary"
+              disabled={saveState === "saving"}
+              onClick={() => void handleSave()}
+              type="button"
+            >
+              {saveState === "saving" ? "Saving..." : "Save map"}
+            </button>
+          </div>
+        </div>
+
+        {status === "error" ? <p className="error-text">{error}</p> : null}
+        {saveMessage ? (
+          <p className={saveState === "error" ? "error-text" : "hardware-map__save-message"}>
+            {saveMessage}
+          </p>
+        ) : null}
+
+        {renderHardwareCanvas("drawer")}
+      </section>
+    );
+  }
+
+  if (view === "function-map") {
+    return (
+      <section className="editor-workspace function-map-page">
+        <div className="editor-workspace__toolbar">
+          <div>
+            <strong>Function Map</strong>
+            <p>{groupedFunctions.length} function group{groupedFunctions.length === 1 ? "" : "s"}, {hardwareMap.devices.length} available hardware device{hardwareMap.devices.length === 1 ? "" : "s"}</p>
+          </div>
+          <div className="workflow-editor__actions">
+            <StatusBadge
+              label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
+              tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
+            />
+            <button className="workflow-editor__action" onClick={() => void loadHardwareMap()} type="button">
+              Refresh
+            </button>
+            <button
+              className="workflow-editor__action workflow-editor__action--primary"
+              disabled={saveState === "saving"}
+              onClick={() => void handleSave()}
+              type="button"
+            >
+              {saveState === "saving" ? "Saving..." : "Save map"}
+            </button>
+          </div>
+        </div>
+
+        {status === "error" ? <p className="error-text">{error}</p> : null}
+        {saveMessage ? (
+          <p className={saveState === "error" ? "error-text" : "hardware-map__save-message"}>
+            {saveMessage}
+          </p>
+        ) : null}
+
+        <div className="function-map-page__surface">
+          {renderFunctionHardwareMap()}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <Panel
-      title="Hardware Map"
-      subtitle="Build the electronics map as connected blocks. Select a controller or IoT device to edit ports and pins."
+      title={panelTitle}
+      subtitle={panelSubtitle}
       headerAction={(
         <div className="hardware-map__header-actions">
           <button className="workflow-editor__action" onClick={() => void loadHardwareMap()} type="button">
             Refresh
           </button>
-          <button className="workflow-editor__action" onClick={addBoard} type="button">
-            Add controller
-          </button>
-          <button className="workflow-editor__action" onClick={() => addDevice()} type="button">
-            Add IoT device
-          </button>
+          {showHardwareMap ? (
+            <>
+              <button className="workflow-editor__action" onClick={handleAddBoard} type="button">
+                Add controller
+              </button>
+              <button className="workflow-editor__action" onClick={() => handleAddDevice()} type="button">
+                Add IoT device
+              </button>
+            </>
+          ) : null}
           <button
             className="workflow-editor__action workflow-editor__action--primary"
             disabled={saveState === "saving"}
@@ -1708,90 +2079,9 @@ function HardwareDiagramSurface({ onHardwareMapSaved }: HardwareDiagramCardProps
           </p>
         ) : null}
 
-        <div className="hardware-map__flow-layout">
-          <div className="hardware-map__canvas-shell">
-            <ReactFlow
-              edges={edges}
-              fitView
-              nodeTypes={nodeTypes}
-              nodes={nodes}
-              onConnect={handleConnect}
-              onEdgeContextMenu={openHardwareEdgeContextMenu}
-              onEdgesDelete={handleEdgesDelete}
-              onEdgesChange={onEdgesChange}
-              onNodeContextMenu={(event, node) => openHardwareContextMenu(event, node.id)}
-              onNodeClick={(event, node) => {
-                event.stopPropagation();
-                setSelectedNodeId(node.id);
-                setContextMenu(null);
-              }}
-              onNodesChange={onNodesChange}
-              onPointerDownCapture={handleControlDragPan}
-              onPaneClick={() => {
-                setSelectedNodeId(RASPBERRY_NODE_ID);
-                setContextMenu(null);
-              }}
-              onPaneContextMenu={(event) => {
-                if (getSelectedHardwareNodeIds().length > 0) {
-                  openHardwareContextMenu(event);
-                }
-              }}
-              onSelectionContextMenu={(event) => openHardwareContextMenu(event)}
-              nodesDraggable={!controlKeyPressed}
-              panActivationKeyCode="Control"
-              panOnDrag={false}
-              selectionMode={SelectionMode.Partial}
-              selectionOnDrag
-            >
-              <MiniMap pannable zoomable />
-              <Controls />
-              <Background gap={24} size={1} />
-            </ReactFlow>
-            {contextMenu ? (
-              <div
-                className="hardware-context-menu"
-                style={{
-                  left: contextMenu.x,
-                  top: contextMenu.y,
-                }}
-              >
-                {contextMenu.edgeId ? (
-                  <button
-                    onClick={() => {
-                      const edge = edges.find((candidate) => candidate.id === contextMenu.edgeId);
-                      if (edge) {
-                        disconnectHardwareEdge(edge);
-                      }
-                    }}
-                    type="button"
-                  >
-                    Disconnect
-                  </button>
-                ) : null}
-                {!contextMenu.edgeId && contextMenu.nodeId && groupFromNodeId(hardwareMap, contextMenu.nodeId) ? (
-                  <button onClick={() => ungroup(contextMenu.nodeId as string)} type="button">
-                    Ungroup
-                  </button>
-                ) : null}
-                {!contextMenu.edgeId && (!contextMenu.nodeId || !groupFromNodeId(hardwareMap, contextMenu.nodeId)) ? (
-                  <button onClick={() => handleCreateGroup(contextMenu.nodeId)} type="button">
-                    Create hardware group
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+        {showFunctionMap ? renderFunctionHardwareMap() : null}
 
-          <aside className="hardware-settings">
-            <div className="hardware-settings__header">
-              <span>{selectedKind}</span>
-              <strong>
-                {selectedBoard?.label ?? selectedDevice?.name ?? (selectedNodeId === RASPBERRY_NODE_ID ? "Raspberry Pi" : "Settings")}
-              </strong>
-            </div>
-            {renderSettings()}
-          </aside>
-        </div>
+        {showHardwareMap ? renderHardwareCanvas("inline") : null}
       </div>
     </Panel>
   );

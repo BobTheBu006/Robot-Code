@@ -70,7 +70,6 @@ import type {
 import type { Esp32CustomBlockSaveResponse, Esp32WorkflowFirmwarePlanRequestItem } from "../../types/esp32Builder";
 import type { Esp32BoardSummary } from "../../types/esp32Builder";
 import type { HardwareDeviceMapping, HardwareMap } from "../../types/hardwareMap";
-import { Panel } from "../Panel";
 import { StatusBadge } from "../StatusBadge";
 import { WorkflowEdge } from "./WorkflowEdge";
 import { WorkflowInspector } from "./WorkflowInspector";
@@ -96,6 +95,7 @@ type WorkflowContextMenuState = {
   y: number;
   nodeId: string;
 } | null;
+type WorkflowDrawerMode = "blocks" | "inspector" | null;
 type CompoundOutputBuild = WorkflowOutputDefinition & {
   sourceNodeId: string;
   sourceHandle?: string | null;
@@ -829,6 +829,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const [saveAsPath, setSaveAsPath] = useState("");
   const [saveAsName, setSaveAsName] = useState("active-workflow");
   const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
+  const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
     phase: "idle",
@@ -2372,6 +2373,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     setFunctionsError(null);
     setSelectedNodeId(null);
     setOpenedNodeId(null);
+    setWorkflowDrawer(null);
     setWorkflowRunState({
       isRunning: true,
       phase: hasEsp32FirmwareWork ? "flashing" : "running",
@@ -2433,18 +2435,8 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   }
 
   return (
-    <Panel
-      title="Workflow Editor"
-      subtitle="Drag basic blocks, advanced robot functions, and compound functions onto the canvas, then connect them left to right."
-      headerAction={
-        <StatusBadge
-          label={functionsStatus === "success" ? `${availableBlocks.length} Blocks` : functionsStatus === "loading" ? "Loading Blocks" : "Block Error"}
-          tone={functionsStatus === "success" ? "online" : functionsStatus === "loading" ? "neutral" : "offline"}
-        />
-      }
-    >
-      <div className="workflow-editor">
-        <div className="workflow-editor__toolbar">
+    <section className="editor-workspace workflow-editor">
+        <div className="editor-workspace__toolbar">
           <div>
             <strong>Function discovery</strong>
             <p>
@@ -2469,6 +2461,17 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           </div>
 
           <div className="workflow-editor__actions">
+            <StatusBadge
+              label={functionsStatus === "success" ? `${availableBlocks.length} Blocks` : functionsStatus === "loading" ? "Loading Blocks" : "Block Error"}
+              tone={functionsStatus === "success" ? "online" : functionsStatus === "loading" ? "neutral" : "offline"}
+            />
+            <button
+              className="workflow-editor__action"
+              onClick={() => setWorkflowDrawer((currentMode) => currentMode === "blocks" ? null : "blocks")}
+              type="button"
+            >
+              Add blocks
+            </button>
             <label className="workflow-editor__skip-flash">
               <input
                 checked={skipEsp32Flashing}
@@ -2529,7 +2532,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           </div>
         ) : null}
 
-        <div className="workflow-editor__surface">
+        <div className="editor-workspace__canvas-frame workflow-editor__surface">
           <div
             className="workflow-editor__canvas-shell"
             onDragOver={handleDragOver}
@@ -2555,7 +2558,8 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 onNodeClick={(event, node) => {
                   event.stopPropagation();
                   setSelectedNodeId(node.id);
-                  setOpenedNodeId(null);
+                  setOpenedNodeId(node.id);
+                  setWorkflowDrawer("inspector");
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2563,6 +2567,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                   event.stopPropagation();
                   setSelectedNodeId(node.id);
                   setOpenedNodeId(node.id);
+                  setWorkflowDrawer("inspector");
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2571,6 +2576,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 onPaneClick={() => {
                   setSelectedNodeId(null);
                   setOpenedNodeId(null);
+                  setWorkflowDrawer(null);
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2624,7 +2630,8 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
               ) : null}
             </div>
 
-            {openedNode ? (
+            {workflowDrawer === "inspector" && openedNode ? (
+              <aside className="editor-drawer editor-drawer--workflow">
               <WorkflowInspector
                 allNodeTestEntries={nodes.map((node) => ({
                   nodeId: node.id,
@@ -2635,10 +2642,14 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 }))}
                 edges={edges}
                 nodes={nodes}
-                onClose={() => setOpenedNodeId(null)}
+                onClose={() => {
+                  setOpenedNodeId(null);
+                  setWorkflowDrawer(null);
+                }}
                 onNavigateToNode={(nodeId) => {
                   setSelectedNodeId(nodeId);
                   setOpenedNodeId(nodeId);
+                  setWorkflowDrawer("inspector");
                 }}
                 onCancel={() => void handleCancelNodeExecution(openedNode.id)}
                 onEditCompound={() => handleEditCompoundFunction(openedNode.id)}
@@ -2654,14 +2665,28 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 testResult={openedNodeTestState.result}
                 testStatus={openedNodeTestState.status}
               />
+              </aside>
+            ) : null}
+
+            {workflowDrawer === "blocks" ? (
+              <aside className="editor-drawer editor-drawer--workflow">
+                <div className="editor-drawer__header">
+                  <div>
+                    <span>Add</span>
+                    <strong>Blocks</strong>
+                  </div>
+                  <button className="editor-drawer__close" onClick={() => setWorkflowDrawer(null)} type="button">
+                    x
+                  </button>
+                </div>
+                <WorkflowPalette
+                  blocks={availableBlocks}
+                  discoveryErrors={discoveryErrors.map((error) => `${error.folder_name}: ${error.message}`)}
+                  onDeleteCustomBlock={(block) => void handleDeleteCustomBlock(block)}
+                />
+              </aside>
             ) : null}
           </div>
-
-          <WorkflowPalette
-            blocks={availableBlocks}
-            discoveryErrors={discoveryErrors.map((error) => `${error.folder_name}: ${error.message}`)}
-            onDeleteCustomBlock={(block) => void handleDeleteCustomBlock(block)}
-          />
         </div>
 
         {editingCompoundNode ? (
@@ -2673,8 +2698,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           />
         ) : null}
 
-      </div>
-    </Panel>
+    </section>
   );
 }
 

@@ -66,7 +66,6 @@ class HardwareMapService:
     def sync_manifest_devices(self, manifests: list[FunctionManifest]) -> HardwareMap:
         hardware_map = self.load_map()
         devices = list(hardware_map.devices)
-        boards = list(hardware_map.boards)
         changed = False
 
         for manifest in manifests:
@@ -74,17 +73,17 @@ class HardwareMapService:
                 continue
 
             input_defaults = self._input_defaults(manifest)
-            default_port = input_defaults.get("tool_port")
 
             for device_reference in manifest.hardware_devices:
-                board_id = self._board_id_for_device_reference(hardware_map, manifest, device_reference.board_id)
-                board, board_changed = self._ensure_board(boards, board_id, manifest, default_port)
-                changed = changed or board_changed
+                if self._assigned_device_for_manifest_device(hardware_map, manifest.id, device_reference.id):
+                    continue
+
                 next_device = HardwareDeviceMapping(
                     id=device_reference.id,
-                    board_id=board.id,
+                    board_id="",
                     name=device_reference.name,
                     kind=device_reference.kind,
+                    enabled=False,
                     sensor_kind=device_reference.sensor_kind,
                     rotation_min_deg=device_reference.rotation_min_deg,
                     rotation_max_deg=device_reference.rotation_max_deg,
@@ -116,7 +115,7 @@ class HardwareMapService:
             return hardware_map
 
         return self.save_map(
-            hardware_map.model_copy(update={"boards": boards, "devices": devices})
+            hardware_map.model_copy(update={"devices": devices})
         ).hardware_map
 
     def apply_function_defaults(
@@ -139,7 +138,7 @@ class HardwareMapService:
 
         pins_by_input_key = {
             pin.function_input_key: pin.gpio
-            for device in hardware_map.devices
+            for device in self._resolved_manifest_devices(hardware_map, manifest)
             for pin in device.pins
             if self._device_is_enabled(hardware_map, device)
             and device.board_id
@@ -157,11 +156,10 @@ class HardwareMapService:
         return resolved_inputs
 
     def _board_for_manifest(self, hardware_map: HardwareMap, manifest: FunctionManifest) -> HardwareBoardMapping | None:
-        declared_device_ids = {device.id for device in manifest.hardware_devices}
         mapped_board_ids = {
             device.board_id
-            for device in hardware_map.devices
-            if device.id in declared_device_ids and self._device_is_enabled(hardware_map, device) and device.board_id
+            for device in self._resolved_manifest_devices(hardware_map, manifest)
+            if self._device_is_enabled(hardware_map, device) and device.board_id
         }
         if len(mapped_board_ids) == 1:
             mapped_board_id = next(iter(mapped_board_ids))
@@ -211,14 +209,76 @@ class HardwareMapService:
 
     def _disabled_dependency_reasons(self, hardware_map: HardwareMap, manifest: FunctionManifest) -> list[str]:
         reasons: list[str] = []
-        declared_device_ids = {device.id for device in manifest.hardware_devices}
-        for device_id in declared_device_ids:
-            device = next((candidate for candidate in hardware_map.devices if candidate.id == device_id), None)
+        for device_reference in manifest.hardware_devices:
+            device = self._resolve_manifest_device(hardware_map, manifest.id, device_reference.id)
             if not device:
                 continue
             if not self._device_is_enabled(hardware_map, device):
-                reasons.append(f"{device.name} is disabled in the Hardware Map.")
+                reasons.append(f"{manifest.display_name} requires {device.name}, but it is disabled in the Hardware Map.")
         return reasons
+
+    def _assignment_for(
+        self,
+        hardware_map: HardwareMap,
+        function_id: str,
+        device_id: str,
+    ):
+        return next(
+            (
+                assignment
+                for assignment in hardware_map.function_assignments
+                if assignment.function_id == function_id and assignment.device_id == device_id
+            ),
+            None,
+        )
+
+    def _assigned_device_for_manifest_device(
+        self,
+        hardware_map: HardwareMap,
+        function_id: str,
+        device_id: str,
+    ) -> HardwareDeviceMapping | None:
+        assignment = self._assignment_for(hardware_map, function_id, device_id)
+        if not assignment or not assignment.hardware_device_id:
+            return None
+
+        return next(
+            (
+                device
+                for device in hardware_map.devices
+                if device.id == assignment.hardware_device_id
+            ),
+            None,
+        )
+
+    def _resolve_manifest_device(
+        self,
+        hardware_map: HardwareMap,
+        function_id: str,
+        device_id: str,
+    ) -> HardwareDeviceMapping | None:
+        return self._assigned_device_for_manifest_device(hardware_map, function_id, device_id) or next(
+            (
+                device
+                for device in hardware_map.devices
+                if device.id == device_id
+            ),
+            None,
+        )
+
+    def _resolved_manifest_devices(
+        self,
+        hardware_map: HardwareMap,
+        manifest: FunctionManifest,
+    ) -> list[HardwareDeviceMapping]:
+        devices: list[HardwareDeviceMapping] = []
+        seen_device_ids: set[str] = set()
+        for device_reference in manifest.hardware_devices:
+            device = self._resolve_manifest_device(hardware_map, manifest.id, device_reference.id)
+            if device and device.id not in seen_device_ids:
+                devices.append(device)
+                seen_device_ids.add(device.id)
+        return devices
 
     def _input_defaults(self, manifest: FunctionManifest) -> dict[str, str]:
         defaults: dict[str, str] = {}

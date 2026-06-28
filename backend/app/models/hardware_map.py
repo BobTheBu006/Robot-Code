@@ -63,11 +63,18 @@ class HardwareGroupMapping(BaseModel):
     notes: str | None = None
 
 
+class FunctionHardwareAssignment(BaseModel):
+    function_id: str = Field(min_length=1)
+    device_id: str = Field(min_length=1)
+    hardware_device_id: str = ""
+
+
 class HardwareMap(BaseModel):
     version: int = 1
     boards: list[HardwareBoardMapping] = Field(default_factory=list)
     devices: list[HardwareDeviceMapping] = Field(default_factory=list)
     groups: list[HardwareGroupMapping] = Field(default_factory=list)
+    function_assignments: list[FunctionHardwareAssignment] = Field(default_factory=list)
     updated_at: datetime | None = None
 
 

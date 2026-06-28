@@ -39,11 +39,18 @@ export interface HardwareGroupMapping {
   notes?: string | null;
 }
 
+export interface FunctionHardwareAssignment {
+  function_id: string;
+  device_id: string;
+  hardware_device_id: string;
+}
+
 export interface HardwareMap {
   version: number;
   boards: HardwareBoardMapping[];
   devices: HardwareDeviceMapping[];
   groups?: HardwareGroupMapping[];
+  function_assignments?: FunctionHardwareAssignment[];
   updated_at?: string | null;
 }
 

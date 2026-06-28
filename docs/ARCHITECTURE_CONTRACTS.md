@@ -13,12 +13,15 @@ The Hardware Map owns physical wiring and grouping:
 - device logical ID
 - device pins and signal names
 - device calibration metadata such as pump mL per 200 motor steps
+- function-to-hardware assignments that bind a function's required logical devices to physical Hardware Map devices
 - controller/device groups
 - enabled/disabled state for controllers, devices, and groups
 
 Functions, firmware, and workflow blocks must not treat private pin maps as the source of truth. They may provide defaults or requirements, but the Hardware Map resolves the actual physical setup.
 
 Workflow function blocks must not expose controller selection, USB port selection, "Selected ESP32", or GPIO pin selection as normal per-block operator settings. Those values are derived from the function's logical hardware devices and the Hardware Map at execution/firmware-planning time.
+
+When a function declares required hardware that is missing from the Hardware Map, the sync path may create a disabled, unconnected device placeholder. It must not create a guessed controller or silently connect that placeholder to an existing controller. Operators bind functions to real devices through the function-to-hardware assignments in the Hardware Map.
 
 Devices wired directly to the Pi use `board_id: raspberry-pi`. This is a virtual controller ID and must not create a duplicate ESP32/controller block.
 

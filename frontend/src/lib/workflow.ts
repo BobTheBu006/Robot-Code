@@ -542,14 +542,22 @@ export function mapDiscoveredFunctionToBlock(
   hardwareMap: HardwareMap | null = null,
 ): WorkflowBlockDefinition {
   const flowOutputs = discoveredFunction.manifest.outputs.filter((output) => output.type === "flow");
+  const assignedDeviceIdByManifestDeviceId = new Map(
+    (hardwareMap?.function_assignments ?? [])
+      .filter((assignment) => assignment.function_id === discoveredFunction.manifest.id && assignment.hardware_device_id)
+      .map((assignment) => [assignment.device_id, assignment.hardware_device_id]),
+  );
   const hardwareDevices = (discoveredFunction.manifest.hardware_devices ?? []).map((deviceReference) => {
-    const mappedDevice = hardwareMap?.devices.find((device) => device.id === deviceReference.id);
+    const assignedHardwareDeviceId = assignedDeviceIdByManifestDeviceId.get(deviceReference.id);
+    const mappedDevice = hardwareMap?.devices.find((device) => device.id === (assignedHardwareDeviceId ?? deviceReference.id));
     if (!mappedDevice) {
       return deviceReference;
     }
 
     return {
       ...deviceReference,
+      id: mappedDevice.id,
+      basic_block_id: deviceReference.basic_block_id ?? getHardwareBasicBlockId({ id: mappedDevice.id, kind: mappedDevice.kind }),
       board_id: mappedDevice.board_id,
       kind: mappedDevice.kind,
       sensor_kind: mappedDevice.sensor_kind ?? deviceReference.sensor_kind,
@@ -617,7 +625,12 @@ export function mapDiscoveredFunctionToBlock(
     builderFirmwareEntryFile: discoveredFunction.manifest.builder_firmware_entry_file ?? null,
     builderBaseFunctionId: discoveredFunction.manifest.builder_base_function_id ?? null,
     hardwareDevices,
-    firmwareRequirements: discoveredFunction.manifest.firmware_requirements ?? [],
+    firmwareRequirements: (discoveredFunction.manifest.firmware_requirements ?? []).map((requirement) => ({
+      ...requirement,
+      required_device_ids: requirement.required_device_ids.map((deviceId) =>
+        assignedDeviceIdByManifestDeviceId.get(deviceId) ?? deviceId,
+      ),
+    })),
     referencedBasicBlockIds,
   };
 }

@@ -8,11 +8,20 @@ import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, setCame
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
 
 type RequestStatus = "loading" | "success" | "error";
+type AppPage = "dashboard" | "workflow-editor" | "function-map" | "hardware-map";
+
+const APP_PAGES: Array<{ id: AppPage; label: string }> = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "workflow-editor", label: "Workflow Editor" },
+  { id: "function-map", label: "Function Map" },
+  { id: "hardware-map", label: "Hardware Map" },
+];
 
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null);
   const [robotState, setRobotState] = useState<RobotState | null>(null);
+  const [activePage, setActivePage] = useState<AppPage>("dashboard");
   const [connectionStatus, setConnectionStatus] = useState<RequestStatus>("loading");
   const [cameraFeedStatus, setCameraFeedStatus] = useState<RequestStatus>("loading");
   const [robotStateStatus, setRobotStateStatus] = useState<RequestStatus>("loading");
@@ -115,60 +124,96 @@ function App() {
   }
 
   const isConnected = connectionStatus === "success";
+  const activePageLabel = APP_PAGES.find((page) => page.id === activePage)?.label ?? "Dashboard";
+
+  function handleHardwareMapSaved() {
+    setHardwareMapRevision((revision) => revision + 1);
+  }
+
+  function renderActivePage() {
+    if (activePage === "dashboard") {
+      return (
+        <>
+          <section className="page-heading">
+            <p className="eyebrow">Local Raspberry Pi Controller</p>
+            <h1>Dashboard</h1>
+          </section>
+          <div className="overview-grid">
+            <RobotStateCard
+              robotState={robotState}
+              status={robotStateStatus}
+              error={robotStateError}
+              lastUpdated={lastUpdated}
+            />
+
+            <CameraFeedCard
+              cameraStatus={cameraStatus}
+              status={cameraFeedStatus}
+              error={cameraFeedError}
+              isToggling={isCameraToggling}
+              onTogglePower={handleToggleCameraPower}
+            />
+          </div>
+        </>
+      );
+    }
+
+    if (activePage === "workflow-editor") {
+      return <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} />;
+    }
+
+    if (activePage === "function-map") {
+      return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="function-map" />;
+    }
+
+    return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="hardware-map" />;
+  }
 
   return (
     <main className="app-shell">
-      <div className="emergency-stop-overlay" role="presentation">
-        <button
-          className={emergencyStopState === "stopping" ? "emergency-stop emergency-stop--active" : "emergency-stop"}
-          onClick={() => void handleEmergencyStop()}
-          type="button"
-        >
-          E-STOP
-        </button>
-        {emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
-      </div>
-      <div className="app-shell__inner">
-        <header className="hero">
-          <div>
-            <p className="eyebrow">Local Raspberry Pi Controller</p>
-            <h1>Robot Control Dashboard</h1>
-            <p className="hero__description">
-              Mock robot state is fetched from the FastAPI backend every second so the dashboard stays live while the hardware layer is still under development.
-            </p>
+      <header className="app-header">
+        <div className="app-header__inner">
+          <div className="app-header__identity">
+            <span>Robot Control</span>
+            <strong>{activePageLabel}</strong>
           </div>
-          <div className="hero__status">
-            <span>Backend status</span>
+          <nav aria-label="Primary pages" className="app-nav">
+            {APP_PAGES.map((page) => (
+              <button
+                aria-current={activePage === page.id ? "page" : undefined}
+                className={activePage === page.id ? "app-nav__item app-nav__item--active" : "app-nav__item"}
+                key={page.id}
+                onClick={() => setActivePage(page.id)}
+                type="button"
+              >
+                {page.label}
+              </button>
+            ))}
+          </nav>
+          <div className="app-header__status">
+            <span>Backend</span>
             <StatusBadge
               label={isConnected ? "Connected" : connectionStatus === "loading" ? "Checking" : "Disconnected"}
               tone={isConnected ? "online" : connectionStatus === "loading" ? "neutral" : "offline"}
             />
             <small>
-              {connectionError ?? (lastUpdated ? `Last robot-state refresh at ${lastUpdated}` : "Waiting for first response")}
+              {connectionError ?? (lastUpdated ? `Updated ${lastUpdated}` : "Waiting")}
             </small>
           </div>
-        </header>
-
-        <div className="overview-grid">
-          <RobotStateCard
-            robotState={robotState}
-            status={robotStateStatus}
-            error={robotStateError}
-            lastUpdated={lastUpdated}
-          />
-
-          <CameraFeedCard
-            cameraStatus={cameraStatus}
-            status={cameraFeedStatus}
-            error={cameraFeedError}
-            isToggling={isCameraToggling}
-            onTogglePower={handleToggleCameraPower}
-          />
+          <div className="app-header__estop">
+            <button
+              className={emergencyStopState === "stopping" ? "emergency-stop emergency-stop--active" : "emergency-stop"}
+              onClick={() => void handleEmergencyStop()}
+              type="button"
+            >
+              E-STOP
+            </button>
+            {emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
+          </div>
         </div>
-
-        <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} />
-
-        <HardwareDiagramCard onHardwareMapSaved={() => setHardwareMapRevision((revision) => revision + 1)} />
+      </header>
+      <div className="app-shell__inner">
+        {renderActivePage()}
       </div>
     </main>
   );

@@ -68,6 +68,8 @@ Examples:
 - module references firmware that cannot be built
 - API block references a missing secret name
 
+Hardware maps without `function_assignments` load as having no function-to-hardware overrides. Missing function hardware is preserved by creating disabled, unconnected placeholders until the operator assigns the function requirement to a physical Hardware Map device.
+
 ## Test Strategy
 
 Minimum long-term test set:
