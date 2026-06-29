@@ -37,7 +37,6 @@ class GantryXYMoveRequest(BaseModel):
     acceleration_rpm_per_s: int = Field(default=600, gt=0)
     on_the_fly_calibration: bool = Field(default=True)
     calibration_max_diff_steps: int = Field(default=5, ge=0)
-    motor_a_step_multiplier: float = Field(default=2.0, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -115,7 +114,8 @@ class GantryXYCalibrationRequest(BaseModel):
     speed_rpm: int = Field(default=100, gt=0)
     trapezoidal_speed: bool = Field(default=True)
     acceleration_rpm_per_s: int = Field(default=300, gt=0)
-    motor_a_step_multiplier: float = Field(default=2.0, gt=0)
+    steps_per_rotation: int = Field(default=800, gt=0)
+    max_probe_rotations: int = Field(default=120, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -129,6 +129,7 @@ class GantryXYCalibrationRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryXYCalibrationRequest":
+        self.limit_switch_mode = "4"
         GantryXYMoveRequest.model_validate(self.model_dump())
         return self
 
@@ -140,6 +141,8 @@ class GantryXYCalibrationResponse(BaseModel):
     speed_rpm: int
     trapezoidal_speed: bool
     acceleration_rpm_per_s: int
+    steps_per_rotation: int
+    max_probe_rotations: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False
@@ -244,6 +247,7 @@ class GantryZCalibrationRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryZCalibrationRequest":
+        self.limit_switch_mode = "4"
         GantryZMoveRequest.model_validate(self.model_dump())
         return self
 
@@ -329,22 +333,6 @@ class ToolChangeRequest(BaseModel):
             "x_max_limit_pin": self.x_max_limit_pin,
             "y_min_limit_pin": self.y_min_limit_pin,
             "y_max_limit_pin": self.y_max_limit_pin,
-            "baud_rate": self.baud_rate,
-        })
-        GantryZMoveRequest.model_validate({
-            "tool_port": self.tool_port,
-            "z_left_cm": self.slot_position()["z_cm"],
-            "z_right_cm": self.slot_position()["z_cm"],
-            "speed_profile": self.speed_profile,
-            "z_left_step_pin": self.z_left_step_pin,
-            "z_left_dir_pin": self.z_left_dir_pin,
-            "z_right_step_pin": self.z_right_step_pin,
-            "z_right_dir_pin": self.z_right_dir_pin,
-            "limit_switch_mode": self.limit_switch_mode,
-            "z_left_min_limit_pin": self.z_left_min_limit_pin,
-            "z_left_max_limit_pin": self.z_left_max_limit_pin,
-            "z_right_min_limit_pin": self.z_right_min_limit_pin,
-            "z_right_max_limit_pin": self.z_right_max_limit_pin,
             "baud_rate": self.baud_rate,
         })
         return self

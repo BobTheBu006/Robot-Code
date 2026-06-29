@@ -29,6 +29,7 @@ import type {
   HardwareDeviceMapping,
   HardwareGroupMapping,
   HardwareMap,
+  HardwareNodePosition,
   HardwarePinMapping,
   HardwareSensorKind,
 } from "../types/hardwareMap";
@@ -67,12 +68,23 @@ interface HardwareNodeData extends Record<string, unknown> {
 
 const RASPBERRY_NODE_ID = "raspberry-pi";
 const RASPBERRY_CONTROLLER_LABEL = "Raspberry Pi GPIO / I2C";
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
+}
+
 const EMPTY_HARDWARE_MAP: HardwareMap = {
   version: 1,
   boards: [],
   devices: [],
   groups: [],
   function_assignments: [],
+  node_positions: [],
   updated_at: null,
 };
 
@@ -120,15 +132,6 @@ function normalizeId(value: string, fallback: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return normalized || fallback;
-}
-
-function normalizeControllerId(value: string, fallback: string): string {
-  const normalized = value
-    .trim()
-    .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
   return normalized || fallback;
@@ -389,16 +392,55 @@ function useControlDragPan() {
   }, [reactFlow]);
 }
 
-function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
+function hardwareNodePositionsFromNodes(nodes: HardwareFlowNode[]): HardwareNodePosition[] {
+  return nodes.map((node) => ({
+    node_id: node.id,
+    x: Math.round(node.position.x * 100) / 100,
+    y: Math.round(node.position.y * 100) / 100,
+  }));
+}
+
+function controllerIdFromUsbPort(usbPort: string): string | null {
+  const portParts = usbPort.trim().split("/").filter(Boolean);
+  const portName = portParts[portParts.length - 1];
+  if (!portName || !/^tty(?:USB|ACM)\d+$/i.test(portName)) {
+    return null;
+  }
+
+  return portName.replace(/^ttyusb/i, "ttyUSB").replace(/^ttyacm/i, "ttyACM");
+}
+
+function uniqueControllerId(baseId: string, usedIds: Set<string>): string {
+  const trimmedBase = baseId.trim().replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalizedBase = trimmedBase || "controller";
+  let candidate = normalizedBase;
+  let suffix = 2;
+  while (usedIds.has(candidate) || candidate === RASPBERRY_NODE_ID) {
+    candidate = `${normalizedBase}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(candidate);
+  return candidate;
+}
+
+function cleanHardwareMap(
+  hardwareMap: HardwareMap,
+  nodePositions: HardwareNodePosition[] = hardwareMap.node_positions ?? [],
+): HardwareMap {
+  const usedBoardIds = new Set<string>([RASPBERRY_NODE_ID]);
   const boards = hardwareMap.boards
-    .map((board) => ({
-      ...board,
-      id: board.id.trim(),
-      label: board.label.trim(),
-      usb_port: board.usb_port.trim(),
-      enabled: isHardwareEnabled(board),
-      notes: board.notes?.trim() || null,
-    }))
+    .map((board, index) => {
+      const originalId = board.id.trim();
+      const id = uniqueControllerId(originalId || controllerIdFromUsbPort(board.usb_port) || `controller-${index + 1}`, usedBoardIds);
+      return {
+        ...board,
+        id,
+        label: board.label.trim(),
+        usb_port: board.usb_port.trim(),
+        enabled: isHardwareEnabled(board),
+        notes: board.notes?.trim() || null,
+      };
+    })
     .filter((board) => board.id && board.label && board.usb_port);
   const boardIds = new Set([RASPBERRY_NODE_ID, ...boards.map((board) => board.id)]);
   const devices = hardwareMap.devices
@@ -441,6 +483,23 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
       notes: group.notes?.trim() || null,
     }))
     .filter((group) => group.id && group.name && group.member_ids.length > 0);
+  const persistedItemIds = new Set([
+    ...itemIds,
+    ...groups.map((group) => group.id),
+  ]);
+  const positionById = new Map<string, HardwareNodePosition>();
+  for (const position of nodePositions) {
+    const nodeId = position.node_id.trim();
+    if (!persistedItemIds.has(nodeId) || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      continue;
+    }
+
+    positionById.set(nodeId, {
+      node_id: nodeId,
+      x: Math.round(position.x * 100) / 100,
+      y: Math.round(position.y * 100) / 100,
+    });
+  }
 
   return {
     version: 1,
@@ -452,6 +511,7 @@ function cleanHardwareMap(hardwareMap: HardwareMap): HardwareMap {
       && assignment.device_id.trim()
       && deviceIds.has(assignment.hardware_device_id),
     ),
+    node_positions: Array.from(positionById.values()),
     updated_at: hardwareMap.updated_at ?? null,
   };
 }
@@ -577,6 +637,14 @@ function buildHardwareNodes(
   currentNodes: HardwareFlowNode[],
 ): HardwareFlowNode[] {
   const previousPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
+  const savedPositionById = new Map(
+    (hardwareMap.node_positions ?? []).map((position) => [
+      position.node_id,
+      { x: position.x, y: position.y },
+    ]),
+  );
+  const positionForNode = (nodeId: string, fallback: { x: number; y: number }) =>
+    previousPositionById.get(nodeId) ?? savedPositionById.get(nodeId) ?? fallback;
   const groupedMemberIds = new Set((hardwareMap.groups ?? []).flatMap((group) => group.member_ids));
   const devicesByBoard = new Map<string, HardwareDeviceMapping[]>();
   for (const device of hardwareMap.devices) {
@@ -601,7 +669,7 @@ function buildHardwareNodes(
 
   const nodes: HardwareFlowNode[] = (hardwareMap.groups ?? []).map((group, groupIndex) => {
     const memberPositions = group.member_ids.map((memberId) =>
-      previousPositionById.get(memberId) ?? nodePositionForId(memberId, boardIndexById, deviceIndexById),
+      positionForNode(memberId, nodePositionForId(memberId, boardIndexById, deviceIndexById)),
     );
     const minX = Math.min(...memberPositions.map((position) => position.x), 260);
     const minY = Math.min(...memberPositions.map((position) => position.y), 80);
@@ -609,7 +677,7 @@ function buildHardwareNodes(
     return {
       id: group.id,
       type: "hardwareNode",
-      position: previousPositionById.get(group.id) ?? { x: minX, y: minY },
+      position: positionForNode(group.id, { x: minX, y: minY }),
       data: {
         kind: "group",
         title: group.name,
@@ -626,7 +694,7 @@ function buildHardwareNodes(
     {
       id: RASPBERRY_NODE_ID,
       type: "hardwareNode",
-      position: previousPositionById.get(RASPBERRY_NODE_ID) ?? { x: 40, y: 180 },
+      position: positionForNode(RASPBERRY_NODE_ID, { x: 40, y: 180 }),
       data: {
         kind: "raspberry",
         title: "Raspberry Pi",
@@ -647,7 +715,7 @@ function buildHardwareNodes(
     nodes.push({
       id: device.id,
       type: "hardwareNode",
-      position: previousPositionById.get(device.id) ?? { x: 680, y: 80 + deviceIndex * 110 },
+      position: positionForNode(device.id, { x: 680, y: 80 + deviceIndex * 110 }),
       data: {
         kind: "device",
         title: device.name,
@@ -673,7 +741,7 @@ function buildHardwareNodes(
     nodes.push({
       id: device.id,
       type: "hardwareNode",
-      position: previousPositionById.get(device.id) ?? { x: 350, y: 250 + deviceIndex * 110 },
+      position: positionForNode(device.id, { x: 350, y: 250 + deviceIndex * 110 }),
       data: {
         kind: "device",
         title: device.name,
@@ -705,7 +773,7 @@ function buildHardwareNodes(
     nodes.push({
       id: board.id,
       type: "hardwareNode",
-      position: previousPositionById.get(board.id) ?? { x: 350, y: boardY },
+      position: positionForNode(board.id, { x: 350, y: boardY }),
       data: {
         kind: "controller",
         title: board.label,
@@ -726,7 +794,7 @@ function buildHardwareNodes(
       nodes.push({
         id: device.id,
         type: "hardwareNode",
-        position: previousPositionById.get(device.id) ?? { x: 680, y: boardY + deviceIndex * 110 },
+        position: positionForNode(device.id, { x: 680, y: boardY + deviceIndex * 110 }),
         data: {
           kind: "device",
           title: device.name,
@@ -892,7 +960,9 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
 
     for (const board of hardwareMap.boards) {
       if (board.usb_port) {
-        boardByPort.set(board.usb_port, board);
+        if (isHardwareEnabled(board) || board.id === selectedBoard?.id) {
+          boardByPort.set(board.usb_port, board);
+        }
       }
     }
 
@@ -920,7 +990,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
       const detected = detectedBoards.find((candidate) =>
         candidate.port === board.usb_port || candidate.board_id === board.id,
       );
-      const usage = board.id === selectedBoard?.id ? "current saved" : `used by ${board.label}`;
+      const usage = board.id === selectedBoard?.id
+        ? "current saved"
+        : isHardwareEnabled(board)
+          ? `used by ${board.label}`
+          : `saved on disabled ${board.label}`;
       addOption(
         board.usb_port,
         detected ? `${detectedPortLabel(detected)} - ${usage}` : `${board.usb_port} - ${usage}, not currently detected`,
@@ -1014,12 +1088,23 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
   }, [hardwareMap, selectedNodeId]);
 
   function updateBoard(boardId: string, updates: Partial<HardwareBoardMapping>) {
+    const { id: _ignoredId, ...safeUpdates } = updates;
+    const selectedBoardForUpdate = hardwareMap.boards.find((board) => board.id === boardId);
+    const nextUsbPort = safeUpdates.usb_port ?? selectedBoardForUpdate?.usb_port ?? "";
+    const automaticId = safeUpdates.usb_port ? controllerIdFromUsbPort(nextUsbPort) : null;
+    const nextId = automaticId ?? boardId;
+    const idConflict = nextId !== boardId && hardwareMap.boards.some((board) => board.id === nextId);
+    if (idConflict) {
+      setSaveState("error");
+      setSaveMessage(`Controller id ${nextId} is already used by another controller.`);
+      return;
+    }
+
     setHardwareMap((currentMap) => {
-      const nextId = updates.id ?? boardId;
       return {
         ...currentMap,
         boards: currentMap.boards.map((board) =>
-          board.id === boardId ? { ...board, ...updates } : board,
+          board.id === boardId ? { ...board, ...safeUpdates, id: nextId } : board,
         ),
         devices: nextId !== boardId
           ? currentMap.devices.map((device) =>
@@ -1032,12 +1117,21 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
               member_ids: group.member_ids.map((memberId) => memberId === boardId ? nextId : memberId),
             }))
           : currentMap.groups,
+        node_positions: nextId !== boardId
+          ? (currentMap.node_positions ?? []).map((position) =>
+              position.node_id === boardId ? { ...position, node_id: nextId } : position,
+            )
+          : currentMap.node_positions,
       };
     });
-    if (updates.id) {
-      setSelectedNodeId(updates.id);
+    if (safeUpdates.usb_port) {
+      const automaticId = controllerIdFromUsbPort(safeUpdates.usb_port);
+      if (automaticId) {
+        setSelectedNodeId(automaticId);
+      }
     }
     setSaveState("idle");
+    setSaveMessage(null);
   }
 
   function addBoard() {
@@ -1367,6 +1461,68 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
     setSaveState("idle");
   }
 
+  function handleDeleteSelectedHardwareBlocks() {
+    const selectedIds = new Set(
+      nodes
+        .filter((node) => node.selected && node.id !== RASPBERRY_NODE_ID)
+        .map((node) => node.id),
+    );
+    if (selectedNodeId && selectedNodeId !== RASPBERRY_NODE_ID) {
+      selectedIds.add(selectedNodeId);
+    }
+
+    if (selectedIds.size === 0) {
+      return false;
+    }
+
+    setHardwareMap((currentMap) => {
+      const deletedBoardIds = new Set(currentMap.boards.filter((board) => selectedIds.has(board.id)).map((board) => board.id));
+      const deletedDeviceIds = new Set(
+        currentMap.devices
+          .filter((device) => selectedIds.has(device.id) || deletedBoardIds.has(device.board_id))
+          .map((device) => device.id),
+      );
+      const deletedGroupIds = new Set((currentMap.groups ?? []).filter((group) => selectedIds.has(group.id)).map((group) => group.id));
+
+      return {
+        ...currentMap,
+        boards: currentMap.boards.filter((board) => !deletedBoardIds.has(board.id)),
+        devices: currentMap.devices.filter((device) => !deletedDeviceIds.has(device.id)),
+        groups: (currentMap.groups ?? [])
+          .filter((group) => !deletedGroupIds.has(group.id))
+          .map((group) => ({
+            ...group,
+            member_ids: group.member_ids.filter((memberId) => !deletedBoardIds.has(memberId) && !deletedDeviceIds.has(memberId)),
+          }))
+          .filter((group) => group.member_ids.length > 0),
+      };
+    });
+    setSelectedNodeId(RASPBERRY_NODE_ID);
+    setHardwareDrawerOpen(false);
+    setContextMenu(null);
+    setSaveState("idle");
+    return true;
+  }
+
+  useEffect(() => {
+    function handleHardwareKeyDown(event: KeyboardEvent) {
+      if (
+        view === "function-map"
+        || (event.key !== "Delete" && event.key !== "Backspace")
+        || isEditableKeyboardTarget(event.target)
+      ) {
+        return;
+      }
+
+      if (handleDeleteSelectedHardwareBlocks()) {
+        event.preventDefault();
+      }
+    }
+
+    window.addEventListener("keydown", handleHardwareKeyDown);
+    return () => window.removeEventListener("keydown", handleHardwareKeyDown);
+  }, [nodes, selectedNodeId, view]);
+
   function openHardwareContextMenu(
     event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number },
     nodeId: string | null = null,
@@ -1395,7 +1551,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
   }
 
   async function handleSave() {
-    const cleanedMap = cleanHardwareMap(hardwareMap);
+    const cleanedMap = cleanHardwareMap(hardwareMap, hardwareNodePositionsFromNodes(nodes));
     if (cleanedMap.boards.length === 0 && cleanedMap.devices.length === 0) {
       setSaveState("error");
       setSaveMessage("Add at least one controller or Raspberry Pi GPIO/I2C device before saving the hardware map.");
@@ -1527,14 +1683,6 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
                 </option>
               ))}
             </select>
-          </label>
-          <label className="hardware-settings__field">
-            <span>Controller id</span>
-            <input
-              defaultValue={selectedBoard.id}
-              key={`${selectedBoard.id}-settings-id`}
-              onBlur={(event) => updateBoard(selectedBoard.id, { id: normalizeControllerId(event.target.value, selectedBoard.id) })}
-            />
           </label>
           <label className="hardware-settings__check">
             <input
@@ -1778,15 +1926,24 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
             <p className="function-hardware-map__empty">No hardware-backed functions discovered.</p>
           ) : (
             groupedFunctions.map(([groupLabel, functions]) => (
-              <div className="function-hardware-map__group" key={groupLabel}>
-                <h3>{groupLabel}</h3>
-                {functions.map((discoveredFunction) => (
-                  <div className="function-hardware-map__function" key={discoveredFunction.manifest.id}>
-                    <div className="function-hardware-map__function-title">
+              <details className="function-hardware-map__group" key={groupLabel} open>
+                <summary>
+                  <span className="function-hardware-map__tree-icon" aria-hidden="true" />
+                  <strong>{groupLabel}</strong>
+                  <small>{functions.length} function{functions.length === 1 ? "" : "s"}</small>
+                </summary>
+                {functions.map((discoveredFunction) => {
+                  const hardwareDeviceCount = discoveredFunction.manifest.hardware_devices?.length ?? 0;
+                  return (
+                  <details className="function-hardware-map__function" key={discoveredFunction.manifest.id}>
+                    <summary>
+                      <span className="function-hardware-map__tree-icon" aria-hidden="true" />
                       <strong>{discoveredFunction.manifest.display_name}</strong>
-                      <span>{discoveredFunction.manifest.id}</span>
-                    </div>
-                    <div className="function-hardware-map__assignments">
+                      <small title={discoveredFunction.manifest.id}>
+                        {hardwareDeviceCount} hardware item{hardwareDeviceCount === 1 ? "" : "s"}
+                      </small>
+                    </summary>
+                    <div className="function-hardware-map__assignments" role="tree">
                       {(discoveredFunction.manifest.hardware_devices ?? []).map((deviceReference) => {
                         const compatibleDevices = compatibleHardwareDevices(hardwareMap, deviceReference);
                         const selectedDeviceId = selectedHardwareDeviceId(
@@ -1794,10 +1951,18 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
                           discoveredFunction.manifest.id,
                           deviceReference.id,
                         );
+                        const selectedDevice = hardwareMap.devices.find((device) => device.id === selectedDeviceId);
                         return (
-                          <label className="function-hardware-map__assignment" key={`${discoveredFunction.manifest.id}-${deviceReference.id}`}>
-                            <span>{deviceReference.name}</span>
+                          <div className="function-hardware-map__assignment" key={`${discoveredFunction.manifest.id}-${deviceReference.id}`} role="treeitem">
+                            <div className="function-hardware-map__leaf">
+                              <span className="function-hardware-map__leaf-icon" aria-hidden="true" />
+                              <div>
+                                <strong>{deviceReference.name}</strong>
+                                <small>{selectedDevice ? `${selectedDevice.name}${selectedDevice.board_id ? ` on ${selectedDevice.board_id}` : " - unconnected"}` : "Not assigned"}</small>
+                              </div>
+                            </div>
                             <select
+                              aria-label={`Hardware for ${deviceReference.name}`}
                               onChange={(event) => updateFunctionHardwareAssignment(
                                 discoveredFunction.manifest.id,
                                 deviceReference.id,
@@ -1812,13 +1977,14 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
                                 </option>
                               ))}
                             </select>
-                          </label>
+                          </div>
                         );
                       })}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  </details>
+                  );
+                })}
+              </details>
             ))
           )}
         </div>
@@ -1946,7 +2112,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
 
   if (view === "hardware-map") {
     return (
-      <section className="editor-workspace hardware-map">
+      <section className="editor-workspace editor-workspace--map-page hardware-map">
         <div className="editor-workspace__toolbar">
           <div>
             <strong>Hardware Map</strong>
@@ -1991,7 +2157,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
 
   if (view === "function-map") {
     return (
-      <section className="editor-workspace function-map-page">
+      <section className="editor-workspace editor-workspace--map-page function-map-page">
         <div className="editor-workspace__toolbar">
           <div>
             <strong>Function Map</strong>

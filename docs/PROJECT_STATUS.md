@@ -16,6 +16,7 @@ The system is a local Raspberry Pi coordinated robot-control app:
 - The backend stores workflows, discovers functions, syncs function hardware dependencies into the Hardware Map, and flashes ESP32 boards before workflow execution.
 - A sticky app header keeps page selection and E-Stop visible, and E-Stop sends immediate STOP commands to active controller sessions.
 - On Raspberry Pi/Linux development runs, the frontend defaults to same-origin `/api` calls through the Vite proxy to the local FastAPI backend. This avoids browser-side `127.0.0.1` resolving to the wrong machine when the UI is opened from another computer on the LAN.
+- Raspberry Pi/Linux launcher scripts keep their terminal windows open when startup fails so dependency, port, or runtime errors stay visible to the operator instead of disappearing immediately.
 
 ## Current Implemented Areas
 
@@ -34,9 +35,9 @@ The Hardware Map currently models:
 - Devices wired directly to Raspberry Pi GPIO or I2C using `board_id: raspberry-pi`.
 - Hardware map connections can be disconnected from the canvas; disconnected devices stay visible as unconnected blocks until the operator reconnects them to the Raspberry Pi or a controller.
 - Detected ESP32 workspaces/ports are shown as connection options, but they are not automatically re-added as controller blocks after the operator deletes them.
-- ESP32 controller blocks with USB port selection. The selector lists currently detected connected serial ports first, marks whether each port is available/current/used by another controller, and keeps saved ports visible when a controller is unplugged.
-- The Hardware Map page is canvas-first and uses most of the viewport: top buttons handle refresh/add/save, and selecting or creating a controller/device opens a right-side settings drawer.
-- A full-page Function Map groups advanced functions by hardware family and lets the operator choose which saved Hardware Map devices each function uses through assignment dropdowns.
+- ESP32 controller blocks with automatic immutable controller IDs and editable USB port selection. The selector lists currently detected connected serial ports first, marks whether each port is available/current/used by an enabled controller, and keeps saved ports visible when a controller is unplugged. Disabled controllers do not reserve ports for enabled controllers.
+- The Hardware Map page fills the page below the sticky app header without page scrolling: refresh/add/save controls float as a top overlay, selecting or creating a controller/device opens a right-side settings drawer overlay, and saved maps preserve hardware block canvas positions.
+- The Function Map page fills the page below the sticky app header: refresh/save controls float as a top overlay, and grouped function-to-hardware assignment dropdowns fill the remaining workspace.
 - Devices connected to controllers.
 - Device types:
   - stepper motor with direction, step, enable, and three micro-step signals
@@ -46,12 +47,12 @@ The Hardware Map currently models:
   - AHT20 temperature/humidity sensor with SCL and SDA signals
 - Default Raspberry Pi AHT20 I2C device using SCL GPIO 3 and SDA GPIO 2.
 - The gantry is modeled as a CoreXY robot with CoreXY A/B motors, a single Z axis, and a 115 cm x 60 cm x 60 cm work area. The 0,0,0 origin is the back-bottom-left corner.
-- Stable legacy device IDs are preserved for compatibility: `x-axis-motor` now means CoreXY A, `y-axis-motor` now means CoreXY B, and `left-z-motor` now means the single Z axis. The old right-Z entries are kept as unconnected legacy placeholders.
+- Stable legacy device IDs are preserved for compatibility: `x-axis-motor` now means CoreXY A, `y-axis-motor` now means CoreXY B, `left-z-motor` means the left Z axis motor, and `right-z-motor` means the right Z axis motor.
 - X/Y CoreXY motor pins and X/Y min/max limit switches may be mapped directly to Raspberry Pi GPIO or a controller through the Hardware Map. Current saved map uses CoreXY A step/dir GPIO 17/27, CoreXY B step/dir GPIO 23/24, and XY limit switch inputs GPIO 5/6/12/13.
 - Hardware groups that collapse selected controller/device assemblies into one block while keeping a visible Raspberry Pi connection.
 - Controller, device, and hardware-group blocks can be disabled without deleting wiring. Disabled boards disable their attached devices, disabled groups disable their members, and dependent workflow blocks become disabled until the hardware is enabled again.
 
-The Hardware Map is the source of truth for USB ports, logical device IDs, function-to-device assignments, pin assignments, and hardware groups.
+The Hardware Map is the source of truth for USB ports, logical controller/device IDs, function-to-device assignments, pin assignments, hardware groups, and saved hardware canvas block positions. Controller, device, and group IDs must be unique so canvas blocks cannot merge.
 
 ## Workflow Editor Status
 
@@ -60,19 +61,21 @@ The Workflow Editor currently has:
 - Basic blocks for trigger, logic, and hardware-map generated device actions.
 - Calibrated peristaltic pump basic blocks generated from stepper devices with `calibration_ml_per_200_steps`.
 - Advanced functions discovered from backend function manifests.
-- Tool Change advanced function for six editable rack slots along the top-left work-area edge.
+- Tool Change advanced function for six editable rack slots along the top-left work-area edge. It is an XY-only CoreXY sequence and declares only the CoreXY A/B motors as hardware dependencies.
 - Compound functions created from directly connected selected blocks.
 - A separate compound-function editing canvas.
-- The Workflow Editor page is canvas-first: top buttons handle add blocks, run, save/load, and reset; the block palette and selected-block editor open as right-side drawers.
+- The Workflow Editor page is non-scrolling: run/add/save/load/reset controls stay in a top Function discovery toolbar, the canvas starts below that toolbar so blocks and canvas controls are not hidden under it, the block palette opens as a right-side drawer, and selected block editing uses the full overlay with inputs and outputs on the sides.
 - Workflow and hardware canvases use drag-select by default and Control-drag for panning.
+- Workflow and hardware canvases delete selected blocks with Delete or Backspace when focus is not inside an editable field.
 - Individual hide/unhide behavior for palette blocks.
 - Right-click actions for creating, editing, and uncompounding compound functions.
 - Pre-run ESP32 flashing for boards referenced by blocks in the workflow.
 - Pre-run flashing is filtered through the Hardware Map: only saved ESP32 controller blocks are flashed, and workflows with no ESP32 controllers skip flashing entirely.
 - Run all has a "Skip ESP32 flash" checkbox for reusing firmware that is already on connected controllers during development/test runs.
 - Advanced function blocks no longer expose a per-block "Selected ESP32" setting. Controller/USB port selection is resolved from the linked hardware devices in the Hardware Map when the block runs.
-- Move Gantry is now a Cartesian XYZ block for the CoreXY gantry. It exposes X, Y, and Z target positions in centimeters, numeric RPM, optional trapezoidal acceleration management, and on-the-fly near-limit calibration settings. X is bounded to 0-115 cm, Y to 0-60 cm, and Z to 0-60 cm from the back-bottom-left origin.
-- Calibrate Gantry XY and Move Gantry expose a Motor A Step Multiplier advanced setting. The current default is 2.0, causing the CoreXY A motor to receive twice the normal step pulses while preserving Cartesian X/Y targets.
+- Move Gantry is now a Cartesian XYZ block for the CoreXY gantry. It exposes X, Y, and Z target positions in centimeters, numeric RPM, optional trapezoidal acceleration management, and on-the-fly near-limit calibration settings. X/Y/Z targets are bounded by the most recent calibration workspace, with nominal defaults of X 0-115 cm, Y 0-60 cm, and Z 0-60 cm from the back-bottom-left origin.
+- Calibrate Gantry XY exposes speed, optional acceleration, X/Y track lengths, steps per motor rotation, and a max probe rotations safety cap. It no longer exposes a 2-vs-4 limit switch layout selector; calibration uses physical min and max switches and probes X min until the X-min switch trips, X max until X-max trips, returns to X=0, probes Y min until Y-min trips, then probes Y max until Y-max trips.
+- Calibrate Gantry Z exposes speed, optional acceleration, and left/right Z track lengths. It uses physical min and max switches for both Z axes, probing both Z motors to min limits and then to max limits.
 - Broken-reference placeholders for saved blocks whose function, hardware device, or module cannot currently be resolved.
 - Blocks that depend on disabled Hardware Map items render as inactive with the hardware reason shown on the node. They do not run and are excluded from ESP32 firmware planning/flashing while disabled.
 - The sticky header E-Stop aborts in-flight workflow requests in the UI and calls the backend emergency stop endpoint.
@@ -105,7 +108,7 @@ Current behavior prepares a workflow firmware plan before flashing ESP32 boards 
 
 The backend exposes `POST /api/emergency-stop`, which immediately sends `STOP` to active gantry and syringe serial sessions tracked by the backend. Controller firmware should treat `STOP` as a highest-priority command.
 
-Gantry calibration firmware defines work-area boundaries by probing physical limit switches. CoreXY XY calibration probes X min/max first, returns to X=0, then probes Y min/max at X=0. Z calibration probes both Z motors against min/max switches. Each boundary probe uses a fast touch, backs off, and repeats with a slower touch. During normal gantry moves, a limit switch hit is treated as an E-stop-style fault. Move blocks can enable on-the-fly calibration: when a target ends within 3 cm of a limit switch, firmware probes that switch, compares the observed position with stored calibration, and triggers full recalibration if the difference exceeds the block's configured step threshold.
+Gantry calibration firmware defines work-area boundaries by probing physical limit switches. CoreXY XY calibration probes X min/max first, returns to X=0, then probes Y min/max at X=0. Each XY probe moves until the relevant limit switch is active or until the block's max probe rotations cap is reached; successful calibration records measured X/Y steps per centimeter from the entered track lengths, so later Cartesian moves use the calibrated workspace scale instead of the old fixed XY step scale. Z calibration probes both Z motors against min/max switches. Each boundary probe uses a fast touch, backs off, and repeats with a slower touch. During normal gantry moves, a limit switch hit is treated as an E-stop-style fault. Move blocks can enable on-the-fly calibration: when a target ends within 3 cm of a limit switch, firmware probes that switch, compares the observed position with stored calibration, and triggers full recalibration if the difference exceeds the block's configured step threshold.
 
 Function manifests now expose `firmware_requirements`. Each requirement has a stable `routine_id`, controller role, optional source file, protocol, entry point, required hardware device IDs, and description. ESP32 workflow-function blueprints carry the same field under `manifest.firmware_requirements`, and generated backend manifests preserve it.
 

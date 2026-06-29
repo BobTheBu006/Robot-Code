@@ -4,7 +4,7 @@
   "display_name": "Calibrate Gantry XY",
   "category": "Robot Actions",
   "description": "Define the CoreXY work-area boundaries by double-probing X min/max first, returning to X=0, then double-probing Y min/max at X=0.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -71,6 +71,28 @@
       "placeholder": null,
       "advanced": false,
       "options": []
+    },
+    {
+      "key": "steps_per_rotation",
+      "label": "Steps per Rotation",
+      "type": "number",
+      "description": "Stepper pulse count for one full motor rotation. Use 800 when the driver is configured for 800 steps per rotation.",
+      "required": true,
+      "default": 800.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "max_probe_rotations",
+      "label": "Max Probe Rotations",
+      "type": "number",
+      "description": "Maximum motor rotations allowed for each limit-switch probe before calibration stops with a safety error.",
+      "required": true,
+      "default": 120.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
     }
   ],
   "advanced_inputs": [
@@ -117,26 +139,6 @@
       "placeholder": null,
       "advanced": true,
       "options": []
-    },
-    {
-      "key": "limit_switch_mode",
-      "label": "Limit Switch Layout",
-      "type": "select",
-      "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
-      "required": false,
-      "default": "4",
-      "placeholder": null,
-      "advanced": true,
-      "options": [
-        {
-          "label": "2 Limit Switches",
-          "value": "2"
-        },
-        {
-          "label": "4 Limit Switches",
-          "value": "4"
-        }
-      ]
     },
     {
       "key": "x_min_limit_pin",
@@ -394,7 +396,7 @@
       "routine_id": "calibrate_xy",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch.",
+      "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch and a per-probe rotation safety cap.",
       "entry_point": "calibrate_xy",
       "required_device_ids": [
         "x-axis-motor",

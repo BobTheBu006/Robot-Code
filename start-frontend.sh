@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+pause_on_error() {
+  local status=$?
+  if [[ $status -ne 0 && -t 0 ]]; then
+    echo
+    echo "Frontend launcher failed with exit code $status."
+    read -r -p "Press Enter to close this window..." _
+  fi
+}
+trap pause_on_error EXIT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/frontend"
 

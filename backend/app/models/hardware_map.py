@@ -69,13 +69,38 @@ class FunctionHardwareAssignment(BaseModel):
     hardware_device_id: str = ""
 
 
+class HardwareNodePosition(BaseModel):
+    node_id: str = Field(min_length=1)
+    x: float
+    y: float
+
+
 class HardwareMap(BaseModel):
     version: int = 1
     boards: list[HardwareBoardMapping] = Field(default_factory=list)
     devices: list[HardwareDeviceMapping] = Field(default_factory=list)
     groups: list[HardwareGroupMapping] = Field(default_factory=list)
     function_assignments: list[FunctionHardwareAssignment] = Field(default_factory=list)
+    node_positions: list[HardwareNodePosition] = Field(default_factory=list)
     updated_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_unique_node_ids(self) -> "HardwareMap":
+        seen_ids: set[str] = {"raspberry-pi"}
+        duplicates: list[str] = []
+        for item_id in [
+            *(board.id for board in self.boards),
+            *(device.id for device in self.devices),
+            *(group.id for group in self.groups),
+        ]:
+            if item_id in seen_ids:
+                duplicates.append(item_id)
+            seen_ids.add(item_id)
+
+        if duplicates:
+            raise ValueError("Hardware map IDs must be unique: " + ", ".join(sorted(set(duplicates))))
+
+        return self
 
 
 class HardwareMapSaveResponse(BaseModel):

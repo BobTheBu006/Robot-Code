@@ -70,6 +70,8 @@ Examples:
 
 Hardware maps without `function_assignments` load as having no function-to-hardware overrides. Missing function hardware is preserved by creating disabled, unconnected placeholders until the operator assigns the function requirement to a physical Hardware Map device.
 
+Hardware maps without `node_positions` load with generated canvas positions. When present, `node_positions` is an additive UI-layout field and does not change physical wiring behavior.
+
 ## Test Strategy
 
 Minimum long-term test set:

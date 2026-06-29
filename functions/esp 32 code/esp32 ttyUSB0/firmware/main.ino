@@ -1,14 +1,17 @@
 #include <Arduino.h>
 
-const int STEPS_PER_REVOLUTION = 200;
+const int DEFAULT_STEPS_PER_REVOLUTION = 800;
 const int STEP_PULSE_WIDTH_US = 8;
-const float XY_STEPS_PER_CM = 100.0f;
+const float DEFAULT_XY_STEPS_PER_CM = 100.0f;
 const float Z_STEPS_PER_CM = 100.0f;
 const float DEFAULT_X_WORKSPACE_CM = 115.0f;
 const float DEFAULT_Y_WORKSPACE_CM = 60.0f;
 const float DEFAULT_Z_WORKSPACE_CM = 60.0f;
 const float NEAR_LIMIT_CALIBRATION_CM = 3.0f;
 const int SLOW_PROBE_RPM_FLOOR = 25;
+const int DEFAULT_MAX_PROBE_ROTATIONS = 120;
+const long XY_PROBE_BACKOFF_STEPS = 200;
+const long XY_SLOW_PROBE_EXTRA_STEPS = 300;
 
 struct AxisChannel {
   int stepPin;
@@ -26,12 +29,14 @@ AxisChannel zRightAxis = {32, 33, 12, 13, 0, DEFAULT_Z_WORKSPACE_CM};
 
 long currentXSteps = 0;
 long currentYSteps = 0;
+float xStepsPerCm = DEFAULT_XY_STEPS_PER_CM;
+float yStepsPerCm = DEFAULT_XY_STEPS_PER_CM;
+int stepsPerRevolution = DEFAULT_STEPS_PER_REVOLUTION;
 
 int xyLimitSwitchMode = 4;
 int zLimitSwitchMode = 4;
 bool xyCalibrated = false;
 bool zCalibrated = false;
-float motorAStepMultiplier = 2.0f;
 
 int rpmForMoveProfile(const String &profile) {
   if (profile == "slow") {
@@ -51,7 +56,7 @@ int rpmForCalibrationProfile(const String &profile) {
 }
 
 unsigned long stepIntervalMicrosForRPM(int rpm) {
-  float stepsPerSecond = (rpm * STEPS_PER_REVOLUTION) / 60.0f;
+  float stepsPerSecond = (rpm * stepsPerRevolution) / 60.0f;
   if (stepsPerSecond <= 0.0f) {
     stepsPerSecond = 1.0f;
   }
@@ -71,7 +76,7 @@ long rampIterationsForMotion(long totalIterations, int targetRpm, int accelerati
   }
 
   float rampSeconds = ((float)targetRpm) / ((float)accelerationRpmPerSecond);
-  float targetStepsPerSecond = (targetRpm * STEPS_PER_REVOLUTION) / 60.0f;
+  float targetStepsPerSecond = (targetRpm * stepsPerRevolution) / 60.0f;
   long rampIterations = (long)((targetStepsPerSecond * rampSeconds) / 2.0f);
   if (rampIterations < 1) {
     return 1;
@@ -306,11 +311,10 @@ bool runCoreXYCartesianMove(
 ) {
   long deltaA = deltaXSteps + deltaYSteps;
   long deltaB = deltaXSteps - deltaYSteps;
-  long scaledDeltaA = lroundf(((float)deltaA) * motorAStepMultiplier);
-  long absA = labs(scaledDeltaA);
+  long absA = labs(deltaA);
   long absB = labs(deltaB);
   long totalIterations = max(absA, absB);
-  bool aPositive = scaledDeltaA >= 0;
+  bool aPositive = deltaA >= 0;
   bool bPositive = deltaB >= 0;
   int xSign = deltaXSteps > 0 ? 1 : deltaXSteps < 0 ? -1 : 0;
   int ySign = deltaYSteps > 0 ? 1 : deltaYSteps < 0 ? -1 : 0;
@@ -435,14 +439,6 @@ void applyXYPins(int nextXStepPin, int nextXDirPin, int nextYStepPin, int nextYD
   Serial.println(yAxis.dirPin);
 }
 
-void applyXYMotorScale(float nextMotorAStepMultiplier) {
-  if (nextMotorAStepMultiplier <= 0.0f) {
-    return;
-  }
-
-  motorAStepMultiplier = nextMotorAStepMultiplier;
-}
-
 void applyXYLimits(
   int nextLimitMode,
   int nextXMinLimitPin,
@@ -511,8 +507,8 @@ bool moveXYTo(float targetXCm, float targetYCm, int rpm, bool trapezoidalSpeed, 
     }
   }
 
-  long targetXSteps = cmToSteps(targetXCm, XY_STEPS_PER_CM);
-  long targetYSteps = cmToSteps(targetYCm, XY_STEPS_PER_CM);
+  long targetXSteps = cmToSteps(targetXCm, xStepsPerCm);
+  long targetYSteps = cmToSteps(targetYCm, yStepsPerCm);
   long deltaX = targetXSteps - currentXSteps;
   long deltaY = targetYSteps - currentYSteps;
   bool xBlocked = false;
@@ -586,7 +582,7 @@ bool maybeCheckZOnlyOnTheFlyCalibration(
 bool probeCoreXYLimit(
   char axis,
   bool positiveDirection,
-  long expectedTravelSteps,
+  long maxProbeSteps,
   int rpm,
   bool trapezoidalSpeed,
   int accelerationRpmPerSecond,
@@ -601,7 +597,15 @@ bool probeZLimit(
   int accelerationRpmPerSecond,
   bool &stopRequested
 );
-bool calibrateXY(float xTrackLengthCm, float yTrackLengthCm, int calibrationRPM, bool trapezoidalSpeed, int accelerationRpmPerSecond);
+bool calibrateXY(
+  float xTrackLengthCm,
+  float yTrackLengthCm,
+  int calibrationRPM,
+  bool trapezoidalSpeed,
+  int accelerationRpmPerSecond,
+  int nextStepsPerRotation,
+  int maxProbeRotations
+);
 bool calibrateZ(float leftTrackLengthCm, float rightTrackLengthCm, int calibrationRPM, bool trapezoidalSpeed, int accelerationRpmPerSecond);
 
 bool moveZTo(float targetLeftCm, float targetRightCm, int rpm, bool trapezoidalSpeed, int accelerationRpmPerSecond, bool onTheFlyCalibration, int maxDiffSteps) {
@@ -709,7 +713,15 @@ bool checkCoreXYAxisCalibration(
 
   if (diffSteps > maxDiffSteps) {
     Serial.println("ON THE FLY XY RECALIBRATE");
-    if (!calibrateXY(xAxis.trackLengthCm, yAxis.trackLengthCm, slowProbeRpmFor(rpm), true, accelerationRpmPerSecond)) {
+    if (!calibrateXY(
+      xAxis.trackLengthCm,
+      yAxis.trackLengthCm,
+      slowProbeRpmFor(rpm),
+      true,
+      accelerationRpmPerSecond,
+      stepsPerRevolution,
+      DEFAULT_MAX_PROBE_ROTATIONS
+    )) {
       return false;
     }
   }
@@ -801,26 +813,27 @@ bool maybeCheckOnTheFlyCalibration(
     return true;
   }
 
-  long returnXSteps = cmToSteps(targetXCm, XY_STEPS_PER_CM);
-  long returnYSteps = cmToSteps(targetYCm, XY_STEPS_PER_CM);
+  long returnXSteps = cmToSteps(targetXCm, xStepsPerCm);
+  long returnYSteps = cmToSteps(targetYCm, yStepsPerCm);
   long returnZSteps = cmToSteps(targetZCm, Z_STEPS_PER_CM);
-  long nearXYSteps = cmToSteps(NEAR_LIMIT_CALIBRATION_CM, XY_STEPS_PER_CM);
+  long nearXSteps = cmToSteps(NEAR_LIMIT_CALIBRATION_CM, xStepsPerCm);
+  long nearYSteps = cmToSteps(NEAR_LIMIT_CALIBRATION_CM, yStepsPerCm);
   long nearZSteps = cmToSteps(NEAR_LIMIT_CALIBRATION_CM, Z_STEPS_PER_CM);
-  long xMaxSteps = cmToSteps(xAxis.trackLengthCm, XY_STEPS_PER_CM);
-  long yMaxSteps = cmToSteps(yAxis.trackLengthCm, XY_STEPS_PER_CM);
+  long xMaxSteps = cmToSteps(xAxis.trackLengthCm, xStepsPerCm);
+  long yMaxSteps = cmToSteps(yAxis.trackLengthCm, yStepsPerCm);
   long zLeftMaxSteps = cmToSteps(zLeftAxis.trackLengthCm, Z_STEPS_PER_CM);
   long zRightMaxSteps = cmToSteps(zRightAxis.trackLengthCm, Z_STEPS_PER_CM);
 
-  if (returnXSteps <= nearXYSteps && !checkCoreXYAxisCalibration('X', false, 0, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
+  if (returnXSteps <= nearXSteps && !checkCoreXYAxisCalibration('X', false, 0, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
     return false;
   }
-  if (xMaxSteps - returnXSteps <= nearXYSteps && !checkCoreXYAxisCalibration('X', true, xMaxSteps, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
+  if (xMaxSteps - returnXSteps <= nearXSteps && !checkCoreXYAxisCalibration('X', true, xMaxSteps, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
     return false;
   }
-  if (returnYSteps <= nearXYSteps && !checkCoreXYAxisCalibration('Y', false, 0, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
+  if (returnYSteps <= nearYSteps && !checkCoreXYAxisCalibration('Y', false, 0, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
     return false;
   }
-  if (yMaxSteps - returnYSteps <= nearXYSteps && !checkCoreXYAxisCalibration('Y', true, yMaxSteps, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
+  if (yMaxSteps - returnYSteps <= nearYSteps && !checkCoreXYAxisCalibration('Y', true, yMaxSteps, returnXSteps, returnYSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
     return false;
   }
   if (returnZSteps <= nearZSteps && !checkZCalibrationNearLimit(false, 0, 0, returnZSteps, returnZSteps, maxDiffSteps, rpm, accelerationRpmPerSecond)) {
@@ -935,13 +948,13 @@ int slowProbeRpmFor(int rpm) {
 bool probeCoreXYLimit(
   char axis,
   bool positiveDirection,
-  long expectedTravelSteps,
+  long maxProbeSteps,
   int rpm,
   bool trapezoidalSpeed,
   int accelerationRpmPerSecond,
   bool &stopRequested
 ) {
-  long travel = labs(expectedTravelSteps) + 500;
+  long travel = max(1L, labs(maxProbeSteps));
   long xDelta = axis == 'X' ? (positiveDirection ? travel : -travel) : 0;
   long yDelta = axis == 'Y' ? (positiveDirection ? travel : -travel) : 0;
   bool xBlocked = false;
@@ -966,13 +979,12 @@ bool probeCoreXYLimit(
     return false;
   }
 
-  long backoff = 200;
   bool ignoredX = false;
   bool ignoredY = false;
   bool backoffStop = false;
   runCoreXYCartesianMove(
-    axis == 'X' ? (positiveDirection ? -backoff : backoff) : 0,
-    axis == 'Y' ? (positiveDirection ? -backoff : backoff) : 0,
+    axis == 'X' ? (positiveDirection ? -XY_PROBE_BACKOFF_STEPS : XY_PROBE_BACKOFF_STEPS) : 0,
+    axis == 'Y' ? (positiveDirection ? -XY_PROBE_BACKOFF_STEPS : XY_PROBE_BACKOFF_STEPS) : 0,
     slowProbeRpmFor(rpm),
     true,
     accelerationRpmPerSecond,
@@ -989,8 +1001,12 @@ bool probeCoreXYLimit(
   xBlocked = false;
   yBlocked = false;
   runCoreXYCartesianMove(
-    axis == 'X' ? (positiveDirection ? backoff + 300 : -(backoff + 300)) : 0,
-    axis == 'Y' ? (positiveDirection ? backoff + 300 : -(backoff + 300)) : 0,
+    axis == 'X'
+      ? (positiveDirection ? XY_PROBE_BACKOFF_STEPS + XY_SLOW_PROBE_EXTRA_STEPS : -(XY_PROBE_BACKOFF_STEPS + XY_SLOW_PROBE_EXTRA_STEPS))
+      : 0,
+    axis == 'Y'
+      ? (positiveDirection ? XY_PROBE_BACKOFF_STEPS + XY_SLOW_PROBE_EXTRA_STEPS : -(XY_PROBE_BACKOFF_STEPS + XY_SLOW_PROBE_EXTRA_STEPS))
+      : 0,
     slowProbeRpmFor(rpm),
     true,
     accelerationRpmPerSecond,
@@ -1004,6 +1020,35 @@ bool probeCoreXYLimit(
   }
 
   return (axis == 'X' && xBlocked) || (axis == 'Y' && yBlocked);
+}
+
+void printXYLimitState(const char *label) {
+  Serial.print("XY LIMIT STATE ");
+  Serial.print(label);
+  Serial.print(" X_MIN ");
+  Serial.print(isLimitActive(xAxis.minLimitPin) ? 1 : 0);
+  Serial.print(" X_MAX ");
+  Serial.print(isLimitActive(xAxis.maxLimitPin) ? 1 : 0);
+  Serial.print(" Y_MIN ");
+  Serial.print(isLimitActive(yAxis.minLimitPin) ? 1 : 0);
+  Serial.print(" Y_MAX ");
+  Serial.println(isLimitActive(yAxis.maxLimitPin) ? 1 : 0);
+}
+
+void printXYProbeFailure(const char *limitName, int limitPin, long maxProbeSteps, bool stopRequested) {
+  if (stopRequested) {
+    Serial.println("ERR STOP CALIBRATE XY");
+    return;
+  }
+
+  Serial.print("ERR XY ");
+  Serial.print(limitName);
+  Serial.print(" SAFETY_STEPS ");
+  Serial.print(maxProbeSteps);
+  Serial.print(" LIMIT_PIN ");
+  Serial.print(limitPin);
+  Serial.print(" LIMIT_ACTIVE ");
+  Serial.println(isLimitActive(limitPin) ? 1 : 0);
 }
 
 bool probeZLimit(
@@ -1082,34 +1127,55 @@ bool probeZLimit(
   return !stopRequested && leftBlocked && rightBlocked;
 }
 
-bool calibrateXY(float xTrackLengthCm, float yTrackLengthCm, int calibrationRPM, bool trapezoidalSpeed, int accelerationRpmPerSecond) {
-  long xExpectedSteps = cmToSteps(xTrackLengthCm, XY_STEPS_PER_CM);
-  long yExpectedSteps = cmToSteps(yTrackLengthCm, XY_STEPS_PER_CM);
+bool calibrateXY(
+  float xTrackLengthCm,
+  float yTrackLengthCm,
+  int calibrationRPM,
+  bool trapezoidalSpeed,
+  int accelerationRpmPerSecond,
+  int nextStepsPerRotation,
+  int maxProbeRotations
+) {
+  stepsPerRevolution = max(1, nextStepsPerRotation);
+  int safeMaxProbeRotations = max(1, maxProbeRotations);
+  long maxProbeSteps = (long)stepsPerRevolution * (long)safeMaxProbeRotations;
 
   Serial.print("ACTIVE XY CALIBRATION RPM ");
   Serial.print(calibrationRPM);
   Serial.print(" TRAPEZOID ");
   Serial.print(trapezoidalSpeed ? 1 : 0);
   Serial.print(" ACCEL ");
-  Serial.println(accelerationRpmPerSecond);
+  Serial.print(accelerationRpmPerSecond);
+  Serial.print(" STEPS_PER_ROTATION ");
+  Serial.print(stepsPerRevolution);
+  Serial.print(" MAX_PROBE_ROTATIONS ");
+  Serial.print(safeMaxProbeRotations);
+  Serial.print(" MAX_PROBE_STEPS ");
+  Serial.println(maxProbeSteps);
+  printXYLimitState("START");
 
   bool stopRequested = false;
 
-  if (!probeCoreXYLimit('X', false, xExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-    Serial.println(stopRequested ? "ERR STOP CALIBRATE XY" : "ERR XY MIN HOME X");
+  if (!probeCoreXYLimit('X', false, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
+    printXYProbeFailure("X_MIN", xAxis.minLimitPin, maxProbeSteps, stopRequested);
     return false;
   }
   xAxis.currentSteps = 0;
   yAxis.currentSteps = 0;
   currentXSteps = 0;
+  currentYSteps = 0;
 
-  if (xyLimitSwitchMode == 4) {
-    if (!probeCoreXYLimit('X', true, xExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-      Serial.println(stopRequested ? "ERR STOP CALIBRATE XY" : "ERR XY MAX HOME X");
-      return false;
-    }
+  if (!probeCoreXYLimit('X', true, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
+    printXYProbeFailure("X_MAX", xAxis.maxLimitPin, maxProbeSteps, stopRequested);
+    return false;
   }
-  xAxis.trackLengthCm = xyLimitSwitchMode == 4 ? stepsToCm(currentXSteps, XY_STEPS_PER_CM) : xTrackLengthCm;
+  long measuredXSteps = labs(currentXSteps);
+  if (measuredXSteps <= 0) {
+    Serial.println("ERR XY X_MAX MEASURED_ZERO");
+    return false;
+  }
+  xAxis.trackLengthCm = xTrackLengthCm;
+  xStepsPerCm = ((float)measuredXSteps) / xTrackLengthCm;
 
   bool ignoredFirst = false;
   bool ignoredSecond = false;
@@ -1131,47 +1197,39 @@ bool calibrateXY(float xTrackLengthCm, float yTrackLengthCm, int calibrationRPM,
 
   currentXSteps = 0;
 
-  if (!probeCoreXYLimit('Y', false, yExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-    Serial.println(stopRequested ? "ERR STOP CALIBRATE XY" : "ERR XY MIN HOME Y");
+  if (!probeCoreXYLimit('Y', false, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
+    printXYProbeFailure("Y_MIN", yAxis.minLimitPin, maxProbeSteps, stopRequested);
     return false;
   }
   currentYSteps = 0;
 
-  if (xyLimitSwitchMode == 4) {
-    if (!probeCoreXYLimit('Y', true, yExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-      Serial.println(stopRequested ? "ERR STOP CALIBRATE XY" : "ERR XY MAX HOME Y");
-      return false;
-    }
-  }
-  yAxis.trackLengthCm = xyLimitSwitchMode == 4 ? stepsToCm(currentYSteps, XY_STEPS_PER_CM) : yTrackLengthCm;
-
-  ignoredFirst = false;
-  ignoredSecond = false;
-  returnStopRequested = false;
-  runCoreXYCartesianMove(
-    0,
-    -currentYSteps,
-    calibrationRPM,
-    trapezoidalSpeed,
-    accelerationRpmPerSecond,
-    false,
-    ignoredFirst,
-    ignoredSecond,
-    returnStopRequested
-  );
-  if (returnStopRequested) {
+  if (!probeCoreXYLimit('Y', true, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
+    printXYProbeFailure("Y_MAX", yAxis.maxLimitPin, maxProbeSteps, stopRequested);
     return false;
   }
+  long measuredYSteps = labs(currentYSteps);
+  if (measuredYSteps <= 0) {
+    Serial.println("ERR XY Y_MAX MEASURED_ZERO");
+    return false;
+  }
+  yAxis.trackLengthCm = yTrackLengthCm;
+  yStepsPerCm = ((float)measuredYSteps) / yTrackLengthCm;
 
-  currentYSteps = 0;
-  xAxis.currentSteps = 0;
-  yAxis.currentSteps = 0;
   xyCalibrated = true;
 
   Serial.print("XY WORKSPACE CM ");
   Serial.print(xAxis.trackLengthCm, 3);
   Serial.print(" ");
   Serial.println(yAxis.trackLengthCm, 3);
+  Serial.print("XY WORKSPACE STEPS ");
+  Serial.print(measuredXSteps);
+  Serial.print(" ");
+  Serial.println(measuredYSteps);
+  Serial.print("XY STEPS PER CM ");
+  Serial.print(xStepsPerCm, 3);
+  Serial.print(" ");
+  Serial.println(yStepsPerCm, 3);
+  printXYLimitState("END");
   Serial.println("OK CALIBRATE XY");
   return true;
 }
@@ -1196,42 +1254,14 @@ bool calibrateZ(float leftTrackLengthCm, float rightTrackLengthCm, int calibrati
   zLeftAxis.currentSteps = 0;
   zRightAxis.currentSteps = 0;
 
-  if (zLimitSwitchMode == 4) {
-    if (!probeZLimit(true, leftExpectedSteps, rightExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-      Serial.println(stopRequested ? "ERR STOP CALIBRATE Z" : "ERR Z MAX HOME");
-      return false;
-    }
-  } else {
-    zLeftAxis.currentSteps = leftExpectedSteps;
-    zRightAxis.currentSteps = rightExpectedSteps;
+  if (!probeZLimit(true, leftExpectedSteps, rightExpectedSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
+    Serial.println(stopRequested ? "ERR STOP CALIBRATE Z" : "ERR Z MAX HOME");
+    return false;
   }
 
   zLeftAxis.trackLengthCm = stepsToCm(zLeftAxis.currentSteps, Z_STEPS_PER_CM);
   zRightAxis.trackLengthCm = stepsToCm(zRightAxis.currentSteps, Z_STEPS_PER_CM);
 
-  bool ignoredFirst = false;
-  bool ignoredSecond = false;
-  bool returnStopRequested = false;
-  runDualAxisMove(
-    zLeftAxis,
-    zRightAxis,
-    -zLeftAxis.currentSteps,
-    -zRightAxis.currentSteps,
-    calibrationRPM,
-    trapezoidalSpeed,
-    accelerationRpmPerSecond,
-    zLimitSwitchMode,
-    false,
-    ignoredFirst,
-    ignoredSecond,
-    returnStopRequested
-  );
-  if (returnStopRequested) {
-    return false;
-  }
-
-  zLeftAxis.currentSteps = 0;
-  zRightAxis.currentSteps = 0;
   zCalibrated = true;
 
   Serial.print("Z WORKSPACE CM ");
@@ -1247,24 +1277,12 @@ bool handleSetXYPinsCommand(const String &cmd) {
   int nextXDirPin = -1;
   int nextYStepPin = -1;
   int nextYDirPin = -1;
-  float nextMotorAStepMultiplier = motorAStepMultiplier;
-  int parsed = sscanf(
-    cmd.c_str(),
-    "SET XY PINS %d %d %d %d %f",
-    &nextXStepPin,
-    &nextXDirPin,
-    &nextYStepPin,
-    &nextYDirPin,
-    &nextMotorAStepMultiplier
-  );
-  if (parsed < 4) {
+  int parsed = sscanf(cmd.c_str(), "SET XY PINS %d %d %d %d", &nextXStepPin, &nextXDirPin, &nextYStepPin, &nextYDirPin);
+  if (parsed != 4) {
     return false;
   }
 
   applyXYPins(nextXStepPin, nextXDirPin, nextYStepPin, nextYDirPin);
-  if (parsed >= 5) {
-    applyXYMotorScale(nextMotorAStepMultiplier);
-  }
   return true;
 }
 
@@ -1276,7 +1294,11 @@ bool handleSetXYLimitsCommand(const String &cmd) {
   int nextYMax = -1;
   int parsed = sscanf(cmd.c_str(), "SET XY LIMITS %d %d %d %d %d", &nextMode, &nextXMin, &nextXMax, &nextYMin, &nextYMax);
   if (parsed != 5) {
-    return false;
+    nextMode = 4;
+    parsed = sscanf(cmd.c_str(), "SET XY LIMITS %d %d %d %d", &nextXMin, &nextXMax, &nextYMin, &nextYMax);
+    if (parsed != 4) {
+      return false;
+    }
   }
 
   applyXYLimits(nextMode, nextXMin, nextXMax, nextYMin, nextYMax);
@@ -1337,7 +1359,19 @@ bool handleCalibrateXYCommand(const String &cmd) {
   char speedBuffer[16] = "safe";
   int trapezoidFlag = 1;
   int accelerationRpmPerSecond = 300;
-  int parsed = sscanf(cmd.c_str(), "CALIBRATE XY %f %f %15s %d %d", &xTrackLengthCm, &yTrackLengthCm, speedBuffer, &trapezoidFlag, &accelerationRpmPerSecond);
+  int nextStepsPerRotation = DEFAULT_STEPS_PER_REVOLUTION;
+  int maxProbeRotations = DEFAULT_MAX_PROBE_ROTATIONS;
+  int parsed = sscanf(
+    cmd.c_str(),
+    "CALIBRATE XY %f %f %15s %d %d %d %d",
+    &xTrackLengthCm,
+    &yTrackLengthCm,
+    speedBuffer,
+    &trapezoidFlag,
+    &accelerationRpmPerSecond,
+    &nextStepsPerRotation,
+    &maxProbeRotations
+  );
   if (parsed < 2) {
     return false;
   }
@@ -1345,7 +1379,15 @@ bool handleCalibrateXYCommand(const String &cmd) {
   String speedToken = parsed >= 3 ? String(speedBuffer) : String("safe");
   speedToken.toLowerCase();
   int rpm = isDigit(speedToken.charAt(0)) ? speedToken.toInt() : rpmForCalibrationProfile(speedToken);
-  calibrateXY(xTrackLengthCm, yTrackLengthCm, rpm, parsed >= 4 ? trapezoidFlag != 0 : true, parsed >= 5 ? accelerationRpmPerSecond : 300);
+  calibrateXY(
+    xTrackLengthCm,
+    yTrackLengthCm,
+    rpm,
+    parsed >= 4 ? trapezoidFlag != 0 : true,
+    parsed >= 5 ? accelerationRpmPerSecond : 300,
+    parsed >= 6 ? nextStepsPerRotation : DEFAULT_STEPS_PER_REVOLUTION,
+    parsed >= 7 ? maxProbeRotations : DEFAULT_MAX_PROBE_ROTATIONS
+  );
   return true;
 }
 
@@ -1371,7 +1413,11 @@ bool handleSetZLimitsCommand(const String &cmd) {
   int nextRightMax = -1;
   int parsed = sscanf(cmd.c_str(), "SET Z LIMITS %d %d %d %d %d", &nextMode, &nextLeftMin, &nextLeftMax, &nextRightMin, &nextRightMax);
   if (parsed != 5) {
-    return false;
+    nextMode = 4;
+    parsed = sscanf(cmd.c_str(), "SET Z LIMITS %d %d %d %d", &nextLeftMin, &nextLeftMax, &nextRightMin, &nextRightMax);
+    if (parsed != 4) {
+      return false;
+    }
   }
 
   applyZLimits(nextMode, nextLeftMin, nextLeftMax, nextRightMin, nextRightMax);

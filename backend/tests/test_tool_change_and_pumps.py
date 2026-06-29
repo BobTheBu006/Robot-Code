@@ -83,10 +83,10 @@ class ToolChangeRequestTests(unittest.TestCase):
         self.assertEqual(
             sequence,
             [
-                {"label": "approach_slot", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 60.0},
-                {"label": "move_left_into_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 60.0},
-                {"label": "move_back_lock_tool", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 60.0},
-                {"label": "move_right_clear_rack", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 60.0},
+                {"label": "approach_slot", "x_cm": 2.0, "y_cm": 55.0},
+                {"label": "move_left_into_tool", "x_cm": 0.0, "y_cm": 55.0},
+                {"label": "move_back_lock_tool", "x_cm": 0.0, "y_cm": 53.0},
+                {"label": "move_right_clear_rack", "x_cm": 2.0, "y_cm": 53.0},
             ],
         )
 
@@ -98,10 +98,10 @@ class ToolChangeRequestTests(unittest.TestCase):
         self.assertEqual(
             sequence,
             [
-                {"label": "approach_loaded_tool", "x_cm": 2.0, "y_cm": 53.0, "z_cm": 60.0},
-                {"label": "move_left_to_drop_lane", "x_cm": 0.0, "y_cm": 53.0, "z_cm": 60.0},
-                {"label": "move_forward_release_tool", "x_cm": 0.0, "y_cm": 55.0, "z_cm": 60.0},
-                {"label": "move_right_clear_empty_tool", "x_cm": 2.0, "y_cm": 55.0, "z_cm": 60.0},
+                {"label": "approach_loaded_tool", "x_cm": 2.0, "y_cm": 53.0},
+                {"label": "move_left_to_drop_lane", "x_cm": 0.0, "y_cm": 53.0},
+                {"label": "move_forward_release_tool", "x_cm": 0.0, "y_cm": 55.0},
+                {"label": "move_right_clear_empty_tool", "x_cm": 2.0, "y_cm": 55.0},
             ],
         )
 

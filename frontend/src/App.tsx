@@ -169,8 +169,12 @@ function App() {
     return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="hardware-map" />;
   }
 
+  const appShellClassName = activePage === "workflow-editor" || activePage === "hardware-map"
+    ? "app-shell app-shell--no-scroll"
+    : "app-shell";
+
   return (
-    <main className="app-shell">
+    <main className={appShellClassName}>
       <header className="app-header">
         <div className="app-header__inner">
           <div className="app-header__identity">

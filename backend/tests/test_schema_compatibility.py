@@ -8,6 +8,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.models.function_manifest import FUNCTION_MANIFEST_SCHEMA_VERSION, FunctionManifest
+from app.models.hardware_map import HardwareMap
 from app.models.workflows import WORKFLOW_SCHEMA_VERSION
 from app.services.workflow_storage import WorkflowStorageError, WorkflowStorageService
 
@@ -102,7 +103,42 @@ class WorkflowSchemaCompatibilityTests(unittest.TestCase):
                         "nodes": [],
                         "edges": [],
                     },
-                )
+            )
+
+
+class HardwareMapSchemaCompatibilityTests(unittest.TestCase):
+    def test_node_positions_are_additive_and_preserved(self) -> None:
+        legacy_map = HardwareMap.model_validate({
+            "version": 1,
+            "boards": [],
+            "devices": [],
+            "groups": [],
+        })
+        positioned_map = HardwareMap.model_validate({
+            "version": 1,
+            "boards": [],
+            "devices": [],
+            "groups": [],
+            "node_positions": [
+                {"node_id": "raspberry-pi", "x": 42.5, "y": 120},
+            ],
+        })
+
+        self.assertEqual(legacy_map.node_positions, [])
+        self.assertEqual(positioned_map.node_positions[0].node_id, "raspberry-pi")
+        self.assertEqual(positioned_map.node_positions[0].x, 42.5)
+
+    def test_duplicate_hardware_node_ids_are_rejected(self) -> None:
+        with self.assertRaises(ValidationError):
+            HardwareMap.model_validate({
+                "version": 1,
+                "boards": [
+                    {"id": "ttyUSB0", "label": "Gantry", "usb_port": "/dev/ttyUSB0"},
+                    {"id": "ttyUSB0", "label": "Syringe", "usb_port": "/dev/ttyUSB1"},
+                ],
+                "devices": [],
+                "groups": [],
+            })
 
 
 if __name__ == "__main__":

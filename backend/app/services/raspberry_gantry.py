@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from app.models.gantry import GantryXYCalibrationRequest, GantryXYMoveRequest
+from app.models.gantry import GANTRY_WORKSPACE_X_CM, GANTRY_WORKSPACE_Y_CM, GantryXYCalibrationRequest, GantryXYMoveRequest
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
 XY_DEVICE_IDS = {
@@ -79,6 +79,8 @@ class RaspberryGantryGPIOService:
         self._lock = Lock()
         self._x_cm = 0.0
         self._y_cm = 0.0
+        self._x_track_length_cm = GANTRY_WORKSPACE_X_CM
+        self._y_track_length_cm = GANTRY_WORKSPACE_Y_CM
         self._calibrated = False
 
     def calibrate_xy(self, context: dict, request: GantryXYCalibrationRequest) -> dict:
@@ -88,6 +90,8 @@ class RaspberryGantryGPIOService:
         if execution.simulated:
             self._x_cm = 0.0
             self._y_cm = 0.0
+            self._x_track_length_cm = request.x_track_length_cm
+            self._y_track_length_cm = request.y_track_length_cm
             self._calibrated = True
             return self._calibration_result(context, request, pins, execution)
 
@@ -101,15 +105,19 @@ class RaspberryGantryGPIOService:
                 execution = self._gpio_unavailable_execution(str(exc))
                 self._x_cm = 0.0
                 self._y_cm = 0.0
+                self._x_track_length_cm = request.x_track_length_cm
+                self._y_track_length_cm = request.y_track_length_cm
                 self._calibrated = True
                 return self._calibration_result(context, request, pins, execution)
             try:
                 fast_rpm = request.speed_rpm
                 slow_rpm = max(1.0, request.speed_rpm / 3.0)
 
-                self._probe_axis(gpio, pins, "x", -1, request.x_track_length_cm, fast_rpm, slow_rpm)
+                max_probe_steps = request.steps_per_rotation * request.max_probe_rotations
+
+                self._probe_axis(gpio, pins, "x", -1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
                 self._x_cm = 0.0
-                self._probe_axis(gpio, pins, "x", 1, request.x_track_length_cm, fast_rpm, slow_rpm)
+                self._probe_axis(gpio, pins, "x", 1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
                 self._x_cm = request.x_track_length_cm
 
                 self._move_cm(
@@ -122,13 +130,12 @@ class RaspberryGantryGPIOService:
                 )
                 self._x_cm = 0.0
 
-                self._probe_axis(gpio, pins, "y", -1, request.y_track_length_cm, fast_rpm, slow_rpm)
+                self._probe_axis(gpio, pins, "y", -1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
                 self._y_cm = 0.0
-                self._probe_axis(gpio, pins, "y", 1, request.y_track_length_cm, fast_rpm, slow_rpm)
-                self._move_cm(gpio, pins, 0.0, -DEFAULT_BACKOFF_CM, slow_rpm)
-                self._move_cm(gpio, pins, DEFAULT_BACKOFF_CM, 0.0, slow_rpm)
-                self._x_cm = min(request.x_track_length_cm, DEFAULT_BACKOFF_CM)
-                self._y_cm = max(0.0, request.y_track_length_cm - DEFAULT_BACKOFF_CM)
+                self._probe_axis(gpio, pins, "y", 1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
+                self._y_cm = request.y_track_length_cm
+                self._x_track_length_cm = request.x_track_length_cm
+                self._y_track_length_cm = request.y_track_length_cm
 
                 self._calibrated = True
             finally:
@@ -139,6 +146,7 @@ class RaspberryGantryGPIOService:
     def move_xy(self, context: dict, request: GantryXYMoveRequest) -> dict:
         pins = self._pins_from_request(request)
         execution = self._execution_mode()
+        self._assert_target_within_calibrated_workspace(request)
 
         if execution.simulated:
             self._x_cm = request.x_cm
@@ -167,6 +175,14 @@ class RaspberryGantryGPIOService:
                 self._cleanup_gpio(gpio, pins)
 
         return self._move_result(context, request, pins, execution, applied=True)
+
+    def _assert_target_within_calibrated_workspace(self, request: GantryXYMoveRequest) -> None:
+        if not self._calibrated:
+            return
+        if not 0.0 <= request.x_cm <= self._x_track_length_cm:
+            raise RuntimeError(f"x_cm must be between 0 and calibrated X length {self._x_track_length_cm} cm.")
+        if not 0.0 <= request.y_cm <= self._y_track_length_cm:
+            raise RuntimeError(f"y_cm must be between 0 and calibrated Y length {self._y_track_length_cm} cm.")
 
     def _execution_mode(self) -> _GPIOExecution:
         gpio, unavailable_reason = self._gpio_module()
@@ -260,10 +276,10 @@ class RaspberryGantryGPIOService:
     def _steps_per_cm(self) -> float:
         return float(os.getenv("ROBOT_GPIO_XY_STEPS_PER_CM", DEFAULT_STEPS_PER_CM))
 
-    def _step_interval_seconds(self, speed_rpm: float) -> float:
-        steps_per_rotation = float(os.getenv("ROBOT_GPIO_STEPS_PER_ROTATION", "200"))
+    def _step_interval_seconds(self, speed_rpm: float, steps_per_rotation: int | None = None) -> float:
+        configured_steps_per_rotation = steps_per_rotation or int(os.getenv("ROBOT_GPIO_STEPS_PER_ROTATION", "200"))
         rpm = max(float(speed_rpm), 0.1)
-        return max(60.0 / (rpm * steps_per_rotation), DEFAULT_STEP_PULSE_SECONDS * 2.0)
+        return max(60.0 / (rpm * configured_steps_per_rotation), DEFAULT_STEP_PULSE_SECONDS * 2.0)
 
     def _limit_active(self, gpio: Any, pin: int) -> bool:
         active_low = _bool_env("ROBOT_GPIO_LIMIT_ACTIVE_LOW", True)
@@ -285,12 +301,21 @@ class RaspberryGantryGPIOService:
         speed_rpm: float,
         request: GantryXYMoveRequest | None = None,
         stop_limit_pin: int | None = None,
+        steps_per_rotation: int | None = None,
     ) -> bool:
         steps_per_cm = self._steps_per_cm()
-        multiplier = request.motor_a_step_multiplier if request is not None else 1.0
-        a_steps = int(round((dx_cm + dy_cm) * steps_per_cm * multiplier))
+        a_steps = int(round((dx_cm + dy_cm) * steps_per_cm))
         b_steps = int(round((dx_cm - dy_cm) * steps_per_cm))
-        return self._move_corexy_steps(gpio, pins, a_steps, b_steps, speed_rpm, request, stop_limit_pin)
+        return self._move_corexy_steps(
+            gpio,
+            pins,
+            a_steps,
+            b_steps,
+            speed_rpm,
+            request,
+            stop_limit_pin,
+            steps_per_rotation,
+        )
 
     def _move_corexy_steps(
         self,
@@ -301,6 +326,7 @@ class RaspberryGantryGPIOService:
         speed_rpm: float,
         request: GantryXYMoveRequest | None = None,
         stop_limit_pin: int | None = None,
+        steps_per_rotation: int | None = None,
     ) -> bool:
         a_total = abs(a_steps)
         b_total = abs(b_steps)
@@ -311,7 +337,7 @@ class RaspberryGantryGPIOService:
         self._set_direction(gpio, pins.a_dir_pin, a_steps >= 0, "ROBOT_GPIO_A_DIR_INVERT")
         self._set_direction(gpio, pins.b_dir_pin, b_steps >= 0, "ROBOT_GPIO_B_DIR_INVERT")
 
-        interval = self._step_interval_seconds(speed_rpm)
+        interval = self._step_interval_seconds(speed_rpm, steps_per_rotation)
         pulse = min(DEFAULT_STEP_PULSE_SECONDS, interval / 2.0)
 
         a_error = 0
@@ -353,36 +379,47 @@ class RaspberryGantryGPIOService:
         pins: _GPIOPinPlan,
         axis: str,
         direction: int,
-        track_length_cm: float,
+        max_probe_steps: int,
+        steps_per_rotation: int,
         fast_rpm: float,
         slow_rpm: float,
     ) -> None:
         limit_pin = self._axis_limit_pin(pins, axis, direction)
-        travel_cm = float(track_length_cm) * 1.25
-        dx_cm = direction * travel_cm if axis == "x" else 0.0
-        dy_cm = direction * travel_cm if axis == "y" else 0.0
+        cartesian_steps = direction * max(1, int(max_probe_steps))
+        a_steps = cartesian_steps
+        b_steps = cartesian_steps if axis == "x" else -cartesian_steps
 
-        hit_fast = self._move_cm(gpio, pins, dx_cm, dy_cm, fast_rpm, stop_limit_pin=limit_pin)
+        hit_fast = self._move_corexy_steps(
+            gpio,
+            pins,
+            a_steps,
+            b_steps,
+            fast_rpm,
+            stop_limit_pin=limit_pin,
+            steps_per_rotation=steps_per_rotation,
+        )
         if not hit_fast:
             raise RuntimeError(f"{axis.upper()} {'max' if direction > 0 else 'min'} limit switch was not hit during fast calibration probe.")
 
-        backoff = -direction * DEFAULT_BACKOFF_CM
-        self._move_cm(
+        backoff_steps = -direction * max(1, steps_per_rotation // 4)
+        self._move_corexy_steps(
             gpio,
             pins,
-            backoff if axis == "x" else 0.0,
-            backoff if axis == "y" else 0.0,
+            backoff_steps,
+            backoff_steps if axis == "x" else -backoff_steps,
             slow_rpm,
+            steps_per_rotation=steps_per_rotation,
         )
 
-        slow_travel = direction * (DEFAULT_BACKOFF_CM * 2.0)
-        hit_slow = self._move_cm(
+        slow_probe_steps = direction * max(1, steps_per_rotation // 2)
+        hit_slow = self._move_corexy_steps(
             gpio,
             pins,
-            slow_travel if axis == "x" else 0.0,
-            slow_travel if axis == "y" else 0.0,
+            slow_probe_steps,
+            slow_probe_steps if axis == "x" else -slow_probe_steps,
             slow_rpm,
             stop_limit_pin=limit_pin,
+            steps_per_rotation=steps_per_rotation,
         )
         if not hit_slow:
             raise RuntimeError(f"{axis.upper()} {'max' if direction > 0 else 'min'} limit switch was not hit during slow calibration probe.")
@@ -434,6 +471,8 @@ class RaspberryGantryGPIOService:
             "speed_rpm": request.speed_rpm,
             "trapezoidal_speed": request.trapezoidal_speed,
             "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+            "steps_per_rotation": request.steps_per_rotation,
+            "max_probe_rotations": request.max_probe_rotations,
             "pin_command_sent": None,
             "pin_reply": None,
             "pins_applied": True,
@@ -447,10 +486,9 @@ class RaspberryGantryGPIOService:
                 "x_dir_pin": pins.a_dir_pin,
                 "y_step_pin": pins.b_step_pin,
                 "y_dir_pin": pins.b_dir_pin,
-                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             "configured_limits": {
-                "limit_switch_mode": request.limit_switch_mode,
+                "limit_switch_mode": "4",
                 "x_min_limit_pin": pins.x_min_limit_pin,
                 "x_max_limit_pin": pins.x_max_limit_pin,
                 "y_min_limit_pin": pins.y_min_limit_pin,
@@ -458,6 +496,8 @@ class RaspberryGantryGPIOService:
                 "speed_rpm": request.speed_rpm,
                 "trapezoidal_speed": request.trapezoidal_speed,
                 "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+                "steps_per_rotation": request.steps_per_rotation,
+                "max_probe_rotations": request.max_probe_rotations,
             },
             "mode": context.get("mode"),
             "controller": RASPBERRY_BOARD_ID,
@@ -498,7 +538,6 @@ class RaspberryGantryGPIOService:
                 "x_dir_pin": pins.a_dir_pin,
                 "y_step_pin": pins.b_step_pin,
                 "y_dir_pin": pins.b_dir_pin,
-                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             "configured_limits": {
                 "limit_switch_mode": request.limit_switch_mode,

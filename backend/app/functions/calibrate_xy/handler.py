@@ -20,6 +20,8 @@ def execute(context: dict, inputs: dict) -> dict:
         "speed_rpm": response.speed_rpm,
         "trapezoidal_speed": response.trapezoidal_speed,
         "acceleration_rpm_per_s": response.acceleration_rpm_per_s,
+        "steps_per_rotation": response.steps_per_rotation,
+        "max_probe_rotations": response.max_probe_rotations,
         "pin_command_sent": response.pin_command_sent,
         "pin_reply": response.pin_reply,
         "pins_applied": response.pins_applied,

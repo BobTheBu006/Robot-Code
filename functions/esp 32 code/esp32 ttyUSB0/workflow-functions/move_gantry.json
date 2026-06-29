@@ -127,17 +127,6 @@
         "advanced": true
       },
       {
-        "key": "motor_a_step_multiplier",
-        "label": "Motor A Step Multiplier",
-        "type": "number",
-        "description": "Multiplier applied to CoreXY motor A step pulses. Use 2.0 when motor A needs twice as many step pulses as motor B for X-only motion.",
-        "required": false,
-        "default": 2.0,
-        "placeholder": null,
-        "advanced": true,
-        "options": []
-      },
-      {
         "key": "limit_switch_mode",
         "label": "Limit Switch Layout",
         "type": "select",
@@ -430,7 +419,7 @@
       },
       {
         "id": "left-z-motor",
-        "name": "Z Axis Motor",
+        "name": "Left Z Axis Motor",
         "kind": "stepper_motor",
         "board_id": "ttyUSB0",
         "sensor_kind": null,
@@ -491,7 +480,7 @@
         "routine_id": "move_gantry",
         "controller_role": "builder_board",
         "source": "firmware/main.ino",
-        "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
+        "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
         "entry_point": "move_gantry",
         "required_device_ids": [
           "x-axis-motor",
@@ -505,11 +494,11 @@
         "description": "Firmware routine required by Move Gantry XYZ on a CoreXY gantry with a single Z axis."
       }
     ],
-    "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
+    "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
     "notes": "CoreXY gantry movement. Origin 0,0,0 is the back-bottom-left corner. X range is 0-115 cm, Y range is 0-60 cm, and Z range is 0-60 cm."
   },
   "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>.",
+  "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>.",
   "notes": "CoreXY gantry movement. Origin 0,0,0 is the back-bottom-left corner. X range is 0-115 cm, Y range is 0-60 cm, and Z range is 0-60 cm.",
   "schema_version": 1,
   "inputs": [],

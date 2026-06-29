@@ -511,7 +511,7 @@
     },
     {
       "id": "left-z-motor",
-      "name": "Z Axis Motor",
+      "name": "Left Z Axis Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,

@@ -82,8 +82,8 @@ class GantryControllerService:
     def _command_deadline(self) -> float:
         return 20.0
 
-    def _move_deadline(self, dominant_steps: float, rpm: int) -> float:
-        steps_per_second = max((rpm * STEPS_PER_REVOLUTION) / 60.0, 1.0)
+    def _move_deadline(self, dominant_steps: float, rpm: int, steps_per_revolution: int = STEPS_PER_REVOLUTION) -> float:
+        steps_per_second = max((rpm * steps_per_revolution) / 60.0, 1.0)
         estimated_runtime = dominant_steps / steps_per_second
         return max(20.0, math.ceil(estimated_runtime * 2.0 + 8.0))
 
@@ -325,10 +325,15 @@ class GantryControllerService:
     def _build_xy_pin_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
         return (
             f"SET XY PINS {request.x_step_pin} {request.x_dir_pin} "
-            f"{request.y_step_pin} {request.y_dir_pin} {request.motor_a_step_multiplier:.6f}"
+            f"{request.y_step_pin} {request.y_dir_pin}"
         )
 
     def _build_xy_limit_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
+        if isinstance(request, GantryXYCalibrationRequest):
+            return (
+                f"SET XY LIMITS {request.x_min_limit_pin} {request.x_max_limit_pin} "
+                f"{request.y_min_limit_pin} {request.y_max_limit_pin}"
+            )
         return (
             f"SET XY LIMITS {request.limit_switch_mode} {request.x_min_limit_pin} "
             f"{request.x_max_limit_pin} {request.y_min_limit_pin} {request.y_max_limit_pin}"
@@ -345,7 +350,8 @@ class GantryControllerService:
         return (
             f"CALIBRATE XY {request.x_track_length_cm:.3f} "
             f"{request.y_track_length_cm:.3f} "
-            f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
+            f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
+            f"{request.steps_per_rotation} {request.max_probe_rotations}"
         )
 
     def _build_z_pin_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:
@@ -355,6 +361,11 @@ class GantryControllerService:
         )
 
     def _build_z_limit_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:
+        if isinstance(request, GantryZCalibrationRequest):
+            return (
+                f"SET Z LIMITS {request.z_left_min_limit_pin} {request.z_left_max_limit_pin} "
+                f"{request.z_right_min_limit_pin} {request.z_right_max_limit_pin}"
+            )
         return (
             f"SET Z LIMITS {request.limit_switch_mode} {request.z_left_min_limit_pin} "
             f"{request.z_left_max_limit_pin} {request.z_right_min_limit_pin} {request.z_right_max_limit_pin}"
@@ -419,7 +430,6 @@ class GantryControllerService:
                 "x_dir_pin": request.x_dir_pin,
                 "y_step_pin": request.y_step_pin,
                 "y_dir_pin": request.y_dir_pin,
-                "motor_a_step_multiplier": request.motor_a_step_multiplier,
                 "z_step_pin": request.z_left_step_pin,
                 "z_dir_pin": request.z_left_dir_pin,
             },
@@ -445,10 +455,7 @@ class GantryControllerService:
         pin_command = self._build_xy_pin_command(request)
         limit_command = self._build_xy_limit_command(request)
         calibration_command = self._build_calibrate_xy_command(request)
-        dominant_steps = max(
-            request.x_track_length_cm * XY_STEPS_PER_CM,
-            request.y_track_length_cm * XY_STEPS_PER_CM,
-        )
+        max_probe_steps = request.steps_per_rotation * request.max_probe_rotations
         pin_reply, limit_reply, calibration_reply = self._send_config_and_action(
             port=port,
             baud_rate=baud_rate,
@@ -457,8 +464,9 @@ class GantryControllerService:
             action_command=calibration_command,
             action_prefix="OK CALIBRATE XY",
             action_deadline=self._move_deadline(
-                dominant_steps * 3.0,
+                max_probe_steps * 5.0,
                 _effective_calibration_rpm(request),
+                request.steps_per_rotation,
             ),
         )
 
@@ -469,6 +477,8 @@ class GantryControllerService:
             speed_rpm=_effective_calibration_rpm(request),
             trapezoidal_speed=request.trapezoidal_speed,
             acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+            steps_per_rotation=request.steps_per_rotation,
+            max_probe_rotations=request.max_probe_rotations,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
@@ -487,7 +497,6 @@ class GantryControllerService:
                 "x_dir_pin": request.x_dir_pin,
                 "y_step_pin": request.y_step_pin,
                 "y_dir_pin": request.y_dir_pin,
-                "motor_a_step_multiplier": request.motor_a_step_multiplier,
             },
             configured_limits={
                 "limit_switch_mode": request.limit_switch_mode,
@@ -498,6 +507,8 @@ class GantryControllerService:
                 "speed_rpm": _effective_calibration_rpm(request),
                 "trapezoidal_speed": request.trapezoidal_speed,
                 "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+                "steps_per_rotation": request.steps_per_rotation,
+                "max_probe_rotations": request.max_probe_rotations,
             },
         )
 

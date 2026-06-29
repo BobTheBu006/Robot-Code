@@ -119,26 +119,6 @@
       "options": []
     },
     {
-      "key": "limit_switch_mode",
-      "label": "Limit Switch Layout",
-      "type": "select",
-      "description": "Choose whether the Z gantry uses 2 shared/home switches or 4 independent end-stop switches.",
-      "required": false,
-      "default": "4",
-      "placeholder": null,
-      "advanced": true,
-      "options": [
-        {
-          "label": "2 Limit Switches",
-          "value": "2"
-        },
-        {
-          "label": "4 Limit Switches",
-          "value": "4"
-        }
-      ]
-    },
-    {
       "key": "z_left_min_limit_pin",
       "label": "Left Z Min Limit Pin",
       "type": "number",
@@ -194,7 +174,7 @@
   "hardware_devices": [
     {
       "id": "left-z-motor",
-      "name": "Z Axis Motor",
+      "name": "Left Z Axis Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -250,7 +230,7 @@
     },
     {
       "id": "right-z-motor",
-      "name": "Legacy Right Z Motor",
+      "name": "Right Z Axis Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,

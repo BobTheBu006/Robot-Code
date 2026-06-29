@@ -45,12 +45,19 @@ export interface FunctionHardwareAssignment {
   hardware_device_id: string;
 }
 
+export interface HardwareNodePosition {
+  node_id: string;
+  x: number;
+  y: number;
+}
+
 export interface HardwareMap {
   version: number;
   boards: HardwareBoardMapping[];
   devices: HardwareDeviceMapping[];
   groups?: HardwareGroupMapping[];
   function_assignments?: FunctionHardwareAssignment[];
+  node_positions?: HardwareNodePosition[];
   updated_at?: string | null;
 }
 

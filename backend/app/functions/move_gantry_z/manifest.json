@@ -216,7 +216,7 @@
   "hardware_devices": [
     {
       "id": "left-z-motor",
-      "name": "Left Z Motor",
+      "name": "Left Z Axis Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,
@@ -272,7 +272,7 @@
     },
     {
       "id": "right-z-motor",
-      "name": "Right Z Motor",
+      "name": "Right Z Axis Motor",
       "kind": "stepper_motor",
       "board_id": "ttyUSB1",
       "sensor_kind": null,

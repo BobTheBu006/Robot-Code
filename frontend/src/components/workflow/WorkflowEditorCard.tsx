@@ -95,12 +95,21 @@ type WorkflowContextMenuState = {
   y: number;
   nodeId: string;
 } | null;
-type WorkflowDrawerMode = "blocks" | "inspector" | null;
+type WorkflowDrawerMode = "blocks" | null;
 type CompoundOutputBuild = WorkflowOutputDefinition & {
   sourceNodeId: string;
   sourceHandle?: string | null;
 };
 const RASPBERRY_BOARD_ID = "raspberry-pi";
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
+}
 
 function isEsp32WorkflowBoardId(boardId: string | null | undefined): boardId is string {
   return Boolean(boardId) && boardId !== RASPBERRY_BOARD_ID;
@@ -1185,6 +1194,54 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
       return nextState;
     });
   }
+
+  function handleDeleteSelectedNodes() {
+    const selectedIds = new Set(nodes.filter((node) => node.selected).map((node) => node.id));
+    if (selectedNodeId) {
+      selectedIds.add(selectedNodeId);
+    }
+
+    if (selectedIds.size === 0) {
+      return false;
+    }
+
+    for (const nodeId of selectedIds) {
+      testAbortControllersRef.current[nodeId]?.abort();
+      delete testAbortControllersRef.current[nodeId];
+    }
+
+    setNodes((currentNodes) => currentNodes.filter((node) => !selectedIds.has(node.id)));
+    setEdges((existingEdges) =>
+      existingEdges.filter((edge) => !selectedIds.has(edge.source) && !selectedIds.has(edge.target)),
+    );
+    setSelectedNodeId(null);
+    setOpenedNodeId((currentNodeId) => (currentNodeId && selectedIds.has(currentNodeId) ? null : currentNodeId));
+    setActiveEdgeId(null);
+    setContextMenu(null);
+    updateTestState((currentState) => {
+      const nextState = { ...currentState };
+      for (const nodeId of selectedIds) {
+        delete nextState[nodeId];
+      }
+      return nextState;
+    });
+    return true;
+  }
+
+  useEffect(() => {
+    function handleWorkflowKeyDown(event: KeyboardEvent) {
+      if ((event.key !== "Delete" && event.key !== "Backspace") || isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+
+      if (handleDeleteSelectedNodes()) {
+        event.preventDefault();
+      }
+    }
+
+    window.addEventListener("keydown", handleWorkflowKeyDown);
+    return () => window.removeEventListener("keydown", handleWorkflowKeyDown);
+  }, [nodes, selectedNodeId]);
 
   function handleToggleNodeActive(nodeId: string) {
     setNodes((currentNodes) =>
@@ -2435,7 +2492,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   }
 
   return (
-    <section className="editor-workspace workflow-editor">
+    <section className="editor-workspace editor-workspace--workflow-page workflow-editor">
         <div className="editor-workspace__toolbar">
           <div>
             <strong>Function discovery</strong>
@@ -2558,8 +2615,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 onNodeClick={(event, node) => {
                   event.stopPropagation();
                   setSelectedNodeId(node.id);
-                  setOpenedNodeId(node.id);
-                  setWorkflowDrawer("inspector");
+                  setOpenedNodeId(null);
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2567,7 +2623,6 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                   event.stopPropagation();
                   setSelectedNodeId(node.id);
                   setOpenedNodeId(node.id);
-                  setWorkflowDrawer("inspector");
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2630,8 +2685,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
               ) : null}
             </div>
 
-            {workflowDrawer === "inspector" && openedNode ? (
-              <aside className="editor-drawer editor-drawer--workflow">
+            {openedNode ? (
               <WorkflowInspector
                 allNodeTestEntries={nodes.map((node) => ({
                   nodeId: node.id,
@@ -2644,12 +2698,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 nodes={nodes}
                 onClose={() => {
                   setOpenedNodeId(null);
-                  setWorkflowDrawer(null);
                 }}
                 onNavigateToNode={(nodeId) => {
                   setSelectedNodeId(nodeId);
                   setOpenedNodeId(nodeId);
-                  setWorkflowDrawer("inspector");
                 }}
                 onCancel={() => void handleCancelNodeExecution(openedNode.id)}
                 onEditCompound={() => handleEditCompoundFunction(openedNode.id)}
@@ -2665,7 +2717,6 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 testResult={openedNodeTestState.result}
                 testStatus={openedNodeTestState.status}
               />
-              </aside>
             ) : null}
 
             {workflowDrawer === "blocks" ? (

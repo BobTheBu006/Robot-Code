@@ -35,830 +35,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 22,
-        "benchmarkDurationMs": 26,
-        "lastDurationMs": 0
+        "runCount": 25,
+        "benchmarkDurationMs": 24,
+        "lastDurationMs": 1
       },
       "measured": {
         "width": 196,
-        "height": 134
-      },
-      "selected": false,
-      "dragging": false
-    },
-    {
-      "id": "dispense-zk5jm",
-      "type": "workflowBlock",
-      "position": {
-        "x": 928.4349470541778,
-        "y": 12.704260429487917
-      },
-      "data": {
-        "block": {
-          "id": "dispense",
-          "displayName": "7 Syringe Dispenser",
-          "category": "Advanced Functions",
-          "description": "Drive the 7-head syringe ESP32 with calibration-aware dispense amounts.",
-          "version": "0.4.0",
-          "kind": "advanced",
-          "acceptsInput": true,
-          "accent": "#0e7490",
-          "inputs": [
-            {
-              "key": "tool_port",
-              "label": "Selected ESP32",
-              "type": "file/path",
-              "description": "Serial device path for the connected ESP32 syringe board.",
-              "required": false,
-              "default": "/dev/ttyUSB0",
-              "placeholder": "/dev/ttyUSB0",
-              "advanced": false,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "calibration_file",
-              "label": "Calibration File",
-              "type": "file/path",
-              "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
-              "required": true,
-              "default": "/home/robot/robot control/Robot-Code/functions/syringe control code/calibration.json",
-              "placeholder": "/path/to/calibration.json",
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "speed",
-              "label": "Dispense Speed",
-              "type": "number",
-              "description": "Shared fallback speed used when dedicated expelling and intake speeds are not set.",
-              "required": false,
-              "default": 100,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "A",
-              "label": "Head A",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head A.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "B",
-              "label": "Head B",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head B.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "C",
-              "label": "Head C",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head C.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "D",
-              "label": "Head D",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head D.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "E",
-              "label": "Head E",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head E.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "F",
-              "label": "Head F",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head F.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "G",
-              "label": "Head G",
-              "type": "number",
-              "description": "Requested dispense amount for syringe head G.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            }
-          ],
-          "advancedInputs": [
-            {
-              "key": "intake_speed",
-              "label": "Expelling Speed",
-              "type": "number",
-              "description": "Overrides the shared dispense speed for the first part of the move where fluid is expelled.",
-              "required": false,
-              "default": 100,
-              "placeholder": null,
-              "advanced": true,
-              "options": []
-            },
-            {
-              "key": "outtake_speed",
-              "label": "Intake Speed",
-              "type": "number",
-              "description": "Overrides the shared dispense speed for the return move where fluid is taken back in.",
-              "required": false,
-              "default": 100,
-              "placeholder": null,
-              "advanced": true,
-              "options": []
-            },
-            {
-              "key": "head_a_step_pin",
-              "label": "Head A Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head A.",
-              "required": false,
-              "default": 33,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_a_dir_pin",
-              "label": "Head A Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head A.",
-              "required": false,
-              "default": 32,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_b_step_pin",
-              "label": "Head B Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head B.",
-              "required": false,
-              "default": 25,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_b_dir_pin",
-              "label": "Head B Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head B.",
-              "required": false,
-              "default": 4,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_c_step_pin",
-              "label": "Head C Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head C.",
-              "required": false,
-              "default": 26,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_c_dir_pin",
-              "label": "Head C Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head C.",
-              "required": false,
-              "default": 5,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_d_step_pin",
-              "label": "Head D Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head D.",
-              "required": false,
-              "default": 27,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_d_dir_pin",
-              "label": "Head D Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head D.",
-              "required": false,
-              "default": 18,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_e_step_pin",
-              "label": "Head E Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head E.",
-              "required": false,
-              "default": 14,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_e_dir_pin",
-              "label": "Head E Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head E.",
-              "required": false,
-              "default": 19,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_f_step_pin",
-              "label": "Head F Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head F.",
-              "required": false,
-              "default": 12,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_f_dir_pin",
-              "label": "Head F Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head F.",
-              "required": false,
-              "default": 21,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_g_step_pin",
-              "label": "Head G Step Pin",
-              "type": "number",
-              "description": "GPIO step pin to use at runtime for syringe head G.",
-              "required": false,
-              "default": 13,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "head_g_dir_pin",
-              "label": "Head G Dir Pin",
-              "type": "number",
-              "description": "GPIO direction pin to use at runtime for syringe head G.",
-              "required": false,
-              "default": 22,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            }
-          ],
-          "outputs": [
-            {
-              "key": "next",
-              "label": "Next",
-              "type": "flow",
-              "description": "Continue when the dispense request completes."
-            }
-          ],
-          "builderBoardId": null,
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/dispense.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
-          "builderFirmwareEntryFile": "firmware/main.ino",
-          "builderBaseFunctionId": null,
-          "hardwareDevices": [
-            {
-              "id": "syringe-head-a",
-              "name": "Syringe Head A",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-a-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_a_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-a-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_a_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-a-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-a-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-a-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-a-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-a",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-b",
-              "name": "Syringe Head B",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-b-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_b_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-b-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_b_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-b-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-b-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-b-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-b-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-b",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-c",
-              "name": "Syringe Head C",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-c-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_c_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-c-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_c_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-c-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-c-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-c-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-c-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-c",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-d",
-              "name": "Syringe Head D",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-d-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_d_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-d-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_d_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-d-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-d-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-d-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-d-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-d",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-e",
-              "name": "Syringe Head E",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-e-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_e_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-e-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_e_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-e-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-e-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-e-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-e-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-e",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-f",
-              "name": "Syringe Head F",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-f-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_f_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-f-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_f_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-f-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-f-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-f-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-f-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-f",
-              "notes": null
-            },
-            {
-              "id": "syringe-head-g",
-              "name": "Syringe Head G",
-              "kind": "stepper_motor",
-              "board_id": "",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "head-g-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "head_g_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-g-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "head_g_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "head-g-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-g-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-g-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "head-g-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-syringe-head-g",
-              "notes": null
-            }
-          ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "dispense",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "serial-text",
-              "entry_point": "dispense",
-              "required_device_ids": [
-                "syringe-head-a",
-                "syringe-head-b",
-                "syringe-head-c",
-                "syringe-head-d",
-                "syringe-head-e",
-                "syringe-head-f",
-                "syringe-head-g"
-              ],
-              "description": "Firmware routine required by 7 Syringe Dispenser."
-            }
-          ],
-          "referencedBasicBlockIds": [
-            "basic-stepper-syringe-head-a",
-            "basic-stepper-syringe-head-b",
-            "basic-stepper-syringe-head-c",
-            "basic-stepper-syringe-head-d",
-            "basic-stepper-syringe-head-e",
-            "basic-stepper-syringe-head-f",
-            "basic-stepper-syringe-head-g"
-          ]
-        },
-        "parameters": {
-          "tool_port": "/dev/ttyUSB0",
-          "calibration_file": "/home/robot/robot control/syringe control code/calibration.json",
-          "speed": 50,
-          "A": 0,
-          "B": 0,
-          "C": 0,
-          "D": 0,
-          "E": 0,
-          "F": 0,
-          "G": 200,
-          "intake_speed": 50,
-          "outtake_speed": 200,
-          "head_a_step_pin": "33",
-          "head_a_dir_pin": "32",
-          "head_b_step_pin": 25,
-          "head_b_dir_pin": 4,
-          "head_c_step_pin": 26,
-          "head_c_dir_pin": 5,
-          "head_d_step_pin": 27,
-          "head_d_dir_pin": 18,
-          "head_e_step_pin": 14,
-          "head_e_dir_pin": 19,
-          "head_f_step_pin": 12,
-          "head_f_dir_pin": 21,
-          "head_g_step_pin": "13",
-          "head_g_dir_pin": "22"
-        },
-        "settings": {
-          "failureMode": "separate_path",
-          "retryCount": 0
-        },
-        "isActive": false,
-        "runCount": 15,
-        "benchmarkDurationMs": 8214,
-        "lastDurationMs": 7287
-      },
-      "measured": {
-        "width": 196,
-        "height": 185
+        "height": 133
       },
       "selected": false,
       "dragging": false
@@ -876,7 +59,7 @@
           "displayName": "Calibrate Gantry XY",
           "category": "Advanced Functions",
           "description": "Define the CoreXY work-area boundaries by double-probing X min/max first, returning to X=0, then double-probing Y min/max at X=0.",
-          "version": "0.2.0",
+          "version": "0.3.0",
           "kind": "advanced",
           "acceptsInput": true,
           "accent": "#0e7490",
@@ -887,8 +70,8 @@
               "type": "file/path",
               "description": "Connected ESP32 board that should run the XY calibration routine.",
               "required": true,
-              "default": "/dev/ttyUSB0",
-              "placeholder": "/dev/ttyUSB0",
+              "default": "/dev/ttyUSB1",
+              "placeholder": "/dev/ttyUSB1",
               "advanced": false,
               "options": [],
               "hidden": true,
@@ -948,6 +131,28 @@
               "placeholder": null,
               "advanced": false,
               "options": []
+            },
+            {
+              "key": "steps_per_rotation",
+              "label": "Steps per Rotation",
+              "type": "number",
+              "description": "Stepper pulse count for one full motor rotation. Use 800 when the driver is configured for 800 steps per rotation.",
+              "required": true,
+              "default": 800,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
+              "key": "max_probe_rotations",
+              "label": "Max Probe Rotations",
+              "type": "number",
+              "description": "Maximum motor rotations allowed for each limit-switch probe before calibration stops with a safety error.",
+              "required": true,
+              "default": 120,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
             }
           ],
           "advancedInputs": [
@@ -1002,37 +207,6 @@
               "options": [],
               "hidden": true,
               "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "motor_a_step_multiplier",
-              "label": "Motor A Step Multiplier",
-              "type": "number",
-              "description": "Multiplier applied to CoreXY motor A step pulses. Use 2.0 when motor A needs twice as many step pulses as motor B for X-only motion.",
-              "required": false,
-              "default": 2,
-              "placeholder": null,
-              "advanced": true,
-              "options": []
-            },
-            {
-              "key": "limit_switch_mode",
-              "label": "Limit Switch Layout",
-              "type": "select",
-              "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
-              "required": false,
-              "default": "4",
-              "placeholder": null,
-              "advanced": true,
-              "options": [
-                {
-                  "label": "2 Limit Switches",
-                  "value": "2"
-                },
-                {
-                  "label": "4 Limit Switches",
-                  "value": "4"
-                }
-              ]
             },
             {
               "key": "x_min_limit_pin",
@@ -1095,9 +269,9 @@
               "description": "Continue when XY calibration completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+          "builderBoardId": "ttyUSB1",
+          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1/workflow-functions/calibrate_xy.json",
+          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB1",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null,
           "hardwareDevices": [
@@ -1114,40 +288,40 @@
                 {
                   "id": "x-dir",
                   "signal": "direction",
-                  "gpio": "16",
+                  "gpio": "14",
                   "function_input_key": "x_dir_pin",
                   "notes": null
                 },
                 {
                   "id": "x-step",
                   "signal": "step",
-                  "gpio": "17",
+                  "gpio": "27",
                   "function_input_key": "x_step_pin",
                   "notes": null
                 },
                 {
-                  "id": "pin-3-iimyy9",
+                  "id": "x-enable",
                   "signal": "enable",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-4-tewib5",
+                  "id": "x-ms1",
                   "signal": "micro_step_1",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-5-92ok0d",
+                  "id": "x-ms2",
                   "signal": "micro_step_2",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-6-3wvcab",
+                  "id": "x-ms3",
                   "signal": "micro_step_3",
                   "gpio": "-",
                   "function_input_key": null,
@@ -1182,28 +356,28 @@
                   "notes": null
                 },
                 {
-                  "id": "pin-3-0a6779",
+                  "id": "y-enable",
                   "signal": "enable",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-4-o543un",
+                  "id": "y-ms1",
                   "signal": "micro_step_1",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-5-ikga1t",
+                  "id": "y-ms2",
                   "signal": "micro_step_2",
                   "gpio": "-",
                   "function_input_key": null,
                   "notes": null
                 },
                 {
-                  "id": "pin-6-13ud03",
+                  "id": "y-ms3",
                   "signal": "micro_step_3",
                   "gpio": "-",
                   "function_input_key": null,
@@ -1226,7 +400,7 @@
                 {
                   "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "27",
+                  "gpio": "34",
                   "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
@@ -1247,7 +421,7 @@
                 {
                   "id": "x-max-limit",
                   "signal": "signal",
-                  "gpio": "14",
+                  "gpio": "35",
                   "function_input_key": "x_max_limit_pin",
                   "notes": null
                 }
@@ -1268,7 +442,7 @@
                 {
                   "id": "y-min-limit",
                   "signal": "signal",
-                  "gpio": "34",
+                  "gpio": "23",
                   "function_input_key": "y_min_limit_pin",
                   "notes": null
                 }
@@ -1289,7 +463,7 @@
                 {
                   "id": "y-max-limit",
                   "signal": "signal",
-                  "gpio": "35",
+                  "gpio": "22",
                   "function_input_key": "y_max_limit_pin",
                   "notes": null
                 }
@@ -1303,7 +477,7 @@
               "routine_id": "calibrate_xy",
               "controller_role": "builder_board",
               "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch.",
+              "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch and a per-probe rotation safety cap.",
               "entry_point": "calibrate_xy",
               "required_device_ids": [
                 "x-axis-motor",
@@ -1327,17 +501,17 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
-          "x_track_length_cm": 100,
-          "y_track_length_cm": 100,
-          "speed_rpm": 2000,
-          "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 2000,
+          "x_track_length_cm": 111,
+          "y_track_length_cm": 56,
+          "speed_rpm": 50,
+          "trapezoidal_speed": false,
+          "acceleration_rpm_per_s": 200,
+          "steps_per_rotation": 800,
+          "max_probe_rotations": 120,
           "x_step_pin": "16",
           "x_dir_pin": "17",
           "y_step_pin": 18,
           "y_dir_pin": 19,
-          "motor_a_step_multiplier": 4,
-          "limit_switch_mode": "2",
           "x_min_limit_pin": "21",
           "x_max_limit_pin": "22",
           "y_min_limit_pin": "23",
@@ -1349,718 +523,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 19,
-        "benchmarkDurationMs": 19482,
-        "lastDurationMs": 41137
+        "runCount": 22,
+        "benchmarkDurationMs": 17778,
+        "lastDurationMs": 7022
       },
       "measured": {
         "width": 196,
         "height": 192
       },
       "selected": true,
-      "dragging": false
-    },
-    {
-      "id": "move_gantry-qkmaz",
-      "type": "workflowBlock",
-      "position": {
-        "x": 620.0349081336975,
-        "y": 173.98251565172882
-      },
-      "data": {
-        "block": {
-          "id": "move_gantry",
-          "displayName": "Move Gantry XYZ",
-          "category": "Advanced Functions",
-          "description": "Move the CoreXY gantry to an absolute X/Y/Z position inside the 115 x 60 x 60 cm workspace. Origin 0,0,0 is the back-bottom-left corner.",
-          "version": "0.4.0",
-          "kind": "advanced",
-          "acceptsInput": true,
-          "accent": "#0e7490",
-          "inputs": [
-            {
-              "key": "tool_port",
-              "label": "Selected ESP32",
-              "type": "file/path",
-              "description": "Controller resolved from the Hardware Map for the CoreXY gantry routine.",
-              "required": true,
-              "default": "/dev/ttyUSB0",
-              "placeholder": "/dev/ttyUSB0",
-              "advanced": false,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "x_cm",
-              "label": "X Position (cm)",
-              "type": "number",
-              "description": "Target X position in cm from the back-bottom-left origin. Range: 0 to 115 cm.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "y_cm",
-              "label": "Y Position (cm)",
-              "type": "number",
-              "description": "Target Y position in cm from the back-bottom-left origin. Range: 0 to 60 cm.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "z_cm",
-              "label": "Z Position (cm)",
-              "type": "number",
-              "description": "Target Z position in cm from the back-bottom-left origin. Range: 0 to 60 cm.",
-              "required": true,
-              "default": 0,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "speed_rpm",
-              "label": "Speed (RPM)",
-              "type": "number",
-              "description": "Numeric target motor speed for the move.",
-              "required": true,
-              "default": 240,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "trapezoidal_speed",
-              "label": "Trapezoidal Speed",
-              "type": "boolean",
-              "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
-              "required": false,
-              "default": true,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "acceleration_rpm_per_s",
-              "label": "Acceleration (RPM/s)",
-              "type": "number",
-              "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
-              "required": false,
-              "default": 600,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "on_the_fly_calibration",
-              "label": "On-the-fly Calibration",
-              "type": "boolean",
-              "description": "When enabled, moves that end within 3 cm of a limit switch probe that switch and compare the observed position against calibration.",
-              "required": false,
-              "default": true,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            },
-            {
-              "key": "calibration_max_diff_steps",
-              "label": "Max Calibration Difference (steps)",
-              "type": "number",
-              "description": "Maximum allowed on-the-fly limit-switch position error before a full recalibration is triggered.",
-              "required": false,
-              "default": 5,
-              "placeholder": null,
-              "advanced": false,
-              "options": []
-            }
-          ],
-          "advancedInputs": [
-            {
-              "key": "x_step_pin",
-              "label": "X Step Pin",
-              "type": "number",
-              "description": "Runtime GPIO step pin for the X axis driver.",
-              "required": false,
-              "default": 16,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "x_dir_pin",
-              "label": "X Dir Pin",
-              "type": "number",
-              "description": "Runtime GPIO direction pin for the X axis driver.",
-              "required": false,
-              "default": 17,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "y_step_pin",
-              "label": "Y Step Pin",
-              "type": "number",
-              "description": "Runtime GPIO step pin for the Y axis driver.",
-              "required": false,
-              "default": 18,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "y_dir_pin",
-              "label": "Y Dir Pin",
-              "type": "number",
-              "description": "Runtime GPIO direction pin for the Y axis driver.",
-              "required": false,
-              "default": 19,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "motor_a_step_multiplier",
-              "label": "Motor A Step Multiplier",
-              "type": "number",
-              "description": "Multiplier applied to CoreXY motor A step pulses. Use 2.0 when motor A needs twice as many step pulses as motor B for X-only motion.",
-              "required": false,
-              "default": 2,
-              "placeholder": null,
-              "advanced": true,
-              "options": []
-            },
-            {
-              "key": "limit_switch_mode",
-              "label": "Limit Switch Layout",
-              "type": "select",
-              "description": "Choose whether the XY gantry uses 2 shared/home switches or 4 end-stop switches.",
-              "required": false,
-              "default": "4",
-              "placeholder": null,
-              "advanced": true,
-              "options": [
-                {
-                  "label": "2 Limit Switches",
-                  "value": "2"
-                },
-                {
-                  "label": "4 Limit Switches",
-                  "value": "4"
-                }
-              ]
-            },
-            {
-              "key": "x_min_limit_pin",
-              "label": "X Min Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the X minimum/home limit switch.",
-              "required": false,
-              "default": 21,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "x_max_limit_pin",
-              "label": "X Max Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the X maximum limit switch.",
-              "required": false,
-              "default": 22,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "y_min_limit_pin",
-              "label": "Y Min Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the Y minimum/home limit switch.",
-              "required": false,
-              "default": 23,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "y_max_limit_pin",
-              "label": "Y Max Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the Y maximum limit switch.",
-              "required": false,
-              "default": 25,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_left_step_pin",
-              "label": "Z Step Pin",
-              "type": "number",
-              "description": "Runtime GPIO step pin for the single Z axis driver.",
-              "required": false,
-              "default": 32,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_left_dir_pin",
-              "label": "Z Dir Pin",
-              "type": "number",
-              "description": "Runtime GPIO direction pin for the single Z axis driver.",
-              "required": false,
-              "default": 33,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_right_step_pin",
-              "label": "Legacy Z Step Pin",
-              "type": "number",
-              "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z step pin.",
-              "required": false,
-              "default": 32,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_right_dir_pin",
-              "label": "Legacy Z Dir Pin",
-              "type": "number",
-              "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z direction pin.",
-              "required": false,
-              "default": 33,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_left_min_limit_pin",
-              "label": "Z Min Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the Z minimum/home limit switch.",
-              "required": false,
-              "default": 12,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_left_max_limit_pin",
-              "label": "Z Max Limit Pin",
-              "type": "number",
-              "description": "GPIO pin for the Z maximum limit switch.",
-              "required": false,
-              "default": 13,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_right_min_limit_pin",
-              "label": "Legacy Z Min Limit Pin",
-              "type": "number",
-              "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z min limit pin.",
-              "required": false,
-              "default": 12,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            },
-            {
-              "key": "z_right_max_limit_pin",
-              "label": "Legacy Z Max Limit Pin",
-              "type": "number",
-              "description": "Compatibility alias for old dual-Z workflows. Single-Z setups reuse the Z max limit pin.",
-              "required": false,
-              "default": 13,
-              "placeholder": null,
-              "advanced": true,
-              "options": [],
-              "hidden": true,
-              "resolvedFrom": "hardware_map"
-            }
-          ],
-          "outputs": [
-            {
-              "key": "next",
-              "label": "Next",
-              "type": "flow",
-              "description": "Continue when the XY move completes."
-            }
-          ],
-          "builderBoardId": "ttyUSB0",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/move_gantry.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
-          "builderFirmwareEntryFile": "firmware/main.ino",
-          "builderBaseFunctionId": null,
-          "hardwareDevices": [
-            {
-              "id": "x-axis-motor",
-              "name": "CoreXY A Motor",
-              "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "x-dir",
-                  "signal": "direction",
-                  "gpio": "16",
-                  "function_input_key": "x_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "x-step",
-                  "signal": "step",
-                  "gpio": "17",
-                  "function_input_key": "x_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "pin-3-iimyy9",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-4-tewib5",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-5-92ok0d",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-6-3wvcab",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-x-axis-motor",
-              "notes": null
-            },
-            {
-              "id": "y-axis-motor",
-              "name": "CoreXY B Motor",
-              "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "y-dir",
-                  "signal": "direction",
-                  "gpio": "26",
-                  "function_input_key": "y_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "y-step",
-                  "signal": "step",
-                  "gpio": "25",
-                  "function_input_key": "y_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "pin-3-0a6779",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-4-o543un",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-5-ikga1t",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "pin-6-13ud03",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-y-axis-motor",
-              "notes": null
-            },
-            {
-              "id": "x-min-limit-switch",
-              "name": "X Min Limit Switch",
-              "kind": "sensor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": "position_limit_switch",
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "x-min-limit",
-                  "signal": "signal",
-                  "gpio": "27",
-                  "function_input_key": "x_min_limit_pin",
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-sensor-x-min-limit-switch",
-              "notes": null
-            },
-            {
-              "id": "x-max-limit-switch",
-              "name": "X Max Limit Switch",
-              "kind": "sensor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": "position_limit_switch",
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "x-max-limit",
-                  "signal": "signal",
-                  "gpio": "14",
-                  "function_input_key": "x_max_limit_pin",
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-sensor-x-max-limit-switch",
-              "notes": null
-            },
-            {
-              "id": "y-min-limit-switch",
-              "name": "Y Min Limit Switch",
-              "kind": "sensor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": "position_limit_switch",
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "y-min-limit",
-                  "signal": "signal",
-                  "gpio": "34",
-                  "function_input_key": "y_min_limit_pin",
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-sensor-y-min-limit-switch",
-              "notes": null
-            },
-            {
-              "id": "y-max-limit-switch",
-              "name": "Y Max Limit Switch",
-              "kind": "sensor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": "position_limit_switch",
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "y-max-limit",
-                  "signal": "signal",
-                  "gpio": "35",
-                  "function_input_key": "y_max_limit_pin",
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-sensor-y-max-limit-switch",
-              "notes": null
-            },
-            {
-              "id": "left-z-motor",
-              "name": "Z Axis Motor",
-              "kind": "stepper_motor",
-              "board_id": "ttyUSB0",
-              "sensor_kind": null,
-              "rotation_min_deg": null,
-              "rotation_max_deg": null,
-              "calibration_ml_per_200_steps": null,
-              "pins": [
-                {
-                  "id": "z-left-dir",
-                  "signal": "direction",
-                  "gpio": null,
-                  "function_input_key": "z_left_dir_pin",
-                  "notes": null
-                },
-                {
-                  "id": "z-left-step",
-                  "signal": "step",
-                  "gpio": null,
-                  "function_input_key": "z_left_step_pin",
-                  "notes": null
-                },
-                {
-                  "id": "z-left-enable",
-                  "signal": "enable",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "z-left-ms1",
-                  "signal": "micro_step_1",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "z-left-ms2",
-                  "signal": "micro_step_2",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                },
-                {
-                  "id": "z-left-ms3",
-                  "signal": "micro_step_3",
-                  "gpio": "-",
-                  "function_input_key": null,
-                  "notes": null
-                }
-              ],
-              "basic_block_id": "basic-stepper-left-z-motor",
-              "notes": "Single Z axis motor. Stable legacy ID kept for compatibility."
-            }
-          ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "move_gantry",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "Serial commands: PING, SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir> <motorAStepMultiplier>, SET XY LIMITS <mode> <xMin> <xMax> <yMin> <yMax>, SET Z PINS <zStep> <zDir> <zStep> <zDir>, SET Z LIMITS <mode> <zMin> <zMax> <zMin> <zMax>, MOVE XYZ <xCm> <yCm> <zCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <onTheFlyFlag> <maxDiffSteps>.",
-              "entry_point": "move_gantry",
-              "required_device_ids": [
-                "x-axis-motor",
-                "y-axis-motor",
-                "left-z-motor",
-                "x-min-limit-switch",
-                "x-max-limit-switch",
-                "y-min-limit-switch",
-                "y-max-limit-switch"
-              ],
-              "description": "Firmware routine required by Move Gantry XYZ on a CoreXY gantry with a single Z axis."
-            }
-          ],
-          "referencedBasicBlockIds": [
-            "basic-stepper-x-axis-motor",
-            "basic-stepper-y-axis-motor",
-            "basic-sensor-x-min-limit-switch",
-            "basic-sensor-x-max-limit-switch",
-            "basic-sensor-y-min-limit-switch",
-            "basic-sensor-y-max-limit-switch",
-            "basic-stepper-left-z-motor"
-          ]
-        },
-        "parameters": {
-          "tool_port": "/dev/ttyUSB0",
-          "x_cm": 100,
-          "y_cm": 100,
-          "z_cm": 0,
-          "speed_rpm": 240,
-          "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 600,
-          "on_the_fly_calibration": true,
-          "calibration_max_diff_steps": 5,
-          "x_step_pin": "16",
-          "x_dir_pin": "17",
-          "y_step_pin": 18,
-          "y_dir_pin": 19,
-          "motor_a_step_multiplier": 2,
-          "limit_switch_mode": "2",
-          "x_min_limit_pin": 21,
-          "x_max_limit_pin": 22,
-          "y_min_limit_pin": 23,
-          "y_max_limit_pin": "25",
-          "z_left_step_pin": 32,
-          "z_left_dir_pin": 33,
-          "z_right_step_pin": 32,
-          "z_right_dir_pin": 33,
-          "z_left_min_limit_pin": 12,
-          "z_left_max_limit_pin": 13,
-          "z_right_min_limit_pin": 12,
-          "z_right_max_limit_pin": 13,
-          "speed_profile": "normal"
-        },
-        "settings": {
-          "failureMode": "separate_path",
-          "retryCount": 0
-        },
-        "isActive": false,
-        "runCount": 19,
-        "benchmarkDurationMs": 1039,
-        "lastDurationMs": 74
-      },
-      "measured": {
-        "width": 196,
-        "height": 214
-      },
-      "selected": false,
       "dragging": false
     }
   ],
@@ -2072,38 +543,6 @@
       "targetHandle": "input",
       "type": "workflowEdge",
       "id": "xy-edge__start-seed-startnext-calibrate_xy-rymf4input"
-    },
-    {
-      "source": "calibrate_xy-rymf4",
-      "sourceHandle": "calibrated",
-      "target": "move_gantry-qkmaz",
-      "targetHandle": "input",
-      "type": "workflowEdge",
-      "id": "xy-edge__calibrate_xy-rymf4calibrated-move_gantry-qkmazinput"
-    },
-    {
-      "source": "move_gantry-qkmaz",
-      "sourceHandle": "accepted",
-      "target": "dispense-zk5jm",
-      "targetHandle": "input",
-      "type": "workflowEdge",
-      "id": "xy-edge__move_gantry-qkmazaccepted-dispense-zk5jminput"
-    },
-    {
-      "source": "calibrate_xy-rymf4",
-      "sourceHandle": "next",
-      "target": "move_gantry-qkmaz",
-      "targetHandle": "input",
-      "type": "workflowEdge",
-      "id": "xy-edge__calibrate_xy-rymf4next-move_gantry-qkmazinput"
-    },
-    {
-      "source": "move_gantry-qkmaz",
-      "sourceHandle": "next",
-      "target": "dispense-zk5jm",
-      "targetHandle": "input",
-      "type": "workflowEdge",
-      "id": "xy-edge__move_gantry-qkmaznext-dispense-zk5jminput"
     }
   ]
 }
