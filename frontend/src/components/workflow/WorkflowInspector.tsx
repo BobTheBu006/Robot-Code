@@ -687,7 +687,7 @@ export function WorkflowInspector({
                 <div className="workflow-overlay__fields">
                   {linkedHardwareBlocks.length > 0 ? (
                     <section className="workflow-overlay__hardware-links">
-                      <strong>Linked basic blocks</strong>
+                      <strong>Hardware dependencies</strong>
                       <div>
                         {linkedHardwareBlocks.map((linkedBlock) => (
                           <span key={linkedBlock.id}>

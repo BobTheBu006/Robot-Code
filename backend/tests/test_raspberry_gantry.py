@@ -5,8 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.functions.calibrate_xy.handler import execute as execute_calibrate_xy
-from app.functions.move_gantry.handler import execute as execute_move_xy
+from app.models.gantry import GantryXYCalibrationRequest, GantryXYMoveRequest
+from app.services.raspberry_gantry import planned_calibrate_xy_result, planned_move_xy_result
 
 
 def _raspberry_xy_context() -> dict:
@@ -40,18 +40,18 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         sys.modules.pop("RPi", None)
 
     def test_calibrate_xy_uses_raspberry_gpio_branch_when_xy_devices_are_on_pi(self) -> None:
-        result = execute_calibrate_xy(
+        result = planned_calibrate_xy_result(
             _raspberry_xy_context(),
-            {
-                "x_step_pin": 17,
-                "x_dir_pin": 27,
-                "y_step_pin": 23,
-                "y_dir_pin": 24,
-                "x_min_limit_pin": 5,
-                "x_max_limit_pin": 6,
-                "y_min_limit_pin": 12,
-                "y_max_limit_pin": 13,
-            },
+            GantryXYCalibrationRequest(
+                x_step_pin=17,
+                x_dir_pin=27,
+                y_step_pin=23,
+                y_dir_pin=24,
+                x_min_limit_pin=5,
+                x_max_limit_pin=6,
+                y_min_limit_pin=12,
+                y_max_limit_pin=13,
+            ),
         )
 
         self.assertEqual(result["controller"], "raspberry-pi")
@@ -60,21 +60,21 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         self.assertIsNone(result["tool_port"])
 
     def test_move_xy_uses_raspberry_gpio_branch_when_xy_devices_are_on_pi(self) -> None:
-        result = execute_move_xy(
+        result = planned_move_xy_result(
             _raspberry_xy_context(),
-            {
-                "x_cm": 10,
-                "y_cm": 10,
-                "z_cm": 10,
-                "x_step_pin": 17,
-                "x_dir_pin": 27,
-                "y_step_pin": 23,
-                "y_dir_pin": 24,
-                "x_min_limit_pin": 5,
-                "x_max_limit_pin": 6,
-                "y_min_limit_pin": 12,
-                "y_max_limit_pin": 13,
-            },
+            GantryXYMoveRequest(
+                x_cm=10,
+                y_cm=10,
+                z_cm=10,
+                x_step_pin=17,
+                x_dir_pin=27,
+                y_step_pin=23,
+                y_dir_pin=24,
+                x_min_limit_pin=5,
+                x_max_limit_pin=6,
+                y_min_limit_pin=12,
+                y_max_limit_pin=13,
+            ),
         )
 
         self.assertEqual(result["controller"], "raspberry-pi")
@@ -100,18 +100,18 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         sys.modules["RPi"] = rpi_module
         sys.modules["RPi.GPIO"] = gpio_module
 
-        result = execute_calibrate_xy(
+        result = planned_calibrate_xy_result(
             _raspberry_xy_context(),
-            {
-                "x_step_pin": 17,
-                "x_dir_pin": 27,
-                "y_step_pin": 23,
-                "y_dir_pin": 24,
-                "x_min_limit_pin": 5,
-                "x_max_limit_pin": 6,
-                "y_min_limit_pin": 12,
-                "y_max_limit_pin": 13,
-            },
+            GantryXYCalibrationRequest(
+                x_step_pin=17,
+                x_dir_pin=27,
+                y_step_pin=23,
+                y_dir_pin=24,
+                x_min_limit_pin=5,
+                x_max_limit_pin=6,
+                y_min_limit_pin=12,
+                y_max_limit_pin=13,
+            ),
         )
 
         self.assertEqual(result["status"], "gpio_simulated")

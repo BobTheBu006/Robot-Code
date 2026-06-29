@@ -91,7 +91,6 @@ class RaspberryGantryGPIOService:
             self._x_cm = 0.0
             self._y_cm = 0.0
             self._x_track_length_cm = request.x_track_length_cm
-            self._y_track_length_cm = request.y_track_length_cm
             self._calibrated = True
             return self._calibration_result(context, request, pins, execution)
 
@@ -106,7 +105,6 @@ class RaspberryGantryGPIOService:
                 self._x_cm = 0.0
                 self._y_cm = 0.0
                 self._x_track_length_cm = request.x_track_length_cm
-                self._y_track_length_cm = request.y_track_length_cm
                 self._calibrated = True
                 return self._calibration_result(context, request, pins, execution)
             try:
@@ -119,23 +117,7 @@ class RaspberryGantryGPIOService:
                 self._x_cm = 0.0
                 self._probe_axis(gpio, pins, "x", 1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
                 self._x_cm = request.x_track_length_cm
-
-                self._move_cm(
-                    gpio,
-                    pins,
-                    -request.x_track_length_cm * 1.25,
-                    0.0,
-                    request.speed_rpm,
-                    stop_limit_pin=pins.x_min_limit_pin,
-                )
-                self._x_cm = 0.0
-
-                self._probe_axis(gpio, pins, "y", -1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
-                self._y_cm = 0.0
-                self._probe_axis(gpio, pins, "y", 1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
-                self._y_cm = request.y_track_length_cm
                 self._x_track_length_cm = request.x_track_length_cm
-                self._y_track_length_cm = request.y_track_length_cm
 
                 self._calibrated = True
             finally:
@@ -465,7 +447,6 @@ class RaspberryGantryGPIOService:
             "tool_port": None,
             "workspace": {
                 "x_track_length_cm": request.x_track_length_cm,
-                "y_track_length_cm": request.y_track_length_cm,
             },
             "calibration_speed_profile": request.calibration_speed_profile,
             "speed_rpm": request.speed_rpm,

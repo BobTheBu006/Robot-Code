@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "id": "calibrate_xy",
-  "display_name": "Calibrate Gantry XY",
+  "id": "move_gantry_x",
+  "display_name": "Move Gantry X",
   "category": "Robot Actions",
-  "description": "First-pass X-only CoreXY calibration. Move toward X min until the X-min switch trips, then move toward X max until the X-max switch trips, and measure X steps per centimeter from the entered track length.",
-  "version": "0.4.0",
+  "description": "Move the CoreXY gantry to an absolute X position (cm from X-min) within the calibrated X workspace. Requires a prior Calibrate Gantry XY run; the calibration is restored from the controller's non-volatile storage.",
+  "version": "0.1.0",
   "inputs": [
     {
       "key": "tool_port",
       "label": "Selected ESP32",
       "type": "file/path",
-      "description": "Connected ESP32 board that should run the X calibration routine.",
+      "description": "Connected ESP32 board that drives the CoreXY gantry.",
       "required": true,
       "default": "/dev/ttyUSB0",
       "placeholder": "/dev/ttyUSB0",
@@ -18,67 +18,23 @@
       "options": []
     },
     {
-      "key": "x_track_length_cm",
-      "label": "X Track Length (cm)",
+      "key": "x_cm",
+      "label": "Target X (cm)",
       "type": "number",
-      "description": "Physical X travel in cm between the X-min and X-max limit switches.",
+      "description": "Absolute X position in cm from X-min (0) toward X-max, within the calibrated track length.",
       "required": true,
-      "default": 115.0,
+      "default": 0.0,
       "placeholder": null,
       "advanced": false,
       "options": []
     },
     {
       "key": "speed_rpm",
-      "label": "Calibration Speed (RPM)",
+      "label": "Move Speed (RPM)",
       "type": "number",
-      "description": "Numeric motor speed used while probing X limits.",
+      "description": "Numeric motor speed used while moving along X.",
       "required": true,
-      "default": 100.0,
-      "placeholder": null,
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "trapezoidal_speed",
-      "label": "Trapezoidal Speed",
-      "type": "boolean",
-      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
-      "required": false,
-      "default": true,
-      "placeholder": null,
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "acceleration_rpm_per_s",
-      "label": "Acceleration (RPM/s)",
-      "type": "number",
-      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
-      "required": false,
-      "default": 300.0,
-      "placeholder": null,
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "steps_per_rotation",
-      "label": "Steps per Rotation",
-      "type": "number",
-      "description": "Stepper pulse count for one full motor rotation. Use 800 when the driver is configured for 800 steps per rotation.",
-      "required": true,
-      "default": 800.0,
-      "placeholder": null,
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "max_probe_rotations",
-      "label": "Max Probe Rotations",
-      "type": "number",
-      "description": "Maximum motor rotations allowed for each X limit-switch probe before calibration stops with a safety error.",
-      "required": true,
-      "default": 120.0,
+      "default": 240.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -157,7 +113,7 @@
       "key": "next",
       "label": "Next",
       "type": "flow",
-      "description": "Continue when X calibration completes."
+      "description": "Continue when the X move completes."
     }
   ],
   "hardware_devices": [
@@ -183,13 +139,6 @@
           "signal": "step",
           "gpio": null,
           "function_input_key": "x_step_pin",
-          "notes": null
-        },
-        {
-          "id": "x-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
           "notes": null
         }
       ],
@@ -218,13 +167,6 @@
           "signal": "step",
           "gpio": null,
           "function_input_key": "y_step_pin",
-          "notes": null
-        },
-        {
-          "id": "y-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
           "notes": null
         }
       ],
@@ -276,22 +218,22 @@
   ],
   "firmware_requirements": [
     {
-      "routine_id": "calibrate_xy",
+      "routine_id": "move_gantry_x",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min then X max and records measured X steps per centimeter.",
-      "entry_point": "calibrate_xy",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, MOVE X <xCm> <rpm>. Firmware moves to an absolute X position using the calibrated steps-per-cm restored from NVS.",
+      "entry_point": "moveXTo",
       "required_device_ids": [
         "x-axis-motor",
         "y-axis-motor",
         "x-min-limit-switch",
         "x-max-limit-switch"
       ],
-      "description": "Firmware routine required by the X-only Calibrate Gantry XY block."
+      "description": "Firmware routine required by the Move Gantry X block."
     }
   ],
   "builder_board_id": "ttyUSB0",
-  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
+  "builder_source_path": null,
   "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
   "builder_firmware_entry_file": "firmware/main.ino",
   "builder_base_function_id": null

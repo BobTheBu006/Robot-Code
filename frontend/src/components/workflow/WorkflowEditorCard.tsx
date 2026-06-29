@@ -22,6 +22,7 @@ import {
 import {
   cancelFunction,
   deleteEsp32CustomBlock,
+  emergencyStop,
   fetchEsp32Boards,
   fetchFunctions,
   fetchHardwareMap,
@@ -41,7 +42,6 @@ import {
   createDefaultParameters,
   createDefaultNodeSettings,
   createBrokenWorkflowBlock,
-  createHardwareBasicBlocks,
   createStarterWorkflow,
   createWorkflowNode,
   getAllBlockInputs,
@@ -834,6 +834,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
   const testAbortControllersRef = useRef<Record<string, AbortController>>({});
+  const flashAbortControllerRef = useRef<AbortController | null>(null);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsPath, setSaveAsPath] = useState("");
   const [saveAsName, setSaveAsName] = useState("active-workflow");
@@ -847,6 +848,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     completedNodeIds: [],
     flashingBoardId: null,
   });
+  const workflowResultsRef = useRef<Map<string, FunctionTestResponse>>(new Map());
   const reactFlow = useReactFlow<WorkflowFlowNode, Edge>();
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
 
@@ -1001,16 +1003,17 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
 
   useEffect(() => {
     const handleEmergencyStop = () => {
+      flashAbortControllerRef.current?.abort();
+      flashAbortControllerRef.current = null;
       Object.values(testAbortControllersRef.current).forEach((controller) => controller.abort());
       testAbortControllersRef.current = {};
-      setWorkflowRunState({
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
         isRunning: false,
         phase: "idle",
-        orderedNodeIds: [],
         currentNodeId: null,
-        completedNodeIds: [],
         flashingBoardId: null,
-      });
+      }));
       setTestStateByNodeId((currentState) =>
         Object.fromEntries(
           Object.entries(currentState).map(([nodeId, state]) => [
@@ -1026,10 +1029,17 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
         ),
       );
     };
+    const handleEmergencyResume = () => {
+      void resumeStoppedWorkflowRun();
+    };
 
     window.addEventListener("robot-emergency-stop", handleEmergencyStop);
-    return () => window.removeEventListener("robot-emergency-stop", handleEmergencyStop);
-  }, []);
+    window.addEventListener("robot-emergency-resume", handleEmergencyResume);
+    return () => {
+      window.removeEventListener("robot-emergency-stop", handleEmergencyStop);
+      window.removeEventListener("robot-emergency-resume", handleEmergencyResume);
+    };
+  });
 
   useEffect(() => {
     testStateByNodeIdRef.current = testStateByNodeId;
@@ -1077,13 +1087,9 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     ),
     [discoveredFunctions, esp32Boards, hardwareMap],
   );
-  const hardwareBasicBlocks = useMemo(
-    () => createHardwareBasicBlocks(hardwareMap),
-    [hardwareMap],
-  );
   const availableBlocks = useMemo(
-    () => [...builtInBlocks, ...hardwareBasicBlocks, ...robotActionBlocks, ...compoundBlocks],
-    [builtInBlocks, hardwareBasicBlocks, robotActionBlocks, compoundBlocks],
+    () => [...builtInBlocks, ...robotActionBlocks, ...compoundBlocks],
+    [builtInBlocks, robotActionBlocks, compoundBlocks],
   );
   const openedNode = nodes.find((node) => node.id === openedNodeId) ?? null;
   const editingCompoundNode = nodes.find((node) => node.id === editingCompoundNodeId) ?? null;
@@ -1111,7 +1117,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     ? functionsError
     : workflowRunState.phase === "flashing"
       ? `Building and flashing ${flashingBoard?.display_name ?? workflowRunState.flashingBoardId ?? "ESP32 firmware"} before running the workflow.`
-      : `${hardwareBasicBlocks.length} hardware basic block${hardwareBasicBlocks.length === 1 ? "" : "s"} and ${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`;
+      : `${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`;
 
   useEffect(() => {
     if (functionsStatus !== "success" || !hardwareMap) {
@@ -2389,20 +2395,125 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   }
 
   async function flashEsp32BoardsForRun(boardIds: string[]) {
-    for (const boardId of boardIds) {
-      setWorkflowRunState((currentState) => ({
-        ...currentState,
-        flashingBoardId: boardId,
-      }));
+    const abortController = new AbortController();
+    flashAbortControllerRef.current = abortController;
+    try {
+      for (const boardId of boardIds) {
+        setWorkflowRunState((currentState) => ({
+          ...currentState,
+          flashingBoardId: boardId,
+        }));
 
-      const response = await flashEsp32BoardFirmware(boardId);
-      if (!response.ok) {
-        throw new Error(`Could not flash ESP32 '${boardId}'. ${response.log || response.auto_reset_note}`);
+        const response = await flashEsp32BoardFirmware(boardId, abortController.signal);
+        if (!response.ok) {
+          throw new Error(`Could not flash ESP32 '${boardId}'. ${response.log || response.auto_reset_note}`);
+        }
       }
+    } finally {
+      flashAbortControllerRef.current = null;
     }
   }
 
+  async function runOrderedWorkflowNodes(orderedNodeIds: string[], resultsByNodeId: Map<string, FunctionTestResponse>) {
+    for (const nodeId of orderedNodeIds) {
+      if (resultsByNodeId.has(nodeId)) {
+        continue;
+      }
+
+      const node = nodeLookup.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        currentNodeId: nodeId,
+      }));
+
+      let inputData: Record<string, unknown> | null = null;
+      const upstreamEdge = edges.find((edge) => edge.target === nodeId);
+      if (blockUsesUpstreamInput(node.data.block) && upstreamEdge) {
+        inputData = resultsByNodeId.get(upstreamEdge.source)?.result ?? null;
+      }
+
+      const result = await executeNode(nodeId, inputData);
+      resultsByNodeId.set(nodeId, result);
+      workflowResultsRef.current = resultsByNodeId;
+
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        completedNodeIds: currentState.completedNodeIds.includes(nodeId)
+          ? currentState.completedNodeIds
+          : [...currentState.completedNodeIds, nodeId],
+      }));
+    }
+  }
+
+  async function runWorkflowFromOrder(
+    orderedNodeIds: string[],
+    resultsByNodeId: Map<string, FunctionTestResponse>,
+    options: { flashBeforeRun: boolean },
+  ) {
+    const fallbackBoardIdsToFlash = skipEsp32Flashing
+      ? []
+      : filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
+    const firmwarePlanItems = skipEsp32Flashing ? [] : collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
+    const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
+
+    setFunctionsError(null);
+    setSelectedNodeId(null);
+    setOpenedNodeId(null);
+    setWorkflowDrawer(null);
+    setWorkflowRunState({
+      isRunning: true,
+      phase: hasEsp32FirmwareWork ? "flashing" : "running",
+      orderedNodeIds,
+      currentNodeId: null,
+      completedNodeIds: Array.from(resultsByNodeId.keys()),
+      flashingBoardId: null,
+    });
+
+    try {
+      if (options.flashBeforeRun) {
+        const boardIdsToFlash = await prepareEsp32FirmwareForRun(firmwarePlanItems, fallbackBoardIdsToFlash);
+        await flashEsp32BoardsForRun(boardIdsToFlash);
+      }
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        phase: "running",
+        flashingBoardId: null,
+      }));
+      await runOrderedWorkflowNodes(orderedNodeIds, resultsByNodeId);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setFunctionsError("Workflow stopped by E-Stop.");
+      } else {
+        setFunctionsError(error instanceof Error ? error.message : "Workflow run failed.");
+      }
+    } finally {
+      setWorkflowRunState((currentState) => ({
+        ...currentState,
+        isRunning: false,
+        phase: "idle",
+        currentNodeId: null,
+        flashingBoardId: null,
+      }));
+    }
+  }
+
+  async function resumeStoppedWorkflowRun() {
+    if (workflowRunState.isRunning || workflowRunState.orderedNodeIds.length === 0) {
+      return;
+    }
+
+    setFunctionsError(null);
+    await runWorkflowFromOrder(workflowRunState.orderedNodeIds, workflowResultsRef.current, { flashBeforeRun: false });
+  }
+
   async function handleRunAll() {
+    // Pressing Run all re-arms the E-Stop (clears any latched "RESUME" state).
+    window.dispatchEvent(new CustomEvent("robot-emergency-reset"));
+
     const startNodeIds = nodes
       .filter((node) => node.data.block.id === "start")
       .map((node) => node.id);
@@ -2421,74 +2532,31 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     for (const nodeId of rootNodeIds) {
       collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
     }
-    const fallbackBoardIdsToFlash = skipEsp32Flashing
-      ? []
-      : filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
-    const firmwarePlanItems = skipEsp32Flashing ? [] : collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
-    const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
-    setFunctionsError(null);
-    setSelectedNodeId(null);
-    setOpenedNodeId(null);
-    setWorkflowDrawer(null);
-    setWorkflowRunState({
-      isRunning: true,
-      phase: hasEsp32FirmwareWork ? "flashing" : "running",
-      orderedNodeIds,
-      currentNodeId: null,
-      completedNodeIds: [],
-      flashingBoardId: null,
-    });
+    workflowResultsRef.current = new Map();
+    await runWorkflowFromOrder(orderedNodeIds, workflowResultsRef.current, { flashBeforeRun: true });
+  }
 
-    const resultsByNodeId = new Map<string, FunctionTestResponse>();
-
+  async function handleCancelRun() {
+    // Abort the in-flight flash request and any running node tests locally...
+    flashAbortControllerRef.current?.abort();
+    flashAbortControllerRef.current = null;
+    Object.values(testAbortControllersRef.current).forEach((controller) => controller.abort());
+    testAbortControllersRef.current = {};
+    // ...then tell the backend to kill an in-progress board flash and stop motion.
     try {
-      const boardIdsToFlash = await prepareEsp32FirmwareForRun(firmwarePlanItems, fallbackBoardIdsToFlash);
-      await flashEsp32BoardsForRun(boardIdsToFlash);
-      setWorkflowRunState((currentState) => ({
-        ...currentState,
-        phase: "running",
-        flashingBoardId: null,
-      }));
-
-      for (const nodeId of orderedNodeIds) {
-        const node = nodeLookup.get(nodeId);
-        if (!node) {
-          continue;
-        }
-
-        setWorkflowRunState((currentState) => ({
-          ...currentState,
-          currentNodeId: nodeId,
-        }));
-
-        let inputData: Record<string, unknown> | null = null;
-        const upstreamEdge = edges.find((edge) => edge.target === nodeId);
-        if (blockUsesUpstreamInput(node.data.block) && upstreamEdge) {
-          inputData = resultsByNodeId.get(upstreamEdge.source)?.result ?? null;
-        }
-
-        const result = await executeNode(nodeId, inputData);
-        resultsByNodeId.set(nodeId, result);
-
-        setWorkflowRunState((currentState) => ({
-          ...currentState,
-          completedNodeIds: currentState.completedNodeIds.includes(nodeId)
-            ? currentState.completedNodeIds
-            : [...currentState.completedNodeIds, nodeId],
-        }));
-      }
-    } catch (error) {
-      setFunctionsError(error instanceof Error ? error.message : "Workflow run failed.");
-    } finally {
-      setWorkflowRunState((currentState) => ({
-        ...currentState,
-        isRunning: false,
-        phase: "idle",
-        currentNodeId: null,
-        flashingBoardId: null,
-      }));
+      await emergencyStop();
+    } catch {
+      // Ignore network errors: the local abort and state reset still cancel the run.
     }
+    setWorkflowRunState((currentState) => ({
+      ...currentState,
+      isRunning: false,
+      phase: "idle",
+      currentNodeId: null,
+      flashingBoardId: null,
+    }));
+    setFunctionsError("Workflow run cancelled.");
   }
 
   return (
@@ -2545,6 +2613,14 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
               type="button"
             >
               {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
+            </button>
+            <button
+              className="workflow-editor__action workflow-editor__action--danger"
+              disabled={!workflowRunState.isRunning}
+              onClick={() => void handleCancelRun()}
+              type="button"
+            >
+              Cancel
             </button>
             <button
               className="workflow-editor__action"

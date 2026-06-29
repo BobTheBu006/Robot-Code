@@ -3,11 +3,13 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 from app.models.esp32_builder import (
     Esp32BoardDetail,
@@ -58,6 +60,57 @@ class Esp32BuilderService:
         self._arduino_cli_user_dir = self._arduino_cli_dir / "user"
         self._arduino_cli_build_dir = self._arduino_cli_dir / "build"
         self._arduino_cli_cache_dir = self._arduino_cli_dir / "cache"
+        # Track in-flight compile/upload subprocesses so an E-Stop can kill them
+        # mid-flash instead of letting the board finish flashing.
+        self._flash_processes_guard = Lock()
+        self._active_flash_processes: set[subprocess.Popen] = set()
+        self._flash_stop_requested = False
+
+    def emergency_stop(self) -> dict[str, object]:
+        """Abort any compile/upload that is currently running.
+
+        Kills the whole arduino-cli process group (it spawns esptool as a child),
+        so flashing actually halts instead of running to completion.
+        """
+        with self._flash_processes_guard:
+            self._flash_stop_requested = True
+            processes = list(self._active_flash_processes)
+
+        for process in processes:
+            self._terminate_flash_process(process)
+
+        return {
+            "ok": True,
+            "tool": "esp32_flash",
+            "message": (
+                f"Aborted {len(processes)} in-progress ESP32 flash process(es)."
+                if processes
+                else "No ESP32 flash was in progress."
+            ),
+        }
+
+    def clear_flash_stop(self) -> None:
+        """Reset the cancellation flag before starting a fresh flash run."""
+        with self._flash_processes_guard:
+            self._flash_stop_requested = False
+
+    def _terminate_flash_process(self, process: subprocess.Popen) -> None:
+        if process.poll() is not None:
+            return
+        try:
+            process_group = os.getpgid(process.pid)
+            os.killpg(process_group, signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process_group, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            # Process already gone, or no permission/POSIX group: fall back to
+            # terminating just the immediate child.
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
 
     def list_boards(self) -> Esp32BoardListResponse:
         self._ensure_root_structure()
@@ -186,6 +239,7 @@ class Esp32BuilderService:
         )
 
     def flash_firmware(self, board_id: str) -> Esp32FirmwareActionResponse:
+        self.clear_flash_stop()
         self._ensure_root_structure()
         workspace_dir = self._resolve_workspace_dir(board_id)
         if not workspace_dir.exists():
@@ -983,35 +1037,95 @@ class Esp32BuilderService:
         command: list[str],
         auto_reset_attempted: bool,
     ) -> Esp32FirmwareActionResponse:
+        env = os.environ.copy()
+        env["XDG_CACHE_HOME"] = str(self._arduino_cli_cache_dir)
+
+        # Refuse to even start if an E-Stop already fired for this run.
+        with self._flash_processes_guard:
+            if self._flash_stop_requested:
+                return self._cancelled_firmware_response(
+                    board_id, action, fqbn, port, sketch_entry_file, command, auto_reset_attempted
+                )
+
         try:
-            env = os.environ.copy()
-            env["XDG_CACHE_HOME"] = str(self._arduino_cli_cache_dir)
-            completed = subprocess.run(
+            # start_new_session puts arduino-cli (and the esptool child it
+            # spawns) in their own process group so an E-Stop can kill the whole
+            # tree, not just the parent.
+            process = subprocess.Popen(
                 command,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=600,
-                check=False,
                 env=env,
+                start_new_session=True,
             )
         except Exception as exc:
             raise Esp32BuilderError(f"Could not run firmware {action}: {exc}") from exc
 
+        with self._flash_processes_guard:
+            self._active_flash_processes.add(process)
+            # An E-Stop could have arrived between the check above and registering.
+            stop_already_requested = self._flash_stop_requested
+        if stop_already_requested:
+            self._terminate_flash_process(process)
+
+        timed_out = False
+        try:
+            stdout, stderr = process.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            self._terminate_flash_process(process)
+            stdout, stderr = process.communicate()
+        finally:
+            with self._flash_processes_guard:
+                self._active_flash_processes.discard(process)
+                stop_requested = self._flash_stop_requested
+
+        if stop_requested:
+            return self._cancelled_firmware_response(
+                board_id, action, fqbn, port, sketch_entry_file, command, auto_reset_attempted
+            )
+
         combined_log = "\n".join(
-            part for part in [completed.stdout.strip(), completed.stderr.strip()] if part
+            part for part in [(stdout or "").strip(), (stderr or "").strip()] if part
         ).strip()
+        if timed_out:
+            combined_log = (f"Firmware {action} timed out after 600s and was terminated.\n{combined_log}").strip()
         if not combined_log:
             combined_log = f"No output was produced while running {action}."
 
         return Esp32FirmwareActionResponse(
             board_id=board_id,
             action=action,
-            ok=completed.returncode == 0,
+            ok=process.returncode == 0,
             fqbn=fqbn,
             port=port,
             sketch_entry_file=sketch_entry_file,
             command=command,
             log=combined_log,
+            auto_reset_attempted=auto_reset_attempted,
+            auto_reset_note=self.AUTO_RESET_NOTE,
+        )
+
+    def _cancelled_firmware_response(
+        self,
+        board_id: str,
+        action: str,
+        fqbn: str,
+        port: str | None,
+        sketch_entry_file: str,
+        command: list[str],
+        auto_reset_attempted: bool,
+    ) -> Esp32FirmwareActionResponse:
+        return Esp32FirmwareActionResponse(
+            board_id=board_id,
+            action=action,
+            ok=False,
+            fqbn=fqbn,
+            port=port,
+            sketch_entry_file=sketch_entry_file,
+            command=command,
+            log=f"Firmware {action} was cancelled by E-Stop before it could finish.",
             auto_reset_attempted=auto_reset_attempted,
             auto_reset_note=self.AUTO_RESET_NOTE,
         )
@@ -1103,7 +1217,7 @@ Each file under `workflow-functions/` should look like:
 - Put normal runtime parameters in `manifest.inputs`.
 - Use `manifest.outputs` only for control-flow branches. Normal robot actions should expose a single `next` flow output; the Workflow Editor can add an `error` path from block settings. Data returned by the handler, such as status strings or controller replies, should stay in the handler result and should not become output handles.
 - Put firmware wiring and board-specific tuning in `advanced_builder_inputs`.
-- Declare every motor, servo, and sensor the function uses in `manifest.hardware_devices`. The Hardware Map will create/update those devices, and the Workflow Editor will generate matching basic blocks from them. Advanced functions should reference those basic blocks instead of duplicating hidden pin state.
+- Declare every motor, servo, and sensor the function uses in `manifest.hardware_devices`. The Hardware Map will create/update those devices, and advanced functions should resolve wiring from those shared devices instead of duplicating hidden pin state.
 - Keep source code changes in `firmware/main.ino`.
 
 ## Workflow block types

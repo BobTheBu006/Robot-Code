@@ -47,8 +47,7 @@ When a schema changes:
 3. Preserve unknown fields unless there is a documented reason not to.
 4. Keep old IDs as aliases when possible.
 5. Add or update fixture tests.
-6. Update `docs/PROJECT_STATUS.md` if behavior changes.
-7. Update `docs/ARCHITECTURE_CONTRACTS.md` if the contract changes.
+6. Update `docs/ARCHITECTURE_CONTRACTS.md` if the contract changes.
 
 ## Broken Reference Behavior
 

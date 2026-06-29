@@ -138,9 +138,13 @@ export function buildEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareA
   });
 }
 
-export function flashEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareActionResponse> {
+export function flashEsp32BoardFirmware(
+  boardId: string,
+  signal?: AbortSignal,
+): Promise<Esp32FirmwareActionResponse> {
   return request<Esp32FirmwareActionResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/flash`, {
     method: "POST",
+    signal,
   });
 }
 

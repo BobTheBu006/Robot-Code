@@ -8,17 +8,14 @@ The long-term target is an extensible alternative to closed lab automation syste
 
 For future AI coding agents and maintainers:
 
-- Read `AGENTS.md` first.
-- Read `docs/PROJECT_STATUS.md` for the current robot state.
 - Read `docs/ARCHITECTURE_CONTRACTS.md` before changing schemas, workflow behavior, firmware generation, or module boundaries.
 - Read `docs/BACKWARDS_COMPATIBILITY.md` before changing saved workflows, hardware maps, manifests, or firmware protocols.
-- Put future ideas and deferred architecture work in `docs/TODO.md`.
 
 ## Current Capabilities
 
 - FastAPI backend with health, robot state, camera, hardware map, function discovery, ESP32 builder, and workflow storage routes.
 - Vite + React + TypeScript frontend.
-- React Flow workflow editor with basic, advanced, and compound function blocks.
+- React Flow workflow editor with built-in flow controls, advanced function blocks, and compound function blocks.
 - Hardware Map editor for Raspberry Pi, ESP32 controllers, motors, servos, sensors, and grouped hardware assemblies.
 - Function manifests can declare hardware dependencies so the Hardware Map and workflow blocks can reference the same logical devices.
 - Workflow runs flash the ESP32 boards used by the workflow before execution.
@@ -27,7 +24,6 @@ For future AI coding agents and maintainers:
 
 ```text
 .
-|-- AGENTS.md
 |-- backend/
 |-- docs/
 |-- firmware/

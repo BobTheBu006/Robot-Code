@@ -41,6 +41,9 @@ class GantryXYMoveRequest(BaseModel):
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
     y_dir_pin: int = Field(default=19, ge=0)
+    x_enable_pin: int = Field(default=-1, ge=-1)
+    y_enable_pin: int = Field(default=-1, ge=-1)
+    enable_active_low: bool = Field(default=True)
     z_left_step_pin: int = Field(default=32, ge=0)
     z_left_dir_pin: int = Field(default=33, ge=0)
     z_right_step_pin: int = Field(default=32, ge=0)
@@ -69,6 +72,10 @@ class GantryXYMoveRequest(BaseModel):
         if self.limit_switch_mode == "4":
             assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
             assigned_pins["y_max_limit_pin"] = self.y_max_limit_pin
+        if self.x_enable_pin >= 0:
+            assigned_pins["x_enable_pin"] = self.x_enable_pin
+        if self.y_enable_pin >= 0:
+            assigned_pins["y_enable_pin"] = self.y_enable_pin
 
         _validate_distinct_pins(
             assigned_pins,
@@ -120,6 +127,9 @@ class GantryXYCalibrationRequest(BaseModel):
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
     y_dir_pin: int = Field(default=19, ge=0)
+    x_enable_pin: int = Field(default=-1, ge=-1)
+    y_enable_pin: int = Field(default=-1, ge=-1)
+    enable_active_low: bool = Field(default=True)
     limit_switch_mode: GantryLimitMode = "4"
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
@@ -130,7 +140,22 @@ class GantryXYCalibrationRequest(BaseModel):
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryXYCalibrationRequest":
         self.limit_switch_mode = "4"
-        GantryXYMoveRequest.model_validate(self.model_dump())
+        assigned_pins = {
+            "x_step_pin": self.x_step_pin,
+            "x_dir_pin": self.x_dir_pin,
+            "y_step_pin": self.y_step_pin,
+            "y_dir_pin": self.y_dir_pin,
+            "x_min_limit_pin": self.x_min_limit_pin,
+            "x_max_limit_pin": self.x_max_limit_pin,
+        }
+        if self.x_enable_pin >= 0:
+            assigned_pins["x_enable_pin"] = self.x_enable_pin
+        if self.y_enable_pin >= 0:
+            assigned_pins["y_enable_pin"] = self.y_enable_pin
+        _validate_distinct_pins(
+            assigned_pins,
+            "Each active gantry driver/X-limit input must use a distinct GPIO pin. Conflicts",
+        )
         return self
 
 
@@ -154,6 +179,69 @@ class GantryXYCalibrationResponse(BaseModel):
     calibrated: bool = False
     workspace: dict[str, float]
     configured_pins: dict[str, int | float]
+    configured_limits: dict[str, int | str]
+
+
+class GantryXMoveRequest(BaseModel):
+    tool_port: str | None = None
+    x_cm: float = Field(default=0.0, ge=0.0)
+    speed_profile: GantrySpeedProfile = "normal"
+    speed_rpm: int = Field(default=240, gt=0)
+    x_step_pin: int = Field(default=16, ge=0)
+    x_dir_pin: int = Field(default=17, ge=0)
+    y_step_pin: int = Field(default=18, ge=0)
+    y_dir_pin: int = Field(default=19, ge=0)
+    x_enable_pin: int = Field(default=-1, ge=-1)
+    y_enable_pin: int = Field(default=-1, ge=-1)
+    enable_active_low: bool = Field(default=True)
+    limit_switch_mode: GantryLimitMode = "4"
+    x_min_limit_pin: int = Field(default=21, ge=0)
+    x_max_limit_pin: int = Field(default=22, ge=0)
+    y_min_limit_pin: int = Field(default=23, ge=0)
+    y_max_limit_pin: int = Field(default=25, ge=0)
+    baud_rate: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_pin_assignments(self) -> "GantryXMoveRequest":
+        assigned_pins = {
+            "x_step_pin": self.x_step_pin,
+            "x_dir_pin": self.x_dir_pin,
+            "y_step_pin": self.y_step_pin,
+            "y_dir_pin": self.y_dir_pin,
+            "x_min_limit_pin": self.x_min_limit_pin,
+        }
+        if self.limit_switch_mode == "4":
+            assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
+        if self.x_enable_pin >= 0:
+            assigned_pins["x_enable_pin"] = self.x_enable_pin
+        if self.y_enable_pin >= 0:
+            assigned_pins["y_enable_pin"] = self.y_enable_pin
+
+        # The firmware enforces the calibrated 0..track-length range; here we only
+        # reject negative targets and pin conflicts.
+        _validate_distinct_pins(
+            assigned_pins,
+            "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
+        )
+        return self
+
+
+class GantryXMoveResponse(BaseModel):
+    port: str
+    baud_rate: int
+    speed_profile: GantrySpeedProfile
+    speed_rpm: int
+    target: dict[str, float]
+    pin_command_sent: str
+    pin_reply: str | None = None
+    pins_applied: bool = False
+    limit_command_sent: str
+    limit_reply: str | None = None
+    limits_applied: bool = False
+    move_command_sent: str
+    move_reply: str | None = None
+    move_applied: bool = False
+    configured_pins: dict[str, int]
     configured_limits: dict[str, int | str]
 
 

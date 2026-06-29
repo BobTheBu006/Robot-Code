@@ -97,7 +97,6 @@ Target design:
 | USB port to controller mapping | Hardware Map |
 | controller to device mapping | Hardware Map |
 | device pin mapping | Hardware Map |
-| primitive motor/servo/sensor blocks | generated from Hardware Map |
 | advanced function metadata | function manifest |
 | function hardware needs | function manifest, synced into Hardware Map |
 | workflow process | workflow JSON |
@@ -109,7 +108,6 @@ Target design:
 New capability should enter through one of these boundaries:
 
 - new hardware device type
-- new basic block generated from a hardware device
 - new advanced function manifest and handler
 - new firmware routine
 - new compound function

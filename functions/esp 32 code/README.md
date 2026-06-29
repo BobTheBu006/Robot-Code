@@ -1,6 +1,6 @@
 # ESP32 Board Workspace Structure
 
-Read `../../AGENTS.md` and `../../docs/ARCHITECTURE_CONTRACTS.md` before changing board workspaces, workflow-function blueprints, or firmware behavior.
+Read `../../docs/ARCHITECTURE_CONTRACTS.md` before changing board workspaces, workflow-function blueprints, or firmware behavior.
 
 Each connected board gets its own workspace folder:
 
@@ -75,8 +75,8 @@ Each blueprint file should contain:
 - Use `manifest.outputs` only for control-flow paths. Normal robot actions should have one `next` flow output; use the block settings error path for failures. Do not add outputs for returned data like status text, measurements, or raw controller replies.
 - Put firmware tuning, pins, and board-wiring fields in `advanced_builder_inputs`.
 - Put required controller routines in `manifest.firmware_requirements`. Use stable routine IDs and point at the firmware source or fragment that must be included when a workflow uses the block.
-- Put every actuator, motor, servo, or sensor the function uses in `manifest.hardware_devices`. Use stable device IDs that match the Hardware Map, and set each pin's `function_input_key` to the matching runtime or advanced input. The Hardware Map creates or updates those devices, and the Workflow Editor generates the matching basic block, for example `basic-stepper-syringe-head-a` for `syringe-head-a`.
-- Advanced functions should reference those generated basic hardware blocks conceptually instead of keeping an unrelated private pin list. If a function moves syringe head A, it should declare/reference the same `syringe-head-a` device that creates the `Move Syringe Head A` basic block.
+- Put every actuator, motor, servo, or sensor the function uses in `manifest.hardware_devices`. Use stable device IDs that match the Hardware Map, and set each pin's `function_input_key` to the matching runtime or advanced input. The Hardware Map creates or updates those devices so function inputs can be resolved from the real wiring.
+- Advanced functions should reference shared Hardware Map devices instead of keeping an unrelated private pin list. If a function moves syringe head A, it should declare/reference the same `syringe-head-a` device used by the physical hardware map.
 - Treat hardware and code as related but separate. The same syringe pump hardware can support multiple firmware routines and workflow functions.
 - Keep actual source code changes in `firmware/main.ino`.
 - Use `board.json` to override the active `fqbn` or firmware entry file for a specific board workspace if needed.

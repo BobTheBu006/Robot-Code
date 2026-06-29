@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.models.gantry import GantryXYCalibrationRequest
-from app.services.gantry_controller import GantryControllerService
+from app.services.gantry_controller import GantryControllerReportedError, GantryControllerService
 
 
 class GantryControllerCommandTests(unittest.TestCase):
@@ -31,7 +31,6 @@ class GantryControllerCommandTests(unittest.TestCase):
         service = GantryControllerService()
         request = GantryXYCalibrationRequest(
             x_track_length_cm=111,
-            y_track_length_cm=56,
             speed_rpm=500,
             trapezoidal_speed=True,
             acceleration_rpm_per_s=2000,
@@ -41,8 +40,36 @@ class GantryControllerCommandTests(unittest.TestCase):
 
         self.assertEqual(
             service._build_calibrate_xy_command(request),
-            "CALIBRATE XY 111.000 56.000 500 1 2000 800 90",
+            "CALIBRATE XY 111.000 500 1 2000 800 90",
         )
+
+    def test_xy_calibration_ignores_unused_y_limit_pins(self) -> None:
+        request = GantryXYCalibrationRequest(
+            x_step_pin=27,
+            x_dir_pin=14,
+            y_step_pin=25,
+            y_dir_pin=26,
+            x_min_limit_pin=12,
+            x_max_limit_pin=13,
+            y_max_limit_pin=25,
+        )
+
+        self.assertEqual(request.y_step_pin, 25)
+
+    def test_xy_calibration_err_reply_is_reported_as_firmware_error(self) -> None:
+        service = GantryControllerService()
+        reply = "\n".join([
+            "ACTIVE X CALIBRATION RPM 100",
+            "COREXY X PROBE STOPPED_BY X_MIN EXPECTED X_MAX A_STEPS 0 B_STEPS 0",
+            "ERR XY X_MAX MEASURED_ZERO",
+        ])
+
+        self.assertTrue(service._reply_contains_prefix(reply, ("ERR ",)))
+        self.assertEqual(
+            service._reply_last_prefixed_line(reply, ("ERR ",)),
+            "ERR XY X_MAX MEASURED_ZERO",
+        )
+        self.assertTrue(issubclass(GantryControllerReportedError, RuntimeError))
 
 
 if __name__ == "__main__":

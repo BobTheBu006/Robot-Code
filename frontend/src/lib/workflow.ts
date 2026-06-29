@@ -12,7 +12,7 @@ import type {
   WorkflowParameterValue,
 } from "../types/workflow";
 import type { Esp32BoardSummary } from "../types/esp32Builder";
-import type { HardwareDeviceMapping, HardwareMap, HardwarePinMapping } from "../types/hardwareMap";
+import type { HardwareMap } from "../types/hardwareMap";
 
 export const WORKFLOW_STORAGE_KEY = "robot-control.workflow-editor";
 export const WORKFLOW_BLOCK_MIME = "application/x-robot-workflow-block";
@@ -63,59 +63,6 @@ function buildOutput(
     type,
     description,
   };
-}
-
-function buildHardwarePinOptions(
-  hardwareMap: HardwareMap | null,
-): Array<WorkflowInputDefinition["options"][number] & { inputKey?: string | null }> {
-  if (!hardwareMap) {
-    return [];
-  }
-
-  const boardLookup = new Map(hardwareMap.boards.map((board) => [board.id, board]));
-
-  return hardwareMap.devices.flatMap((device) => {
-    const board = boardLookup.get(device.board_id);
-
-    return device.pins
-      .filter((pin): pin is HardwarePinMapping & { gpio: string } => Boolean(pin.gpio) && pin.gpio !== "-" && pin.signal !== "-")
-      .map((pin) => ({
-        label: `${device.name} - ${pin.signal} GPIO ${pin.gpio}${board ? ` (${board.label})` : ""}`,
-        value: pin.gpio,
-        inputKey: pin.function_input_key ?? null,
-      }));
-  });
-}
-
-function getServoRange(device: HardwareDeviceMapping): { min: number; max: number } {
-  const min = Number(device.rotation_min_deg ?? -5);
-  const max = Number(device.rotation_max_deg ?? 175);
-
-  return {
-    min: Number.isFinite(min) ? min : -5,
-    max: Number.isFinite(max) ? max : 175,
-  };
-}
-
-function getPumpCalibrationMlPer200Steps(device: HardwareDeviceMapping): number | null {
-  const calibration = Number(device.calibration_ml_per_200_steps);
-  return Number.isFinite(calibration) && calibration > 0 ? calibration : null;
-}
-
-function getHardwareBasicBlockId(device: Pick<HardwareDeviceMapping, "id" | "kind">): string | null {
-  if (device.kind === "stepper_motor") {
-    return `basic-stepper-${device.id}`;
-  }
-
-  if (device.kind === "servo") {
-    return `basic-servo-${device.id}`;
-  }
-
-  if (device.kind === "sensor") {
-    return `basic-sensor-${device.id}`;
-  }
-
-  return null;
 }
 
 export function createBrokenWorkflowBlock(
@@ -433,109 +380,6 @@ export function createBuiltInBlocks(): WorkflowBlockDefinition[] {
   ];
 }
 
-export function createHardwareBasicBlocks(hardwareMap: HardwareMap | null): WorkflowBlockDefinition[] {
-  if (!hardwareMap) {
-    return [];
-  }
-
-  const boardLookup = new Map(hardwareMap.boards.map((board) => [board.id, board]));
-
-  return hardwareMap.devices.flatMap((device): WorkflowBlockDefinition[] => {
-    const board = boardLookup.get(device.board_id);
-
-    if (device.kind === "stepper_motor") {
-      const pumpCalibration = getPumpCalibrationMlPer200Steps(device);
-      if (pumpCalibration !== null) {
-        return [{
-          id: `basic-stepper-${device.id}`,
-          displayName: `Pump ${device.name}`,
-          category: BASIC_BLOCK_CATEGORY,
-          description: `Run ${device.name} as a peristaltic pump${board ? ` on ${board.label}` : ""}.`,
-          version: "1.0.0",
-          kind: "basic",
-          acceptsInput: true,
-          accent: "#a85d13",
-          inputs: [
-            buildInput("volume_ml", "Volume (mL)", "number", 1, "Volume to pump. Positive values run the configured pump direction."),
-            buildInput("calibration_ml_per_200_steps", "mL / 200 steps", "number", pumpCalibration, "Measured pump volume per one full 200-step motor rotation."),
-          ],
-          advancedInputs: [
-            buildInput("speed_steps_per_second", "Speed (steps/s)", "number", 800, "Step pulse speed used by the pump."),
-          ],
-          outputs: [buildOutput("next", "Next", "flow", "Continue when the pump move completes.")],
-          hardwareDeviceId: device.id,
-          hardwareDeviceKind: "stepper_motor",
-          hardwareBoardId: device.board_id,
-          hardwareCalibrationMlPer200Steps: pumpCalibration,
-        }];
-      }
-
-      return [{
-        id: `basic-stepper-${device.id}`,
-        displayName: `Move ${device.name}`,
-        category: BASIC_BLOCK_CATEGORY,
-        description: `Move ${device.name} by a signed step amount${board ? ` on ${board.label}` : ""}.`,
-        version: "1.0.0",
-        kind: "basic",
-        acceptsInput: true,
-        accent: "#a85d13",
-        inputs: [
-          buildInput("amount_steps", "Amount (steps)", "number", 0, "Signed step count. Positive and negative values move in opposite directions."),
-        ],
-        advancedInputs: [
-          buildInput("speed_steps_per_second", "Speed (steps/s)", "number", 800, "Step pulse speed used by the basic move."),
-        ],
-        outputs: [buildOutput("next", "Next", "flow", "Continue when the stepper move completes.")],
-        hardwareDeviceId: device.id,
-        hardwareDeviceKind: "stepper_motor",
-        hardwareBoardId: device.board_id,
-        hardwareCalibrationMlPer200Steps: null,
-      }];
-    }
-
-    if (device.kind === "servo") {
-      const range = getServoRange(device);
-      return [{
-        id: `basic-servo-${device.id}`,
-        displayName: `Move ${device.name}`,
-        category: BASIC_BLOCK_CATEGORY,
-        description: `Move ${device.name} to an angle between ${range.min} and ${range.max} degrees.`,
-        version: "1.0.0",
-        kind: "basic",
-        acceptsInput: true,
-        accent: "#8e4ec6",
-        inputs: [
-          buildInput("angle_deg", "Angle (deg)", "number", Math.max(range.min, Math.min(90, range.max)), `Target servo angle. Hardware range is ${range.min} to ${range.max} degrees.`),
-        ],
-        outputs: [buildOutput("next", "Next", "flow", "Continue when the servo reaches the target angle.")],
-        hardwareDeviceId: device.id,
-        hardwareDeviceKind: "servo",
-        hardwareBoardId: device.board_id,
-      }];
-    }
-
-    if (device.kind === "sensor") {
-      return [{
-        id: `basic-sensor-${device.id}`,
-        displayName: `Read ${device.name}`,
-        category: BASIC_BLOCK_CATEGORY,
-        description: `Read ${device.name}${board ? ` on ${board.label}` : ""}.`,
-        version: "1.0.0",
-        kind: "basic",
-        acceptsInput: true,
-        accent: "#0f6f66",
-        inputs: [],
-        outputs: [buildOutput("next", "Next", "flow", "Continue after reading the sensor.")],
-        hardwareDeviceId: device.id,
-        hardwareDeviceKind: "sensor",
-        hardwareBoardId: device.board_id,
-      }];
-    }
-
-    return [];
-  });
-}
-
 export function mapDiscoveredFunctionToBlock(
   discoveredFunction: DiscoveredFunctionDefinition,
   esp32Boards: Esp32BoardSummary[] = [],
@@ -557,7 +401,6 @@ export function mapDiscoveredFunctionToBlock(
     return {
       ...deviceReference,
       id: mappedDevice.id,
-      basic_block_id: deviceReference.basic_block_id ?? getHardwareBasicBlockId({ id: mappedDevice.id, kind: mappedDevice.kind }),
       board_id: mappedDevice.board_id,
       kind: mappedDevice.kind,
       sensor_kind: mappedDevice.sensor_kind ?? deviceReference.sensor_kind,
@@ -573,9 +416,7 @@ export function mapDiscoveredFunctionToBlock(
       })),
     };
   });
-  const referencedBasicBlockIds = hardwareDevices
-    .map((device) => device.basic_block_id ?? getHardwareBasicBlockId({ id: device.id, kind: device.kind }))
-    .filter((blockId): blockId is string => Boolean(blockId));
+  const referencedBasicBlockIds: string[] = [];
 
   const mapInput = (input: WorkflowInputDefinition): WorkflowInputDefinition => {
     if (input.key === "tool_port") {

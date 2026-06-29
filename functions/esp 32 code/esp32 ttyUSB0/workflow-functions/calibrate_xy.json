@@ -1,43 +1,44 @@
 {
   "manifest": {
+    "schema_version": 1,
     "id": "calibrate_xy",
     "display_name": "Calibrate Gantry XY",
     "category": "Robot Actions",
-    "description": "Define the CoreXY work-area boundaries by double-probing X min/max first, returning to X=0, then double-probing Y min/max at X=0.",
-    "version": "0.3.0",
+    "description": "First-pass X-only CoreXY calibration. Move toward X min until the X-min switch trips, then move toward X max until the X-max switch trips, and measure X steps per centimeter from the entered track length.",
+    "version": "0.4.0",
     "inputs": [
       {
         "key": "tool_port",
         "label": "Selected ESP32",
         "type": "file/path",
-        "description": "Connected ESP32 board that should run the XY calibration routine.",
+        "description": "Connected ESP32 board that should run the X calibration routine.",
         "required": true,
         "default": "/dev/ttyUSB0",
-        "placeholder": "/dev/ttyUSB0"
+        "placeholder": "/dev/ttyUSB0",
+        "advanced": false,
+        "options": []
       },
       {
         "key": "x_track_length_cm",
         "label": "X Track Length (cm)",
         "type": "number",
-        "description": "CoreXY X workspace length in cm. Nominal robot length is 115 cm from the back-bottom-left origin.",
+        "description": "Physical X travel in cm between the X-min and X-max limit switches.",
         "required": true,
-        "default": 115
-      },
-      {
-        "key": "y_track_length_cm",
-        "label": "Y Track Length (cm)",
-        "type": "number",
-        "description": "CoreXY Y workspace width in cm. Nominal robot width is 60 cm from the back-bottom-left origin.",
-        "required": true,
-        "default": 60
+        "default": 115.0,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       },
       {
         "key": "speed_rpm",
         "label": "Calibration Speed (RPM)",
         "type": "number",
-        "description": "Numeric motor speed used while probing limits.",
+        "description": "Numeric motor speed used while probing X limits.",
         "required": true,
-        "default": 100
+        "default": 100.0,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       },
       {
         "key": "trapezoidal_speed",
@@ -45,7 +46,10 @@
         "type": "boolean",
         "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
         "required": false,
-        "default": true
+        "default": true,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       },
       {
         "key": "acceleration_rpm_per_s",
@@ -53,7 +57,10 @@
         "type": "number",
         "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
         "required": false,
-        "default": 300
+        "default": 300.0,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       },
       {
         "key": "steps_per_rotation",
@@ -61,53 +68,67 @@
         "type": "number",
         "description": "Stepper pulse count for one full motor rotation. Use 800 when the driver is configured for 800 steps per rotation.",
         "required": true,
-        "default": 800
+        "default": 800.0,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       },
       {
         "key": "max_probe_rotations",
         "label": "Max Probe Rotations",
         "type": "number",
-        "description": "Maximum motor rotations allowed for each limit-switch probe before calibration stops with a safety error.",
+        "description": "Maximum motor rotations allowed for each X limit-switch probe before calibration stops with a safety error.",
         "required": true,
-        "default": 120
+        "default": 120.0,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
       }
     ],
     "advanced_inputs": [
       {
         "key": "x_step_pin",
-        "label": "X Step Pin",
+        "label": "CoreXY A Step Pin",
         "type": "number",
-        "description": "Runtime GPIO step pin for the X axis driver.",
+        "description": "Runtime GPIO step pin for the CoreXY A driver.",
         "required": false,
-        "default": 16,
-        "advanced": true
+        "default": 16.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       },
       {
         "key": "x_dir_pin",
-        "label": "X Dir Pin",
+        "label": "CoreXY A Dir Pin",
         "type": "number",
-        "description": "Runtime GPIO direction pin for the X axis driver.",
+        "description": "Runtime GPIO direction pin for the CoreXY A driver.",
         "required": false,
-        "default": 17,
-        "advanced": true
+        "default": 17.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       },
       {
         "key": "y_step_pin",
-        "label": "Y Step Pin",
+        "label": "CoreXY B Step Pin",
         "type": "number",
-        "description": "Runtime GPIO step pin for the Y axis driver.",
+        "description": "Runtime GPIO step pin for the CoreXY B driver.",
         "required": false,
-        "default": 18,
-        "advanced": true
+        "default": 18.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       },
       {
         "key": "y_dir_pin",
-        "label": "Y Dir Pin",
+        "label": "CoreXY B Dir Pin",
         "type": "number",
-        "description": "Runtime GPIO direction pin for the Y axis driver.",
+        "description": "Runtime GPIO direction pin for the CoreXY B driver.",
         "required": false,
-        "default": 19,
-        "advanced": true
+        "default": 19.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       },
       {
         "key": "x_min_limit_pin",
@@ -115,8 +136,10 @@
         "type": "number",
         "description": "GPIO pin for the X minimum/home limit switch.",
         "required": false,
-        "default": 21,
-        "advanced": true
+        "default": 21.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       },
       {
         "key": "x_max_limit_pin",
@@ -124,26 +147,10 @@
         "type": "number",
         "description": "GPIO pin for the X maximum limit switch.",
         "required": false,
-        "default": 22,
-        "advanced": true
-      },
-      {
-        "key": "y_min_limit_pin",
-        "label": "Y Min Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the Y minimum/home limit switch.",
-        "required": false,
-        "default": 23,
-        "advanced": true
-      },
-      {
-        "key": "y_max_limit_pin",
-        "label": "Y Max Limit Pin",
-        "type": "number",
-        "description": "GPIO pin for the Y maximum limit switch.",
-        "required": false,
-        "default": 25,
-        "advanced": true
+        "default": 22.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       }
     ],
     "outputs": [
@@ -151,7 +158,7 @@
         "key": "next",
         "label": "Next",
         "type": "flow",
-        "description": "Continue when XY calibration completes."
+        "description": "Continue when X calibration completes."
       }
     ],
     "hardware_devices": [
@@ -160,165 +167,141 @@
         "name": "CoreXY A Motor",
         "kind": "stepper_motor",
         "board_id": "ttyUSB0",
-        "basic_block_id": "basic-stepper-x-axis-motor",
+        "sensor_kind": null,
+        "rotation_min_deg": null,
+        "rotation_max_deg": null,
+        "calibration_ml_per_200_steps": null,
         "pins": [
           {
             "id": "x-dir",
             "signal": "direction",
-            "function_input_key": "x_dir_pin"
+            "gpio": null,
+            "function_input_key": "x_dir_pin",
+            "notes": null
           },
           {
             "id": "x-step",
             "signal": "step",
-            "function_input_key": "x_step_pin"
+            "gpio": null,
+            "function_input_key": "x_step_pin",
+            "notes": null
           },
           {
             "id": "x-enable",
             "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "x-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
+            "gpio": "-",
+            "function_input_key": null,
+            "notes": null
           }
-        ]
+        ],
+        "basic_block_id": "basic-stepper-x-axis-motor",
+        "notes": null
       },
       {
         "id": "y-axis-motor",
         "name": "CoreXY B Motor",
         "kind": "stepper_motor",
         "board_id": "ttyUSB0",
-        "basic_block_id": "basic-stepper-y-axis-motor",
+        "sensor_kind": null,
+        "rotation_min_deg": null,
+        "rotation_max_deg": null,
+        "calibration_ml_per_200_steps": null,
         "pins": [
           {
             "id": "y-dir",
             "signal": "direction",
-            "function_input_key": "y_dir_pin"
+            "gpio": null,
+            "function_input_key": "y_dir_pin",
+            "notes": null
           },
           {
             "id": "y-step",
             "signal": "step",
-            "function_input_key": "y_step_pin"
+            "gpio": null,
+            "function_input_key": "y_step_pin",
+            "notes": null
           },
           {
             "id": "y-enable",
             "signal": "enable",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms1",
-            "signal": "micro_step_1",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms2",
-            "signal": "micro_step_2",
-            "gpio": "-"
-          },
-          {
-            "id": "y-ms3",
-            "signal": "micro_step_3",
-            "gpio": "-"
+            "gpio": "-",
+            "function_input_key": null,
+            "notes": null
           }
-        ]
+        ],
+        "basic_block_id": "basic-stepper-y-axis-motor",
+        "notes": null
       },
       {
         "id": "x-min-limit-switch",
         "name": "X Min Limit Switch",
         "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
         "board_id": "ttyUSB0",
-        "basic_block_id": "basic-sensor-x-min-limit-switch",
+        "sensor_kind": "position_limit_switch",
+        "rotation_min_deg": null,
+        "rotation_max_deg": null,
+        "calibration_ml_per_200_steps": null,
         "pins": [
           {
             "id": "x-min-limit",
             "signal": "signal",
-            "function_input_key": "x_min_limit_pin"
+            "gpio": null,
+            "function_input_key": "x_min_limit_pin",
+            "notes": null
           }
-        ]
+        ],
+        "basic_block_id": "basic-sensor-x-min-limit-switch",
+        "notes": null
       },
       {
         "id": "x-max-limit-switch",
         "name": "X Max Limit Switch",
         "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
         "board_id": "ttyUSB0",
-        "basic_block_id": "basic-sensor-x-max-limit-switch",
+        "sensor_kind": "position_limit_switch",
+        "rotation_min_deg": null,
+        "rotation_max_deg": null,
+        "calibration_ml_per_200_steps": null,
         "pins": [
           {
             "id": "x-max-limit",
             "signal": "signal",
-            "function_input_key": "x_max_limit_pin"
+            "gpio": null,
+            "function_input_key": "x_max_limit_pin",
+            "notes": null
           }
-        ]
-      },
-      {
-        "id": "y-min-limit-switch",
-        "name": "Y Min Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB0",
-        "basic_block_id": "basic-sensor-y-min-limit-switch",
-        "pins": [
-          {
-            "id": "y-min-limit",
-            "signal": "signal",
-            "function_input_key": "y_min_limit_pin"
-          }
-        ]
-      },
-      {
-        "id": "y-max-limit-switch",
-        "name": "Y Max Limit Switch",
-        "kind": "sensor",
-        "sensor_kind": "position_limit_switch",
-        "board_id": "ttyUSB0",
-        "basic_block_id": "basic-sensor-y-max-limit-switch",
-        "pins": [
-          {
-            "id": "y-max-limit",
-            "signal": "signal",
-            "function_input_key": "y_max_limit_pin"
-          }
-        ]
+        ],
+        "basic_block_id": "basic-sensor-x-max-limit-switch",
+        "notes": null
       }
     ],
-    "schema_version": 1,
     "firmware_requirements": [
       {
         "routine_id": "calibrate_xy",
         "controller_role": "builder_board",
         "source": "firmware/main.ino",
-        "protocol": "Serial commands: SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min/max, then Y min/max at X=0, with a fast touch followed by a slow touch and a per-probe rotation safety cap.",
+        "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min then X max and records measured X steps per centimeter.",
         "entry_point": "calibrate_xy",
         "required_device_ids": [
           "x-axis-motor",
           "y-axis-motor",
           "x-min-limit-switch",
-          "x-max-limit-switch",
-          "y-min-limit-switch",
-          "y-max-limit-switch"
+          "x-max-limit-switch"
         ],
-        "description": "Firmware routine required by Calibrate Gantry XY."
+        "description": "Firmware routine required by the X-only Calibrate Gantry XY block."
       }
-    ]
+    ],
+    "builder_board_id": "ttyUSB0",
+    "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
+    "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+    "builder_firmware_entry_file": "firmware/main.ino",
+    "builder_base_function_id": null
   },
   "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: SET XY PINS <coreAStep> <coreADir> <coreBStep> <coreBDir>, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>.",
-  "notes": "Homes XY to the minimum switches, optionally probes max switches, and records workspace lengths.",
+  "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>.",
+  "notes": "X-only gantry bring-up calibration: home to X-min, move to X-max, and measure X steps per centimeter.",
   "schema_version": 1,
   "inputs": [],
-  "version": "0.3.0",
+  "version": "0.4.0",
   "advanced_inputs": []
 }

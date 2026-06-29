@@ -91,6 +91,19 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    // Starting a new run clears any latched E-Stop so the control returns to
+    // its armed "E-STOP" state instead of staying on "RESUME".
+    const handleEmergencyReset = () => {
+      setEmergencyStopState("idle");
+      setEmergencyStopMessage(null);
+    };
+    window.addEventListener("robot-emergency-reset", handleEmergencyReset);
+    return () => {
+      window.removeEventListener("robot-emergency-reset", handleEmergencyReset);
+    };
+  }, []);
+
   async function handleToggleCameraPower() {
     const nextEnabled = !(cameraStatus?.enabled ?? false);
     setIsCameraToggling(true);
@@ -109,6 +122,13 @@ function App() {
   }
 
   async function handleEmergencyStop() {
+    if (emergencyStopState === "sent") {
+      window.dispatchEvent(new CustomEvent("robot-emergency-resume"));
+      setEmergencyStopState("idle");
+      setEmergencyStopMessage("Flow resumed");
+      return;
+    }
+
     window.dispatchEvent(new CustomEvent("robot-emergency-stop"));
     setEmergencyStopState("stopping");
     setEmergencyStopMessage("Stopping now");
@@ -210,7 +230,7 @@ function App() {
               onClick={() => void handleEmergencyStop()}
               type="button"
             >
-              E-STOP
+              {emergencyStopState === "sent" ? "RESUME" : "E-STOP"}
             </button>
             {emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
           </div>

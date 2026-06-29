@@ -9,406 +9,14 @@
       "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
     },
     {
-      "id": "controller-j8ri6p",
-      "label": "7 Syringe pump controller",
+      "id": "controller-x83xnc",
+      "label": "7 syringe pump controller",
       "usb_port": "/dev/ttyUSB0",
       "enabled": false,
       "notes": null
     }
   ],
   "devices": [
-    {
-      "id": "syringe-head-a",
-      "board_id": "",
-      "name": "Syringe Head A",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-a-dir",
-          "signal": "direction",
-          "gpio": "32",
-          "function_input_key": "head_a_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-a-step",
-          "signal": "step",
-          "gpio": "33",
-          "function_input_key": "head_a_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-a-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-a-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-a-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-a-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-b",
-      "board_id": "",
-      "name": "Syringe Head B",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-b-dir",
-          "signal": "direction",
-          "gpio": "4",
-          "function_input_key": "head_b_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-b-step",
-          "signal": "step",
-          "gpio": "25",
-          "function_input_key": "head_b_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-b-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-b-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-b-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-b-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-c",
-      "board_id": "",
-      "name": "Syringe Head C",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-c-dir",
-          "signal": "direction",
-          "gpio": "5",
-          "function_input_key": "head_c_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-c-step",
-          "signal": "step",
-          "gpio": "26",
-          "function_input_key": "head_c_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-c-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-c-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-c-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-c-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-d",
-      "board_id": "",
-      "name": "Syringe Head D",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-d-dir",
-          "signal": "direction",
-          "gpio": "18",
-          "function_input_key": "head_d_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-d-step",
-          "signal": "step",
-          "gpio": "27",
-          "function_input_key": "head_d_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-d-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-d-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-d-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-d-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-e",
-      "board_id": "",
-      "name": "Syringe Head E",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-e-dir",
-          "signal": "direction",
-          "gpio": "19",
-          "function_input_key": "head_e_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-e-step",
-          "signal": "step",
-          "gpio": "14",
-          "function_input_key": "head_e_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-e-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-e-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-e-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-e-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-f",
-      "board_id": "",
-      "name": "Syringe Head F",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-f-dir",
-          "signal": "direction",
-          "gpio": "21",
-          "function_input_key": "head_f_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-f-step",
-          "signal": "step",
-          "gpio": "12",
-          "function_input_key": "head_f_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-f-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-f-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-f-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-f-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "syringe-head-g",
-      "board_id": "",
-      "name": "Syringe Head G",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "head-g-dir",
-          "signal": "direction",
-          "gpio": "22",
-          "function_input_key": "head_g_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "head-g-step",
-          "signal": "step",
-          "gpio": "13",
-          "function_input_key": "head_g_step_pin",
-          "notes": null
-        },
-        {
-          "id": "head-g-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-g-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-g-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "head-g-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
     {
       "id": "x-axis-motor",
       "board_id": "ttyUSB0",
@@ -479,14 +87,14 @@
         {
           "id": "y-dir",
           "signal": "direction",
-          "gpio": "26",
+          "gpio": "16",
           "function_input_key": "y_dir_pin",
           "notes": null
         },
         {
           "id": "y-step",
           "signal": "step",
-          "gpio": "25",
+          "gpio": "17",
           "function_input_key": "y_step_pin",
           "notes": null
         },
@@ -800,6 +408,398 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "syringe-head-a",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head A",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-a-dir",
+          "signal": "direction",
+          "gpio": "32",
+          "function_input_key": "head_a_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-step",
+          "signal": "step",
+          "gpio": "33",
+          "function_input_key": "head_a_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-b",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head B",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-b-dir",
+          "signal": "direction",
+          "gpio": "4",
+          "function_input_key": "head_b_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-step",
+          "signal": "step",
+          "gpio": "25",
+          "function_input_key": "head_b_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-c",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head C",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-c-dir",
+          "signal": "direction",
+          "gpio": "5",
+          "function_input_key": "head_c_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-step",
+          "signal": "step",
+          "gpio": "26",
+          "function_input_key": "head_c_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-d",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head D",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-d-dir",
+          "signal": "direction",
+          "gpio": "18",
+          "function_input_key": "head_d_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-step",
+          "signal": "step",
+          "gpio": "27",
+          "function_input_key": "head_d_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-e",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head E",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-e-dir",
+          "signal": "direction",
+          "gpio": "19",
+          "function_input_key": "head_e_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-step",
+          "signal": "step",
+          "gpio": "14",
+          "function_input_key": "head_e_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-f",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head F",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-f-dir",
+          "signal": "direction",
+          "gpio": "21",
+          "function_input_key": "head_f_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-step",
+          "signal": "step",
+          "gpio": "12",
+          "function_input_key": "head_f_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "syringe-head-g",
+      "board_id": "controller-x83xnc",
+      "name": "Syringe Head G",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-g-dir",
+          "signal": "direction",
+          "gpio": "22",
+          "function_input_key": "head_g_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-step",
+          "signal": "step",
+          "gpio": "13",
+          "function_input_key": "head_g_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
     }
   ],
   "groups": [],
@@ -823,26 +823,6 @@
       "function_id": "calibrate_xy",
       "device_id": "x-max-limit-switch",
       "hardware_device_id": "x-max-limit-switch"
-    },
-    {
-      "function_id": "calibrate_xy",
-      "device_id": "y-min-limit-switch",
-      "hardware_device_id": "y-min-limit-switch"
-    },
-    {
-      "function_id": "calibrate_xy",
-      "device_id": "y-max-limit-switch",
-      "hardware_device_id": "y-max-limit-switch"
-    },
-    {
-      "function_id": "tool_change",
-      "device_id": "x-axis-motor",
-      "hardware_device_id": "x-axis-motor"
-    },
-    {
-      "function_id": "tool_change",
-      "device_id": "y-axis-motor",
-      "hardware_device_id": "y-axis-motor"
     }
   ],
   "node_positions": [
@@ -850,41 +830,6 @@
       "node_id": "raspberry-pi",
       "x": 40.0,
       "y": 180.0
-    },
-    {
-      "node_id": "syringe-head-a",
-      "x": 628.0,
-      "y": -162.0
-    },
-    {
-      "node_id": "syringe-head-b",
-      "x": 628.0,
-      "y": -52.0
-    },
-    {
-      "node_id": "syringe-head-c",
-      "x": 628.0,
-      "y": 58.0
-    },
-    {
-      "node_id": "syringe-head-d",
-      "x": 628.0,
-      "y": 168.0
-    },
-    {
-      "node_id": "syringe-head-e",
-      "x": 628.0,
-      "y": 278.0
-    },
-    {
-      "node_id": "syringe-head-f",
-      "x": 628.0,
-      "y": 388.0
-    },
-    {
-      "node_id": "syringe-head-g",
-      "x": 628.0,
-      "y": 498.0
     },
     {
       "node_id": "ttyUSB0",
@@ -918,8 +863,8 @@
     },
     {
       "node_id": "y-max-limit-switch",
-      "x": 680.0,
-      "y": 1400.0
+      "x": 683.39,
+      "y": 1398.31
     },
     {
       "node_id": "left-z-motor",
@@ -952,10 +897,45 @@
       "y": 2121.66
     },
     {
-      "node_id": "controller-j8ri6p",
-      "x": 298.0,
-      "y": 28.0
+      "node_id": "controller-x83xnc",
+      "x": 350.0,
+      "y": 270.0
+    },
+    {
+      "node_id": "syringe-head-a",
+      "x": 680.0,
+      "y": 80.0
+    },
+    {
+      "node_id": "syringe-head-b",
+      "x": 680.0,
+      "y": 190.0
+    },
+    {
+      "node_id": "syringe-head-c",
+      "x": 680.0,
+      "y": 300.0
+    },
+    {
+      "node_id": "syringe-head-d",
+      "x": 680.0,
+      "y": 410.0
+    },
+    {
+      "node_id": "syringe-head-e",
+      "x": 680.0,
+      "y": 520.0
+    },
+    {
+      "node_id": "syringe-head-f",
+      "x": 680.0,
+      "y": 630.0
+    },
+    {
+      "node_id": "syringe-head-g",
+      "x": 680.0,
+      "y": 740.0
     }
   ],
-  "updated_at": "2026-06-29T11:27:20.460362Z"
+  "updated_at": "2026-06-29T16:25:29.565497Z"
 }

@@ -599,7 +599,6 @@ bool probeZLimit(
 );
 bool calibrateXY(
   float xTrackLengthCm,
-  float yTrackLengthCm,
   int calibrationRPM,
   bool trapezoidalSpeed,
   int accelerationRpmPerSecond,
@@ -715,7 +714,6 @@ bool checkCoreXYAxisCalibration(
     Serial.println("ON THE FLY XY RECALIBRATE");
     if (!calibrateXY(
       xAxis.trackLengthCm,
-      yAxis.trackLengthCm,
       slowProbeRpmFor(rpm),
       true,
       accelerationRpmPerSecond,
@@ -1129,7 +1127,6 @@ bool probeZLimit(
 
 bool calibrateXY(
   float xTrackLengthCm,
-  float yTrackLengthCm,
   int calibrationRPM,
   bool trapezoidalSpeed,
   int accelerationRpmPerSecond,
@@ -1140,7 +1137,7 @@ bool calibrateXY(
   int safeMaxProbeRotations = max(1, maxProbeRotations);
   long maxProbeSteps = (long)stepsPerRevolution * (long)safeMaxProbeRotations;
 
-  Serial.print("ACTIVE XY CALIBRATION RPM ");
+  Serial.print("ACTIVE X CALIBRATION RPM ");
   Serial.print(calibrationRPM);
   Serial.print(" TRAPEZOID ");
   Serial.print(trapezoidalSpeed ? 1 : 0);
@@ -1177,58 +1174,14 @@ bool calibrateXY(
   xAxis.trackLengthCm = xTrackLengthCm;
   xStepsPerCm = ((float)measuredXSteps) / xTrackLengthCm;
 
-  bool ignoredFirst = false;
-  bool ignoredSecond = false;
-  bool returnStopRequested = false;
-  runCoreXYCartesianMove(
-    -currentXSteps,
-    0,
-    calibrationRPM,
-    trapezoidalSpeed,
-    accelerationRpmPerSecond,
-    false,
-    ignoredFirst,
-    ignoredSecond,
-    returnStopRequested
-  );
-  if (returnStopRequested) {
-    return false;
-  }
-
-  currentXSteps = 0;
-
-  if (!probeCoreXYLimit('Y', false, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-    printXYProbeFailure("Y_MIN", yAxis.minLimitPin, maxProbeSteps, stopRequested);
-    return false;
-  }
-  currentYSteps = 0;
-
-  if (!probeCoreXYLimit('Y', true, maxProbeSteps, calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond, stopRequested)) {
-    printXYProbeFailure("Y_MAX", yAxis.maxLimitPin, maxProbeSteps, stopRequested);
-    return false;
-  }
-  long measuredYSteps = labs(currentYSteps);
-  if (measuredYSteps <= 0) {
-    Serial.println("ERR XY Y_MAX MEASURED_ZERO");
-    return false;
-  }
-  yAxis.trackLengthCm = yTrackLengthCm;
-  yStepsPerCm = ((float)measuredYSteps) / yTrackLengthCm;
-
   xyCalibrated = true;
 
-  Serial.print("XY WORKSPACE CM ");
+  Serial.print("X WORKSPACE CM ");
   Serial.print(xAxis.trackLengthCm, 3);
-  Serial.print(" ");
-  Serial.println(yAxis.trackLengthCm, 3);
-  Serial.print("XY WORKSPACE STEPS ");
+  Serial.print(" STEPS ");
   Serial.print(measuredXSteps);
-  Serial.print(" ");
-  Serial.println(measuredYSteps);
-  Serial.print("XY STEPS PER CM ");
-  Serial.print(xStepsPerCm, 3);
-  Serial.print(" ");
-  Serial.println(yStepsPerCm, 3);
+  Serial.print(" STEPS_PER_CM ");
+  Serial.println(xStepsPerCm, 3);
   printXYLimitState("END");
   Serial.println("OK CALIBRATE XY");
   return true;
@@ -1355,38 +1308,56 @@ bool handleMoveXYZCommand(const String &cmd) {
 
 bool handleCalibrateXYCommand(const String &cmd) {
   float xTrackLengthCm = 0.0f;
-  float yTrackLengthCm = 0.0f;
   char speedBuffer[16] = "safe";
   int trapezoidFlag = 1;
   int accelerationRpmPerSecond = 300;
   int nextStepsPerRotation = DEFAULT_STEPS_PER_REVOLUTION;
   int maxProbeRotations = DEFAULT_MAX_PROBE_ROTATIONS;
+  int parsedOld = 0;
+  float ignoredYTrackLengthCm = 0.0f;
   int parsed = sscanf(
     cmd.c_str(),
-    "CALIBRATE XY %f %f %15s %d %d %d %d",
+    "CALIBRATE XY %f %15s %d %d %d %d",
     &xTrackLengthCm,
-    &yTrackLengthCm,
     speedBuffer,
     &trapezoidFlag,
     &accelerationRpmPerSecond,
     &nextStepsPerRotation,
     &maxProbeRotations
   );
-  if (parsed < 2) {
+  bool shouldTryLegacyFormat = parsed < 2 || (parsed >= 3 && trapezoidFlag != 0 && trapezoidFlag != 1);
+  if (shouldTryLegacyFormat) {
+    trapezoidFlag = 1;
+    accelerationRpmPerSecond = 300;
+    nextStepsPerRotation = DEFAULT_STEPS_PER_REVOLUTION;
+    maxProbeRotations = DEFAULT_MAX_PROBE_ROTATIONS;
+    parsedOld = sscanf(
+      cmd.c_str(),
+      "CALIBRATE XY %f %f %15s %d %d %d %d",
+      &xTrackLengthCm,
+      &ignoredYTrackLengthCm,
+      speedBuffer,
+      &trapezoidFlag,
+      &accelerationRpmPerSecond,
+      &nextStepsPerRotation,
+      &maxProbeRotations
+    );
+  }
+  if (parsed < 2 && parsedOld < 3) {
     return false;
   }
 
-  String speedToken = parsed >= 3 ? String(speedBuffer) : String("safe");
+  int effectiveParsed = parsed >= 2 ? parsed : parsedOld - 1;
+  String speedToken = effectiveParsed >= 2 ? String(speedBuffer) : String("safe");
   speedToken.toLowerCase();
   int rpm = isDigit(speedToken.charAt(0)) ? speedToken.toInt() : rpmForCalibrationProfile(speedToken);
   calibrateXY(
     xTrackLengthCm,
-    yTrackLengthCm,
     rpm,
-    parsed >= 4 ? trapezoidFlag != 0 : true,
-    parsed >= 5 ? accelerationRpmPerSecond : 300,
-    parsed >= 6 ? nextStepsPerRotation : DEFAULT_STEPS_PER_REVOLUTION,
-    parsed >= 7 ? maxProbeRotations : DEFAULT_MAX_PROBE_ROTATIONS
+    effectiveParsed >= 3 ? trapezoidFlag != 0 : true,
+    effectiveParsed >= 4 ? accelerationRpmPerSecond : 300,
+    effectiveParsed >= 5 ? nextStepsPerRotation : DEFAULT_STEPS_PER_REVOLUTION,
+    effectiveParsed >= 6 ? maxProbeRotations : DEFAULT_MAX_PROBE_ROTATIONS
   );
   return true;
 }

@@ -13,7 +13,7 @@ def execute(context: dict, inputs: dict) -> dict:
     return {
         "calibrated": response.calibrated,
         "status": "completed",
-        "message": "XY gantry calibration completed.",
+        "message": "X gantry calibration completed.",
         "tool_port": response.port,
         "workspace": response.workspace,
         "calibration_speed_profile": response.calibration_speed_profile,

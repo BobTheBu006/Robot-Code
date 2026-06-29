@@ -40,7 +40,6 @@ The current gantry model is CoreXY, not independent left/right or independent X/
 Device IDs are the durable bridge between:
 
 - hardware map entries
-- generated basic blocks
 - advanced function manifests
 - firmware generation
 - saved workflows

@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from threading import Lock
 
 from app.models.gantry import (
+    GANTRY_WORKSPACE_X_CM,
+    GantryXMoveRequest,
+    GantryXMoveResponse,
     GantryXYCalibrationRequest,
     GantryXYCalibrationResponse,
     GantryXYMoveRequest,
@@ -52,6 +55,10 @@ def _acceleration_rpm_per_s(request) -> int:
 
 
 class GantryControllerError(RuntimeError):
+    pass
+
+
+class GantryControllerReportedError(GantryControllerError):
     pass
 
 
@@ -184,6 +191,16 @@ class GantryControllerService:
                 return True
         return False
 
+    def _reply_last_prefixed_line(self, reply: str | None, prefixes: tuple[str, ...]) -> str | None:
+        if not reply:
+            return None
+        normalized_prefixes = tuple(prefix.upper() for prefix in prefixes)
+        for line in reversed(reply.splitlines()):
+            normalized_line = line.strip().upper()
+            if any(normalized_line.startswith(prefix) for prefix in normalized_prefixes):
+                return line.strip()
+        return None
+
     def _send_command(
         self,
         serial_port,
@@ -248,6 +265,7 @@ class GantryControllerService:
         action_command: str,
         action_prefix: str,
         action_deadline: float,
+        enable_command: str | list[str] | None = None,
     ) -> tuple[str | None, str | None, str | None]:
         serial = self._load_serial_module()
         try:
@@ -280,6 +298,22 @@ class GantryControllerService:
                                 pin_replies.append(pin_reply)
                         pin_reply = "\n".join(pin_replies) if pin_replies else None
 
+                        if enable_command is not None:
+                            for next_enable_command in self._command_list(enable_command):
+                                enable_reply, enable_completed = self._send_command(
+                                    serial_port,
+                                    next_enable_command,
+                                    terminal_prefixes=("OK XY ENABLE", "OK Z ENABLE", "ERR "),
+                                    deadline_seconds=self._command_deadline(),
+                                    active_session=active_session,
+                                )
+                                if not enable_completed or not self._reply_contains_prefix(
+                                    enable_reply, ("OK XY ENABLE", "OK Z ENABLE")
+                                ):
+                                    raise GantryControllerError(
+                                        f"ESP32 did not acknowledge gantry enable configuration. Reply: {enable_reply}"
+                                    )
+
                         limit_replies: list[str] = []
                         for next_limit_command in self._command_list(limit_command):
                             limit_reply, limit_completed = self._send_command(
@@ -306,9 +340,14 @@ class GantryControllerService:
                         )
                         if self._reply_contains_prefix(action_reply, ("OK STOP",)):
                             raise GantryControllerError("Gantry command was cancelled.")
+                        if self._reply_contains_prefix(action_reply, ("ERR ",)):
+                            terminal_error = self._reply_last_prefixed_line(action_reply, ("ERR ",))
+                            raise GantryControllerReportedError(
+                                f"ESP32 reported gantry error: {terminal_error}. Full reply: {action_reply}"
+                            )
                         if not action_completed or not self._reply_contains_prefix(action_reply, (action_prefix,)):
                             raise GantryControllerError(
-                                f"ESP32 did not acknowledge gantry command completion. Reply: {action_reply}"
+                                f"ESP32 did not send expected completion '{action_prefix}'. Full reply: {action_reply}"
                             )
                     finally:
                         self._unregister_active_session(port, active_session)
@@ -339,6 +378,18 @@ class GantryControllerService:
             f"{request.x_max_limit_pin} {request.y_min_limit_pin} {request.y_max_limit_pin}"
         )
 
+    def _build_xy_enable_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str | None:
+        # Only configure driver enable pins when at least one is wired. When both
+        # are unassigned (-1) the drivers are assumed hardwired-enabled, and we
+        # skip the command entirely so older firmware without SET XY ENABLE keeps
+        # working unchanged.
+        if request.x_enable_pin < 0 and request.y_enable_pin < 0:
+            return None
+        return (
+            f"SET XY ENABLE {request.x_enable_pin} {request.y_enable_pin} "
+            f"{1 if request.enable_active_low else 0}"
+        )
+
     def _build_move_xy_command(self, request: GantryXYMoveRequest) -> str:
         return (
             f"MOVE XYZ {request.x_cm:.3f} {request.y_cm:.3f} {request.z_cm:.3f} "
@@ -349,7 +400,6 @@ class GantryControllerService:
     def _build_calibrate_xy_command(self, request: GantryXYCalibrationRequest) -> str:
         return (
             f"CALIBRATE XY {request.x_track_length_cm:.3f} "
-            f"{request.y_track_length_cm:.3f} "
             f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
             f"{request.steps_per_rotation} {request.max_probe_rotations}"
         )
@@ -400,6 +450,7 @@ class GantryControllerService:
             port=port,
             baud_rate=baud_rate,
             pin_command=pin_command,
+            enable_command=self._build_xy_enable_command(request),
             limit_command=limit_command,
             action_command=move_command,
             action_prefix="OK MOVE XYZ",
@@ -460,6 +511,7 @@ class GantryControllerService:
             port=port,
             baud_rate=baud_rate,
             pin_command=pin_command,
+            enable_command=self._build_xy_enable_command(request),
             limit_command=limit_command,
             action_command=calibration_command,
             action_prefix="OK CALIBRATE XY",
@@ -490,7 +542,6 @@ class GantryControllerService:
             calibrated=True,
             workspace={
                 "x_track_length_cm": request.x_track_length_cm,
-                "y_track_length_cm": request.y_track_length_cm,
             },
             configured_pins={
                 "x_step_pin": request.x_step_pin,
@@ -509,6 +560,59 @@ class GantryControllerService:
                 "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
                 "steps_per_rotation": request.steps_per_rotation,
                 "max_probe_rotations": request.max_probe_rotations,
+            },
+        )
+
+    def move_x(self, request: GantryXMoveRequest) -> GantryXMoveResponse:
+        port = self._selected_port(request.tool_port)
+        baud_rate = request.baud_rate or self._baud_rate()
+        pin_command = self._build_xy_pin_command(request)
+        limit_command = self._build_xy_limit_command(request)
+        move_command = f"MOVE X {request.x_cm:.3f} {_effective_move_rpm(request)}"
+        # Generous deadline: a single move can traverse the whole calibrated track.
+        action_deadline = self._move_deadline(
+            GANTRY_WORKSPACE_X_CM * XY_STEPS_PER_CM * 8.0,
+            _effective_move_rpm(request),
+        )
+        pin_reply, limit_reply, move_reply = self._send_config_and_action(
+            port=port,
+            baud_rate=baud_rate,
+            pin_command=pin_command,
+            enable_command=self._build_xy_enable_command(request),
+            limit_command=limit_command,
+            action_command=move_command,
+            action_prefix="OK MOVE X",
+            action_deadline=action_deadline,
+        )
+
+        return GantryXMoveResponse(
+            port=port,
+            baud_rate=baud_rate,
+            speed_profile=request.speed_profile,
+            speed_rpm=_effective_move_rpm(request),
+            target={"x_cm": request.x_cm},
+            pin_command_sent=pin_command,
+            pin_reply=pin_reply,
+            pins_applied=True,
+            limit_command_sent=limit_command,
+            limit_reply=limit_reply,
+            limits_applied=True,
+            move_command_sent=move_command,
+            move_reply=move_reply,
+            move_applied=True,
+            configured_pins={
+                "x_step_pin": request.x_step_pin,
+                "x_dir_pin": request.x_dir_pin,
+                "y_step_pin": request.y_step_pin,
+                "y_dir_pin": request.y_dir_pin,
+            },
+            configured_limits={
+                "limit_switch_mode": request.limit_switch_mode,
+                "x_min_limit_pin": request.x_min_limit_pin,
+                "x_max_limit_pin": request.x_max_limit_pin,
+                "y_min_limit_pin": request.y_min_limit_pin,
+                "y_max_limit_pin": request.y_max_limit_pin,
+                "speed_rpm": _effective_move_rpm(request),
             },
         )
 
