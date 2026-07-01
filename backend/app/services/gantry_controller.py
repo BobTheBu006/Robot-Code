@@ -76,6 +76,9 @@ class GantryControllerService:
         self._port_locks_guard = Lock()
         self._active_sessions: dict[str, _ActiveGantrySession] = {}
         self._active_sessions_guard = Lock()
+        # Serial connections kept open and reused across commands so the ESP32 is
+        # not reset (and the boot delay re-paid) on every workflow block.
+        self._open_connections: dict[str, object] = {}
 
     def _baud_rate(self) -> int:
         return 115200
@@ -255,6 +258,47 @@ class GantryControllerService:
             if time.monotonic() - last_data_at >= quiet_seconds:
                 break
 
+    def _acquire_connection(self, serial_module, port: str, baud_rate: int):
+        """Return an open serial connection for the port, reusing a cached one.
+
+        Reusing the connection keeps the ESP32 powered and awake between blocks,
+        so the auto-reset + boot delay is only paid on the first command. Must be
+        called while holding the port lock.
+        """
+        cached = self._open_connections.get(port)
+        if cached is not None:
+            try:
+                if getattr(cached, "is_open", False):
+                    return cached
+            except Exception:
+                pass
+            self._close_connection(port)
+
+        serial_port = serial_module.Serial(port, baud_rate, timeout=self._serial_timeout())
+        try:
+            boot_delay = self._boot_delay()
+            if boot_delay > 0:
+                time.sleep(boot_delay)
+            self._drain_startup_output(serial_port)
+        except Exception:
+            try:
+                serial_port.close()
+            except Exception:
+                pass
+            raise
+
+        self._open_connections[port] = serial_port
+        return serial_port
+
+    def _close_connection(self, port: str) -> None:
+        serial_port = self._open_connections.pop(port, None)
+        if serial_port is None:
+            return
+        try:
+            serial_port.close()
+        except Exception:
+            pass
+
     def _send_config_and_action(
         self,
         *,
@@ -270,13 +314,10 @@ class GantryControllerService:
         serial = self._load_serial_module()
         try:
             with self._port_lock(port):
-                with serial.Serial(port, baud_rate, timeout=self._serial_timeout()) as serial_port:
-                    active_session = self._register_active_session(port, serial_port)
-                    boot_delay = self._boot_delay()
-                    if boot_delay > 0:
-                        time.sleep(boot_delay)
-                    self._drain_startup_output(serial_port)
+                serial_port = self._acquire_connection(serial, port, baud_rate)
+                active_session = self._register_active_session(port, serial_port)
 
+                try:
                     try:
                         if active_session.cancel_requested:
                             raise GantryControllerError("Gantry command was cancelled.")
@@ -351,6 +392,11 @@ class GantryControllerService:
                             )
                     finally:
                         self._unregister_active_session(port, active_session)
+                except Exception:
+                    # Drop the (possibly broken) connection so the next command
+                    # re-opens a fresh, reset board.
+                    self._close_connection(port)
+                    raise
         except Exception as exc:
             raise GantryControllerError(
                 f"Failed to communicate with gantry ESP32 on {port}: {exc}"
