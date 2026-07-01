@@ -31,6 +31,7 @@ class GantryControllerCommandTests(unittest.TestCase):
         service = GantryControllerService()
         request = GantryXYCalibrationRequest(
             x_track_length_cm=111,
+            y_track_length_cm=55.5,
             speed_rpm=500,
             trapezoidal_speed=True,
             acceleration_rpm_per_s=2000,
@@ -40,7 +41,7 @@ class GantryControllerCommandTests(unittest.TestCase):
 
         self.assertEqual(
             service._build_calibrate_xy_command(request),
-            "CALIBRATE XY 111.000 500 1 2000 800 90",
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90",
         )
 
     def test_xy_calibration_ignores_unused_y_limit_pins(self) -> None:

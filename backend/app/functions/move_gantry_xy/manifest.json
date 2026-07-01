@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "id": "move_gantry_x",
-  "display_name": "Move Gantry X",
+  "id": "move_gantry_xy",
+  "display_name": "Move Gantry XY",
   "category": "Robot Actions",
-  "description": "Move the CoreXY gantry to an absolute X position (cm from X-min) within the calibrated X workspace. Requires a prior Calibrate Gantry XY run; the calibration is restored from the controller's non-volatile storage.",
-  "version": "0.1.0",
+  "description": "Move the CoreXY gantry in a straight line from its current position to an absolute (X, Y) position in cm, with trapezoidal acceleration. Requires a prior Calibrate Gantry XY run (X steps-per-cm is reused for Y). The gantry is assumed parked at Y = max at the start. Errors and stops immediately if the target is outside the workspace or a limit switch is hit.",
+  "version": "0.2.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -21,7 +21,18 @@
       "key": "x_cm",
       "label": "Target X (cm)",
       "type": "number",
-      "description": "Absolute X position in cm from X-min (0) toward X-max, within the calibrated track length.",
+      "description": "Absolute X position in cm from X-min (0) toward X-max, within the calibrated X track length.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "y_cm",
+      "label": "Target Y (cm)",
+      "type": "number",
+      "description": "Absolute Y position in cm from Y-min (0) toward Y-max, within the Y track length.",
       "required": true,
       "default": 0.0,
       "placeholder": null,
@@ -32,9 +43,31 @@
       "key": "speed_rpm",
       "label": "Move Speed (RPM)",
       "type": "number",
-      "description": "Numeric motor speed used while moving along X.",
+      "description": "Numeric target motor speed for the move.",
       "required": true,
       "default": 240.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "trapezoidal_speed",
+      "label": "Trapezoidal Speed",
+      "type": "boolean",
+      "description": "Ramp acceleration and deceleration instead of jumping straight to target speed.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "acceleration_rpm_per_s",
+      "label": "Acceleration (RPM/s)",
+      "type": "number",
+      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+      "required": false,
+      "default": 600.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -106,6 +139,28 @@
       "placeholder": null,
       "advanced": true,
       "options": []
+    },
+    {
+      "key": "y_min_limit_pin",
+      "label": "Y Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Y minimum limit switch.",
+      "required": false,
+      "default": 23.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_max_limit_pin",
+      "label": "Y Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Y maximum limit switch.",
+      "required": false,
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
     }
   ],
   "outputs": [
@@ -113,7 +168,7 @@
       "key": "next",
       "label": "Next",
       "type": "flow",
-      "description": "Continue when the X move completes."
+      "description": "Continue when the XY move completes."
     }
   ],
   "hardware_devices": [
@@ -214,22 +269,66 @@
       ],
       "basic_block_id": "basic-sensor-x-max-limit-switch",
       "notes": null
+    },
+    {
+      "id": "y-min-limit-switch",
+      "name": "Y Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "y-max-limit-switch",
+      "name": "Y Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-max-limit-switch",
+      "notes": null
     }
   ],
   "firmware_requirements": [
     {
-      "routine_id": "move_gantry_x",
+      "routine_id": "move_gantry_xy",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, MOVE X <xCm> <rpm>. Firmware moves to an absolute X position using the calibrated steps-per-cm restored from NVS.",
-      "entry_point": "moveXTo",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves in a straight line using the calibrated steps-per-cm and Y track length restored from NVS, with trapezoidal ramping, and faults on workspace or limit violations.",
+      "entry_point": "moveGantryXYTo",
       "required_device_ids": [
         "x-axis-motor",
         "y-axis-motor",
         "x-min-limit-switch",
-        "x-max-limit-switch"
+        "x-max-limit-switch",
+        "y-min-limit-switch",
+        "y-max-limit-switch"
       ],
-      "description": "Firmware routine required by the Move Gantry X block."
+      "description": "Firmware routine required by the Move Gantry XY block."
     }
   ],
   "builder_board_id": "ttyUSB0",

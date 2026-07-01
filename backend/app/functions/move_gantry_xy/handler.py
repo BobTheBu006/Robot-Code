@@ -1,18 +1,20 @@
-from app.models.gantry import GantryXMoveRequest
+from app.models.gantry import GantryGotoXYRequest
 from app.services.gantry_controller import gantry_controller_service
 
 
 def execute(context: dict, inputs: dict) -> dict:
-    request = GantryXMoveRequest.model_validate(inputs)
-    response = gantry_controller_service.move_x(request)
+    request = GantryGotoXYRequest.model_validate(inputs)
+    response = gantry_controller_service.goto_xy(request)
 
     return {
         "status": "completed",
-        "message": f"Gantry moved to X = {request.x_cm:.3f} cm.",
+        "message": f"Gantry moved to X = {request.x_cm:.3f} cm, Y = {request.y_cm:.3f} cm.",
         "tool_port": response.port,
         "target": response.target,
         "speed_profile": response.speed_profile,
         "speed_rpm": response.speed_rpm,
+        "trapezoidal_speed": response.trapezoidal_speed,
+        "acceleration_rpm_per_s": response.acceleration_rpm_per_s,
         "pin_command_sent": response.pin_command_sent,
         "pin_reply": response.pin_reply,
         "pins_applied": response.pins_applied,

@@ -24,7 +24,18 @@
         "type": "number",
         "description": "Physical X travel in cm between the X-min and X-max limit switches.",
         "required": true,
-        "default": 115.0,
+        "default": 104.5,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
+      },
+      {
+        "key": "y_track_length_cm",
+        "label": "Y Track Length (cm)",
+        "type": "number",
+        "description": "Physical Y travel in cm. Y is not probed; the gantry is assumed parked at Y = this value (Y max) when calibration runs.",
+        "required": true,
+        "default": 55.5,
         "placeholder": null,
         "advanced": false,
         "options": []

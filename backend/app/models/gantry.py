@@ -115,8 +115,8 @@ class GantryXYMoveResponse(BaseModel):
 
 class GantryXYCalibrationRequest(BaseModel):
     tool_port: str | None = None
-    x_track_length_cm: float = Field(default=GANTRY_WORKSPACE_X_CM, gt=0)
-    y_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Y_CM, gt=0)
+    x_track_length_cm: float = Field(default=104.5, gt=0)
+    y_track_length_cm: float = Field(default=55.5, gt=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
     speed_rpm: int = Field(default=100, gt=0)
     trapezoidal_speed: bool = Field(default=True)
@@ -182,11 +182,14 @@ class GantryXYCalibrationResponse(BaseModel):
     configured_limits: dict[str, int | str]
 
 
-class GantryXMoveRequest(BaseModel):
+class GantryGotoXYRequest(BaseModel):
     tool_port: str | None = None
     x_cm: float = Field(default=0.0, ge=0.0)
+    y_cm: float = Field(default=0.0, ge=0.0)
     speed_profile: GantrySpeedProfile = "normal"
     speed_rpm: int = Field(default=240, gt=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=600, gt=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)
@@ -202,23 +205,25 @@ class GantryXMoveRequest(BaseModel):
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
-    def validate_pin_assignments(self) -> "GantryXMoveRequest":
+    def validate_pin_assignments(self) -> "GantryGotoXYRequest":
         assigned_pins = {
             "x_step_pin": self.x_step_pin,
             "x_dir_pin": self.x_dir_pin,
             "y_step_pin": self.y_step_pin,
             "y_dir_pin": self.y_dir_pin,
             "x_min_limit_pin": self.x_min_limit_pin,
+            "y_min_limit_pin": self.y_min_limit_pin,
         }
         if self.limit_switch_mode == "4":
             assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
+            assigned_pins["y_max_limit_pin"] = self.y_max_limit_pin
         if self.x_enable_pin >= 0:
             assigned_pins["x_enable_pin"] = self.x_enable_pin
         if self.y_enable_pin >= 0:
             assigned_pins["y_enable_pin"] = self.y_enable_pin
 
-        # The firmware enforces the calibrated 0..track-length range; here we only
-        # reject negative targets and pin conflicts.
+        # The firmware enforces the calibrated 0..track-length workspace; here we
+        # only reject negative targets and pin conflicts.
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -226,11 +231,13 @@ class GantryXMoveRequest(BaseModel):
         return self
 
 
-class GantryXMoveResponse(BaseModel):
+class GantryGotoXYResponse(BaseModel):
     port: str
     baud_rate: int
     speed_profile: GantrySpeedProfile
     speed_rpm: int
+    trapezoidal_speed: bool
+    acceleration_rpm_per_s: int
     target: dict[str, float]
     pin_command_sent: str
     pin_reply: str | None = None

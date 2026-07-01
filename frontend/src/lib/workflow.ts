@@ -143,7 +143,10 @@ function coerceResolvedValue(
       return value;
     }
 
-    const parsed = Number(value);
+    // Accept a comma as the decimal separator (e.g. "104,5") so locales that use
+    // it still parse. Only the first comma is treated as the decimal point.
+    const normalized = typeof value === "string" ? value.trim().replace(",", ".") : value;
+    const parsed = Number(normalized);
     if (!Number.isFinite(parsed)) {
       throw new Error(`Expected a number-compatible value, received '${String(value)}'.`);
     }

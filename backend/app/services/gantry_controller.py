@@ -6,8 +6,8 @@ from threading import Lock
 
 from app.models.gantry import (
     GANTRY_WORKSPACE_X_CM,
-    GantryXMoveRequest,
-    GantryXMoveResponse,
+    GantryGotoXYRequest,
+    GantryGotoXYResponse,
     GantryXYCalibrationRequest,
     GantryXYCalibrationResponse,
     GantryXYMoveRequest,
@@ -399,7 +399,7 @@ class GantryControllerService:
 
     def _build_calibrate_xy_command(self, request: GantryXYCalibrationRequest) -> str:
         return (
-            f"CALIBRATE XY {request.x_track_length_cm:.3f} "
+            f"CALIBRATE XY {request.x_track_length_cm:.3f} {request.y_track_length_cm:.3f} "
             f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
             f"{request.steps_per_rotation} {request.max_probe_rotations}"
         )
@@ -563,12 +563,15 @@ class GantryControllerService:
             },
         )
 
-    def move_x(self, request: GantryXMoveRequest) -> GantryXMoveResponse:
+    def goto_xy(self, request: GantryGotoXYRequest) -> GantryGotoXYResponse:
         port = self._selected_port(request.tool_port)
         baud_rate = request.baud_rate or self._baud_rate()
         pin_command = self._build_xy_pin_command(request)
         limit_command = self._build_xy_limit_command(request)
-        move_command = f"MOVE X {request.x_cm:.3f} {_effective_move_rpm(request)}"
+        move_command = (
+            f"GOTOXY {request.x_cm:.3f} {request.y_cm:.3f} {_effective_move_rpm(request)} "
+            f"{_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
+        )
         # Generous deadline: a single move can traverse the whole calibrated track.
         action_deadline = self._move_deadline(
             GANTRY_WORKSPACE_X_CM * XY_STEPS_PER_CM * 8.0,
@@ -581,16 +584,18 @@ class GantryControllerService:
             enable_command=self._build_xy_enable_command(request),
             limit_command=limit_command,
             action_command=move_command,
-            action_prefix="OK MOVE X",
+            action_prefix="OK MOVE XY",
             action_deadline=action_deadline,
         )
 
-        return GantryXMoveResponse(
+        return GantryGotoXYResponse(
             port=port,
             baud_rate=baud_rate,
             speed_profile=request.speed_profile,
             speed_rpm=_effective_move_rpm(request),
-            target={"x_cm": request.x_cm},
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+            target={"x_cm": request.x_cm, "y_cm": request.y_cm},
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
