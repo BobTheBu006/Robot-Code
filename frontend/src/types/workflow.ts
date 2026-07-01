@@ -191,6 +191,7 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   onRun?: (() => void) | undefined;
   onCancel?: (() => void) | undefined;
   onToggleActive?: (() => void) | undefined;
+  onQuickAdd?: ((outputKey: string) => void) | undefined;
 }
 
 export interface FunctionTestResponse {

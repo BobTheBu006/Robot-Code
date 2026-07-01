@@ -53,6 +53,7 @@ interface WorkflowInspectorProps {
   onCancel: () => void;
   onEditCompound: () => void;
   onRunTest: () => void;
+  onRunNode: (nodeId: string) => void;
   onSaveCustomBlock: (displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
   onUpdateParameter: (
     nodeId: string,
@@ -321,6 +322,7 @@ export function WorkflowInspector({
   onCancel,
   onEditCompound,
   onRunTest,
+  onRunNode,
   onSaveCustomBlock,
   onUpdateParameter,
   onUpdateSettings,
@@ -518,17 +520,42 @@ export function WorkflowInspector({
 
   return (
     <div className="workflow-overlay">
+      <div className="workflow-overlay__header">
+        <div className="workflow-overlay__title-group">
+          <span className="workflow-overlay__node-icon" style={{ background: block.accent }} />
+          <div className="workflow-overlay__title">
+            <span className="workflow-overlay__eyebrow">
+              {block.kind === "compound" ? "Compound Function" : block.kind === "broken" ? "Missing Block" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
+            </span>
+            <strong>{block.displayName}</strong>
+          </div>
+        </div>
+        <button className="workflow-overlay__close" onClick={onClose} type="button">
+          x
+        </button>
+      </div>
+
       <div className="workflow-overlay__topbar">
         <div className="workflow-overlay__topbar-side">
           <span>Input</span>
         </div>
 
         <div className="workflow-overlay__topbar-center">
-          <div className="workflow-overlay__title">
-            <span className="workflow-overlay__eyebrow">
-              {block.kind === "compound" ? "Compound Function" : block.kind === "broken" ? "Missing Block" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
-            </span>
-            <strong>{block.displayName}</strong>
+          <div className="workflow-overlay__tabs">
+            <button
+              className={activeTab === "parameters" ? "workflow-overlay__tab workflow-overlay__tab--active" : "workflow-overlay__tab"}
+              onClick={() => setActiveTab("parameters")}
+              type="button"
+            >
+              Parameters
+            </button>
+            <button
+              className={activeTab === "settings" ? "workflow-overlay__tab workflow-overlay__tab--active" : "workflow-overlay__tab"}
+              onClick={() => setActiveTab("settings")}
+              type="button"
+            >
+              Settings
+            </button>
           </div>
 
           <button
@@ -543,9 +570,6 @@ export function WorkflowInspector({
 
         <div className="workflow-overlay__topbar-side workflow-overlay__topbar-side--right">
           <span>Output</span>
-          <button className="workflow-overlay__close" onClick={onClose} type="button">
-            x
-          </button>
         </div>
       </div>
 
@@ -586,7 +610,20 @@ export function WorkflowInspector({
           {inputSourceMode === "previous" ? (
             <section className="workflow-overlay__section workflow-overlay__section--stretch">
               {previousNodeTestStatus === "idle" ? (
-                <p className="workflow-overlay__empty-text">Run the previous block to preview its output here.</p>
+                <div className="workflow-overlay__empty-state">
+                  <p className="workflow-overlay__empty-text">
+                    {previousNode ? "Run the previous block to preview its output here." : "This is the first block, so there is no input to preview."}
+                  </p>
+                  {previousNode ? (
+                    <button
+                      className="workflow-overlay__run"
+                      onClick={() => onRunNode(previousNode.id)}
+                      type="button"
+                    >
+                      Execute previous nodes
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
               {previousNodeTestStatus === "running" ? (
                 <p className="workflow-overlay__empty-text">Previous block is currently running...</p>
@@ -649,22 +686,6 @@ export function WorkflowInspector({
         </aside>
 
         <section className="workflow-overlay__editor">
-          <div className="workflow-overlay__tabs">
-            <button
-              className={activeTab === "parameters" ? "workflow-overlay__tab workflow-overlay__tab--active" : "workflow-overlay__tab"}
-              onClick={() => setActiveTab("parameters")}
-              type="button"
-            >
-              Parameters
-            </button>
-            <button
-              className={activeTab === "settings" ? "workflow-overlay__tab workflow-overlay__tab--active" : "workflow-overlay__tab"}
-              onClick={() => setActiveTab("settings")}
-              type="button"
-            >
-              Settings
-            </button>
-          </div>
 
           <div className="workflow-overlay__editor-body">
             {activeTab === "parameters" ? (
@@ -864,7 +885,17 @@ export function WorkflowInspector({
 
           <section className="workflow-overlay__section workflow-overlay__section--stretch">
             {testStatus === "idle" ? (
-              <p className="workflow-overlay__empty-text">Run this step to preview its output.</p>
+              <div className="workflow-overlay__empty-state">
+                <p className="workflow-overlay__empty-text">Run this step to preview its output.</p>
+                <button
+                  className="workflow-overlay__run"
+                  disabled={isBrokenBlock}
+                  onClick={onRunTest}
+                  type="button"
+                >
+                  Execute step
+                </button>
+              </div>
             ) : null}
             {testStatus === "running" ? (
               <p className="workflow-overlay__empty-text">Running block test...</p>

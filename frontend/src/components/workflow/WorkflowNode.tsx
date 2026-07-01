@@ -16,7 +16,6 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
     "--workflow-node-accent": data.block.accent,
   } as CSSProperties;
   const outputs = getWorkflowNodeOutputs(data);
-  const portsHeight = Math.max(outputs.length * 22, 14);
   const isActive = data.isActive !== false;
   const disabledReason = data.block.disabledReason ?? null;
   const canRun = isActive && !disabledReason;
@@ -86,13 +85,13 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
 
       <div className="workflow-node__header">
         <span className="workflow-node__kind">{kindLabel}</span>
-        <strong>{data.block.displayName}</strong>
-        <p>{data.block.description}</p>
+        <strong title={data.block.displayName}>{data.block.displayName}</strong>
+        <p title={data.block.description}>{data.block.description}</p>
         {disabledReason ? <p className="workflow-node__disabled-reason">{disabledReason}</p> : null}
         {isBroken ? <p className="workflow-node__repair">{data.block.missingReference?.suggestedFix}</p> : null}
       </div>
 
-      <div className="workflow-node__ports" style={{ minHeight: `${portsHeight}px` }}>
+      <div className="workflow-node__ports">
         {outputs.map((output, index) => {
           const top = getHandleTop(index, outputs.length);
           return (
@@ -105,6 +104,20 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
                 style={{ top: "50%" }}
                 type="source"
               />
+              {data.onQuickAdd ? (
+                <button
+                  className="workflow-node__quick-add nodrag nopan"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    data.onQuickAdd?.(output.key);
+                  }}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  title={`Add a block after ${output.label}`}
+                  type="button"
+                >
+                  +
+                </button>
+              ) : null}
             </div>
           );
         })}

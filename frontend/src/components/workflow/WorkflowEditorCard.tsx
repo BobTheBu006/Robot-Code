@@ -102,6 +102,12 @@ type CompoundOutputBuild = WorkflowOutputDefinition & {
 };
 const RASPBERRY_BOARD_ID = "raspberry-pi";
 
+function scheduleFitView(fitView: (options?: { padding?: number; duration?: number }) => void) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+  });
+}
+
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -840,6 +846,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const [saveAsName, setSaveAsName] = useState("active-workflow");
   const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
+  const [quickAddSource, setQuickAddSource] = useState<{ nodeId: string; outputKey: string } | null>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
     phase: "idle",
@@ -914,6 +921,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
         onRun: () => void handleRunTestForNode(node.id),
         onCancel: () => void handleCancelNodeExecution(node.id),
         onToggleActive: () => handleToggleNodeActive(node.id),
+        onQuickAdd: (outputKey: string) => handleQuickAddFromPort(node.id, outputKey),
       },
     };
   });
@@ -1060,6 +1068,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
         setNodes(parsedNodes);
         setEdges(parsedEdges);
         setCompoundBlocks(extractCompoundBlocksFromNodes(parsedNodes));
+        scheduleFitView(reactFlow.fitView);
       } catch (error) {
         if (cancelled) {
           return;
@@ -1327,6 +1336,68 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     setSelectedNodeId(nextNode.id);
     setOpenedNodeId(null);
     setActiveEdgeId(null);
+  }
+
+  function handleQuickAddFromPort(nodeId: string, outputKey: string) {
+    setQuickAddSource({ nodeId, outputKey });
+    setWorkflowDrawer("blocks");
+    setSelectedNodeId(nodeId);
+    setOpenedNodeId(null);
+    setActiveEdgeId(null);
+    setContextMenu(null);
+  }
+
+  function handleQuickAddSelectBlock(block: WorkflowBlockDefinition) {
+    if (!quickAddSource) {
+      return;
+    }
+
+    const sourceNode = nodeLookup.get(quickAddSource.nodeId);
+    if (!sourceNode) {
+      setQuickAddSource(null);
+      return;
+    }
+
+    const outputs = getWorkflowNodeOutputs(sourceNode.data);
+    const outputIndex = Math.max(outputs.findIndex((output) => output.key === quickAddSource.outputKey), 0);
+    const nextNode = createWorkflowNode(block, {
+      x: sourceNode.position.x + 300,
+      y: sourceNode.position.y + outputIndex * 140,
+    });
+
+    setNodes((currentNodes) => [...currentNodes, nextNode]);
+
+    if (block.acceptsInput) {
+      setEdges((currentEdges) =>
+        addEdge(
+          {
+            source: quickAddSource.nodeId,
+            sourceHandle: quickAddSource.outputKey,
+            target: nextNode.id,
+            targetHandle: "input",
+            type: "workflowEdge",
+          },
+          currentEdges,
+        ),
+      );
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        reactFlow.fitView({
+          nodes: [{ id: sourceNode.id }, { id: nextNode.id }],
+          padding: 0.4,
+          duration: 300,
+          maxZoom: 1,
+        });
+      });
+    });
+
+    setSelectedNodeId(nextNode.id);
+    setOpenedNodeId(null);
+    setActiveEdgeId(null);
+    setWorkflowDrawer(null);
+    setQuickAddSource(null);
   }
 
   function getCompoundSelection(nodeId: string): WorkflowFlowNode[] {
@@ -2586,51 +2657,65 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
           </div>
 
           <div className="workflow-editor__actions">
-            <StatusBadge
-              label={functionsStatus === "success" ? `${availableBlocks.length} Blocks` : functionsStatus === "loading" ? "Loading Blocks" : "Block Error"}
-              tone={functionsStatus === "success" ? "online" : functionsStatus === "loading" ? "neutral" : "offline"}
-            />
-            <button
-              className="workflow-editor__action"
-              onClick={() => setWorkflowDrawer((currentMode) => currentMode === "blocks" ? null : "blocks")}
-              type="button"
-            >
-              Add blocks
-            </button>
-            <label className="workflow-editor__skip-flash">
-              <input
-                checked={skipEsp32Flashing}
+            <div className="toolbar-group">
+              {functionsStatus !== "success" ? (
+                <StatusBadge
+                  label={functionsStatus === "loading" ? "Loading Blocks" : "Block Error"}
+                  tone={functionsStatus === "loading" ? "neutral" : "offline"}
+                />
+              ) : null}
+              <button
+                className="workflow-editor__action workflow-editor__action--ghost"
+                onClick={() => {
+                  setWorkflowDrawer((currentMode) => currentMode === "blocks" ? null : "blocks");
+                  setQuickAddSource(null);
+                }}
+                type="button"
+              >
+                Add blocks
+                {functionsStatus === "success" ? <span className="toolbar-group__count">{availableBlocks.length}</span> : null}
+              </button>
+            </div>
+
+            <div className="toolbar-group toolbar-group--run">
+              <label className="workflow-editor__skip-flash">
+                <input
+                  checked={skipEsp32Flashing}
+                  disabled={workflowRunState.isRunning}
+                  onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>Skip ESP32 flash</span>
+              </label>
+              <button
+                className="workflow-editor__action workflow-editor__action--primary"
                 disabled={workflowRunState.isRunning}
-                onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
-                type="checkbox"
-              />
-              <span>Skip ESP32 flash</span>
-            </label>
-            <button
-              className="workflow-editor__action workflow-editor__action--primary"
-              disabled={workflowRunState.isRunning}
-              onClick={() => void handleRunAll()}
-              type="button"
-            >
-              {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
-            </button>
-            <button
-              className="workflow-editor__action workflow-editor__action--danger"
-              disabled={!workflowRunState.isRunning}
-              onClick={() => void handleCancelRun()}
-              type="button"
-            >
-              Cancel
-            </button>
-            <button
-              className="workflow-editor__action"
-              onClick={() => setSaveAsOpen((currentValue) => !currentValue)}
-              type="button"
-            >
-              Save as
-            </button>
-            <button className="workflow-editor__action" onClick={() => void handleLoadSavedWorkflow()} type="button">Load saved</button>
-            <button className="workflow-editor__action" onClick={handleResetWorkflow} type="button">Reset canvas</button>
+                onClick={() => void handleRunAll()}
+                type="button"
+              >
+                {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
+              </button>
+              <button
+                className="workflow-editor__action workflow-editor__action--danger"
+                disabled={!workflowRunState.isRunning}
+                onClick={() => void handleCancelRun()}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="toolbar-group">
+              <button
+                className="workflow-editor__action workflow-editor__action--ghost"
+                onClick={() => setSaveAsOpen((currentValue) => !currentValue)}
+                type="button"
+              >
+                Save as
+              </button>
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void handleLoadSavedWorkflow()} type="button">Load saved</button>
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={handleResetWorkflow} type="button">Reset canvas</button>
+            </div>
           </div>
         </div>
 
@@ -2708,6 +2793,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                   setSelectedNodeId(null);
                   setOpenedNodeId(null);
                   setWorkflowDrawer(null);
+                  setQuickAddSource(null);
                   setActiveEdgeId(null);
                   setContextMenu(null);
                 }}
@@ -2782,6 +2868,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                 onCancel={() => void handleCancelNodeExecution(openedNode.id)}
                 onEditCompound={() => handleEditCompoundFunction(openedNode.id)}
                 onRunTest={handleRunTest}
+                onRunNode={(nodeId) => void handleRunTestForNode(nodeId)}
                 onSaveCustomBlock={(displayName) => handleSaveCustomBlock(openedNode.id, displayName)}
                 onUpdateParameter={handleUpdateParameter}
                 onUpdateSettings={handleUpdateNodeSettings}
@@ -2799,10 +2886,17 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
               <aside className="editor-drawer editor-drawer--workflow">
                 <div className="editor-drawer__header">
                   <div>
-                    <span>Add</span>
+                    <span>{quickAddSource ? "Add & connect" : "Add"}</span>
                     <strong>Blocks</strong>
                   </div>
-                  <button className="editor-drawer__close" onClick={() => setWorkflowDrawer(null)} type="button">
+                  <button
+                    className="editor-drawer__close"
+                    onClick={() => {
+                      setWorkflowDrawer(null);
+                      setQuickAddSource(null);
+                    }}
+                    type="button"
+                  >
                     x
                   </button>
                 </div>
@@ -2810,6 +2904,7 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
                   blocks={availableBlocks}
                   discoveryErrors={discoveryErrors.map((error) => `${error.folder_name}: ${error.message}`)}
                   onDeleteCustomBlock={(block) => void handleDeleteCustomBlock(block)}
+                  onSelectBlock={quickAddSource ? handleQuickAddSelectBlock : undefined}
                 />
               </aside>
             ) : null}

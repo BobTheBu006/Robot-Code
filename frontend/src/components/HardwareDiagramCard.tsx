@@ -38,6 +38,12 @@ import { StatusBadge } from "./StatusBadge";
 
 type RequestStatus = "loading" | "success" | "error";
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+function scheduleFitView(fitView: (options?: { padding?: number; duration?: number }) => void) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+  });
+}
 type HardwareNodeKind = "raspberry" | "controller" | "device" | "group";
 type HardwareFlowNode = Node<HardwareNodeData>;
 type ControllerPortOption = {
@@ -922,6 +928,7 @@ function deviceFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hard
 function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareDiagramCardProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
+  const reactFlow = useReactFlow();
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [hardwareMap, setHardwareMap] = useState<HardwareMap>(EMPTY_HARDWARE_MAP);
@@ -1056,6 +1063,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
       setStatus("success");
       setSaveState("idle");
       setSaveMessage(null);
+      scheduleFitView(reactFlow.fitView);
       return;
     }
 
@@ -2123,15 +2131,19 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
               label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
               tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
             />
-            <button className="workflow-editor__action" onClick={() => void loadHardwareMap()} type="button">
-              Refresh
-            </button>
-            <button className="workflow-editor__action" onClick={handleAddBoard} type="button">
-              Add controller
-            </button>
-            <button className="workflow-editor__action" onClick={() => handleAddDevice()} type="button">
-              Add IoT device
-            </button>
+            <div className="toolbar-group">
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void loadHardwareMap()} type="button">
+                Refresh
+              </button>
+            </div>
+            <div className="toolbar-group">
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={handleAddBoard} type="button">
+                Add controller
+              </button>
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => handleAddDevice()} type="button">
+                Add IoT device
+              </button>
+            </div>
             <button
               className="workflow-editor__action workflow-editor__action--primary"
               disabled={saveState === "saving"}
@@ -2168,9 +2180,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
               label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
               tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
             />
-            <button className="workflow-editor__action" onClick={() => void loadHardwareMap()} type="button">
-              Refresh
-            </button>
+            <div className="toolbar-group">
+              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void loadHardwareMap()} type="button">
+                Refresh
+              </button>
+            </div>
             <button
               className="workflow-editor__action workflow-editor__action--primary"
               disabled={saveState === "saving"}

@@ -8,6 +8,7 @@ interface WorkflowPaletteProps {
   blocks: WorkflowBlockDefinition[];
   discoveryErrors: string[];
   onDeleteCustomBlock: (block: WorkflowBlockDefinition) => void;
+  onSelectBlock?: (block: WorkflowBlockDefinition) => void;
 }
 
 const LOGIC_BLOCK_IDS = new Set(["if", "if_else", "while", "for", "loop_over"]);
@@ -67,7 +68,7 @@ function scrollPageNearViewportEdge(clientY: number) {
   }
 }
 
-export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock }: WorkflowPaletteProps) {
+export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, onSelectBlock }: WorkflowPaletteProps) {
   const [hiddenBlockIds, setHiddenBlockIds] = useState<Set<string>>(() => new Set());
   const [showAllBlocks, setShowAllBlocks] = useState(false);
   const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
@@ -162,14 +163,18 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock }
                     return (
                       <div className="workflow-palette__item-shell" key={block.id}>
                         <div
-                          className={`workflow-palette__item${blockIsHidden ? " workflow-palette__item--hidden" : ""}`}
+                          className={`workflow-palette__item${blockIsHidden ? " workflow-palette__item--hidden" : ""}${onSelectBlock ? " workflow-palette__item--selectable" : ""}`}
                           draggable
+                          onClick={onSelectBlock ? () => onSelectBlock(block) : undefined}
                           onDragEnd={() => setDraggingBlockId(null)}
                           onDragStart={(event) => handleDragStart(event, block)}
                         >
                           <button
                             className={`workflow-palette__hide${blockIsHidden ? " workflow-palette__hide--unhide" : ""}`}
-                            onClick={() => blockIsHidden ? handleUnhideBlock(block.id) : handleHideBlock(block.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              blockIsHidden ? handleUnhideBlock(block.id) : handleHideBlock(block.id);
+                            }}
                             title={blockIsHidden ? `Unhide ${block.displayName}` : `Hide ${block.displayName} from the block list`}
                             type="button"
                           >
@@ -182,7 +187,10 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock }
                             <div className="workflow-palette__item-actions">
                               <button
                                 className="workflow-palette__delete"
-                                onClick={() => onDeleteCustomBlock(block)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onDeleteCustomBlock(block);
+                                }}
                                 title={`Delete custom block ${block.displayName}`}
                                 type="button"
                               >
