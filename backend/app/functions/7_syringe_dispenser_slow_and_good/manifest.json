@@ -1,0 +1,724 @@
+{
+  "schema_version": 1,
+  "id": "7_syringe_dispenser_slow_and_good",
+  "display_name": "7 Syringe Dispenser Slow and Good",
+  "category": "Robot Actions",
+  "description": "7 Syringe Dispenser Slow and Good reusable preset.",
+  "version": "0.3.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "ESP32 Port",
+      "type": "file/path",
+      "description": "Serial device path for the connected ESP32 syringe board.",
+      "required": false,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0",
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "calibration_file",
+      "label": "Calibration File",
+      "type": "file/path",
+      "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
+      "required": true,
+      "default": "/home/robot/robot control/syringe control code/calibration.json",
+      "placeholder": "/path/to/calibration.json",
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "speed",
+      "label": "Dispense Speed",
+      "type": "number",
+      "description": "Shared fallback speed used when dedicated expelling and intake speeds are not set.",
+      "required": false,
+      "default": 50.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "A",
+      "label": "Head A",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head A.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "B",
+      "label": "Head B",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head B.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "C",
+      "label": "Head C",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head C.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "D",
+      "label": "Head D",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head D.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "E",
+      "label": "Head E",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head E.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "F",
+      "label": "Head F",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head F.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "G",
+      "label": "Head G",
+      "type": "number",
+      "description": "Requested dispense amount for syringe head G.",
+      "required": true,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "intake_speed",
+      "label": "Expelling Speed",
+      "type": "number",
+      "description": "Overrides the shared dispense speed for the first part of the move where fluid is expelled.",
+      "required": false,
+      "default": 50.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "outtake_speed",
+      "label": "Intake Speed",
+      "type": "number",
+      "description": "Overrides the shared dispense speed for the return move where fluid is taken back in.",
+      "required": false,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_a_step_pin",
+      "label": "Head A Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head A when saving a reusable hardware preset.",
+      "required": false,
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_a_dir_pin",
+      "label": "Head A Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head A when saving a reusable hardware preset.",
+      "required": false,
+      "default": 32.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_b_step_pin",
+      "label": "Head B Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head B when saving a reusable hardware preset.",
+      "required": false,
+      "default": 25.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_b_dir_pin",
+      "label": "Head B Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head B when saving a reusable hardware preset.",
+      "required": false,
+      "default": 4.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_c_step_pin",
+      "label": "Head C Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head C when saving a reusable hardware preset.",
+      "required": false,
+      "default": 26.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_c_dir_pin",
+      "label": "Head C Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head C when saving a reusable hardware preset.",
+      "required": false,
+      "default": 5.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_d_step_pin",
+      "label": "Head D Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head D when saving a reusable hardware preset.",
+      "required": false,
+      "default": 27.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_d_dir_pin",
+      "label": "Head D Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head D when saving a reusable hardware preset.",
+      "required": false,
+      "default": 18.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_e_step_pin",
+      "label": "Head E Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head E when saving a reusable hardware preset.",
+      "required": false,
+      "default": 14.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_e_dir_pin",
+      "label": "Head E Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head E when saving a reusable hardware preset.",
+      "required": false,
+      "default": 19.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_f_step_pin",
+      "label": "Head F Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head F when saving a reusable hardware preset.",
+      "required": false,
+      "default": 12.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_f_dir_pin",
+      "label": "Head F Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head F when saving a reusable hardware preset.",
+      "required": false,
+      "default": 21.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_g_step_pin",
+      "label": "Head G Step Pin",
+      "type": "number",
+      "description": "GPIO step pin for syringe head G when saving a reusable hardware preset.",
+      "required": false,
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "head_g_dir_pin",
+      "label": "Head G Dir Pin",
+      "type": "number",
+      "description": "GPIO direction pin for syringe head G when saving a reusable hardware preset.",
+      "required": false,
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue when the dispense request completes."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "syringe-head-a",
+      "name": "Syringe Head A",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-a-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_a_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_a_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-a-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-a-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-a",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-b",
+      "name": "Syringe Head B",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-b-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_b_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_b_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-b-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-b-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-b",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-c",
+      "name": "Syringe Head C",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-c-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_c_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_c_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-c-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-c-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-c",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-d",
+      "name": "Syringe Head D",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-d-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_d_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_d_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-d-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-d-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-d",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-e",
+      "name": "Syringe Head E",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-e-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_e_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_e_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-e-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-e-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-e",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-f",
+      "name": "Syringe Head F",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-f-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_f_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_f_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-f-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-f-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-f",
+      "notes": null
+    },
+    {
+      "id": "syringe-head-g",
+      "name": "Syringe Head G",
+      "kind": "stepper_motor",
+      "board_id": "",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "head-g-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "head_g_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "head_g_step_pin",
+          "notes": null
+        },
+        {
+          "id": "head-g-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms1",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "head-g-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-syringe-head-g",
+      "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "7_syringe_dispenser_slow_and_good",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "serial-text",
+      "entry_point": "7_syringe_dispenser_slow_and_good",
+      "required_device_ids": [
+        "syringe-head-a",
+        "syringe-head-b",
+        "syringe-head-c",
+        "syringe-head-d",
+        "syringe-head-e",
+        "syringe-head-f",
+        "syringe-head-g"
+      ],
+      "description": "Firmware routine required by 7 Syringe Dispenser Slow and Good."
+    }
+  ],
+  "builder_board_id": null,
+  "builder_source_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/7_syringe_dispenser_slow_and_good.json",
+  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+  "builder_firmware_entry_file": "firmware/main.ino",
+  "builder_base_function_id": "dispense"
+}
