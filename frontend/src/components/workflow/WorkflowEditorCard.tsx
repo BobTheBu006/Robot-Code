@@ -1,5 +1,6 @@
 import type { DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   addEdge,
@@ -35,7 +36,6 @@ import {
 } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
-  formatDurationShort,
   formatWorkflowParameterValue,
   WORKFLOW_BLOCK_MIME,
   createBuiltInBlocks,
@@ -70,7 +70,6 @@ import type {
 import type { Esp32CustomBlockSaveResponse, Esp32WorkflowFirmwarePlanRequestItem } from "../../types/esp32Builder";
 import type { Esp32BoardSummary } from "../../types/esp32Builder";
 import type { HardwareDeviceMapping, HardwareMap } from "../../types/hardwareMap";
-import { StatusBadge } from "../StatusBadge";
 import { WorkflowEdge } from "./WorkflowEdge";
 import { WorkflowInspector } from "./WorkflowInspector";
 import { WorkflowNode } from "./WorkflowNode";
@@ -815,9 +814,10 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
 
 interface WorkflowEditorSurfaceProps {
   hardwareMapRevision: number;
+  headerSlot: HTMLElement | null;
 }
 
-function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfaceProps) {
+function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEditorSurfaceProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const starterWorkflow = useMemo(() => createStarterWorkflow(), []);
@@ -841,9 +841,10 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
   const testAbortControllersRef = useRef<Record<string, AbortController>>({});
   const flashAbortControllerRef = useRef<AbortController | null>(null);
-  const [saveAsOpen, setSaveAsOpen] = useState(false);
-  const [saveAsPath, setSaveAsPath] = useState("");
-  const [saveAsName, setSaveAsName] = useState("active-workflow");
+  const [saveAsPath] = useState("");
+  const [saveAsName] = useState("active-workflow");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const saveResetTimeoutRef = useRef<number | null>(null);
   const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
   const [quickAddSource, setQuickAddSource] = useState<{ nodeId: string; outputKey: string } | null>(null);
@@ -1111,23 +1112,6 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   const previousOpenedNodeTestState = previousOpenedNode
     ? testStateByNodeId[previousOpenedNode.id] ?? { status: "idle", result: null, error: null }
     : { status: "idle" as const, result: null, error: null };
-  const totalRunNodes = workflowRunState.orderedNodeIds.length;
-  const completedRunNodes = workflowRunState.completedNodeIds.length;
-  const remainingEstimateMs = workflowRunState.orderedNodeIds
-    .filter((nodeId) => !workflowRunState.completedNodeIds.includes(nodeId))
-    .reduce((total, nodeId) => {
-      const node = nodeLookup.get(nodeId);
-      return total + (node ? estimateNodeDuration(node) : 0);
-    }, 0);
-  const flashingBoard = workflowRunState.flashingBoardId
-    ? esp32Boards.find((board) => board.board_id === workflowRunState.flashingBoardId)
-    : null;
-  const workflowStatusMessage = functionsError
-    ? functionsError
-    : workflowRunState.phase === "flashing"
-      ? `Building and flashing ${flashingBoard?.display_name ?? workflowRunState.flashingBoardId ?? "ESP32 firmware"} before running the workflow.`
-      : `${robotActionBlocks.length} advanced function${robotActionBlocks.length === 1 ? "" : "s"} available.`;
-
   useEffect(() => {
     if (functionsStatus !== "success" || !hardwareMap) {
       return;
@@ -1757,16 +1741,21 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
   }
 
   async function handleSaveWorkflow() {
+    if (saveResetTimeoutRef.current) {
+      window.clearTimeout(saveResetTimeoutRef.current);
+    }
+    setSaveState("saving");
     try {
-      const saveResult = await saveWorkflowToFile(
+      await saveWorkflowToFile(
         nodes as WorkflowCanvasNode[],
         edges as WorkflowCanvasEdge[],
         saveAsPath,
         saveAsName,
       );
-      setSaveAsOpen(false);
-      setFunctionsError(`Saved workflow to ${saveResult.path}`);
+      setSaveState("saved");
+      saveResetTimeoutRef.current = window.setTimeout(() => setSaveState("idle"), 1600);
     } catch (error) {
+      setSaveState("idle");
       setFunctionsError(error instanceof Error ? error.message : "Could not save workflow file.");
     }
   }
@@ -2630,123 +2619,58 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
     setFunctionsError("Workflow run cancelled.");
   }
 
+  const headerControls = (
+    <div className="workflow-editor__actions">
+      <div className="toolbar-group">
+        <button
+          className={saveState === "saved"
+            ? "workflow-editor__action workflow-editor__action--ghost workflow-editor__action--saved"
+            : "workflow-editor__action workflow-editor__action--ghost"}
+          disabled={saveState === "saving"}
+          onClick={() => void handleSaveWorkflow()}
+          type="button"
+        >
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+        </button>
+      </div>
+
+      <div className="toolbar-group toolbar-group--run">
+        <label className="workflow-editor__skip-flash">
+          <input
+            checked={skipEsp32Flashing}
+            disabled={workflowRunState.isRunning}
+            onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
+            type="checkbox"
+          />
+          <span>Skip ESP32 flash</span>
+        </label>
+        <button
+          className="workflow-editor__action workflow-editor__action--primary"
+          disabled={workflowRunState.isRunning}
+          onClick={() => void handleRunAll()}
+          type="button"
+        >
+          {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <section className="editor-workspace editor-workspace--workflow-page workflow-editor">
-        <div className="editor-workspace__toolbar">
-          <div>
-            <strong>Function discovery</strong>
-            <p>
-              {workflowStatusMessage}
-            </p>
-            <div className="workflow-editor__run-stats">
-              <span>
-                {workflowRunState.phase === "flashing"
-                  ? "Preparing ESP32 firmware"
-                  : workflowRunState.isRunning
-                  ? `${completedRunNodes} / ${totalRunNodes} blocks executed`
-                  : `${nodes.length} blocks on canvas`}
-              </span>
-              <span>
-                {workflowRunState.phase === "flashing"
-                  ? "Workflow will start after flashing"
-                  : workflowRunState.isRunning
-                  ? `~${formatDurationShort(remainingEstimateMs)} remaining`
-                  : `Est. total ${formatDurationShort(nodes.reduce((total, node) => total + estimateNodeDuration(node), 0))}`}
-              </span>
-            </div>
-          </div>
+        {headerSlot ? createPortal(headerControls, headerSlot) : null}
 
-          <div className="workflow-editor__actions">
-            <div className="toolbar-group">
-              {functionsStatus !== "success" ? (
-                <StatusBadge
-                  label={functionsStatus === "loading" ? "Loading Blocks" : "Block Error"}
-                  tone={functionsStatus === "loading" ? "neutral" : "offline"}
-                />
-              ) : null}
-              <button
-                className="workflow-editor__action workflow-editor__action--ghost"
-                onClick={() => {
-                  setWorkflowDrawer((currentMode) => currentMode === "blocks" ? null : "blocks");
-                  setQuickAddSource(null);
-                }}
-                type="button"
-              >
-                Add blocks
-                {functionsStatus === "success" ? <span className="toolbar-group__count">{availableBlocks.length}</span> : null}
-              </button>
-            </div>
-
-            <div className="toolbar-group toolbar-group--run">
-              <label className="workflow-editor__skip-flash">
-                <input
-                  checked={skipEsp32Flashing}
-                  disabled={workflowRunState.isRunning}
-                  onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>Skip ESP32 flash</span>
-              </label>
-              <button
-                className="workflow-editor__action workflow-editor__action--primary"
-                disabled={workflowRunState.isRunning}
-                onClick={() => void handleRunAll()}
-                type="button"
-              >
-                {workflowRunState.phase === "flashing" ? "Flashing ESP32..." : workflowRunState.isRunning ? "Running flow..." : "Run all"}
-              </button>
-              <button
-                className="workflow-editor__action workflow-editor__action--danger"
-                disabled={!workflowRunState.isRunning}
-                onClick={() => void handleCancelRun()}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-
-            <div className="toolbar-group">
-              <button
-                className="workflow-editor__action workflow-editor__action--ghost"
-                onClick={() => setSaveAsOpen((currentValue) => !currentValue)}
-                type="button"
-              >
-                Save as
-              </button>
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void handleLoadSavedWorkflow()} type="button">Load saved</button>
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={handleResetWorkflow} type="button">Reset canvas</button>
-            </div>
-          </div>
-        </div>
-
-        {saveAsOpen ? (
-          <div className="workflow-editor__save-as">
-            <label className="workflow-editor__save-field">
-              <span>Path</span>
-              <input
-                onChange={(event) => setSaveAsPath(event.target.value)}
-                placeholder="optional/subfolder"
-                type="text"
-                value={saveAsPath}
-              />
-            </label>
-            <label className="workflow-editor__save-field">
-              <span>Name</span>
-              <input
-                onChange={(event) => setSaveAsName(event.target.value)}
-                placeholder="workflow-name"
-                type="text"
-                value={saveAsName}
-              />
-            </label>
-            <div className="workflow-editor__save-actions">
-              <button className="workflow-editor__action" onClick={() => void handleSaveWorkflow()} type="button">
-                Save
-              </button>
-              <button className="workflow-editor__action" onClick={() => setSaveAsOpen(false)} type="button">
-                Cancel
-              </button>
-            </div>
+        {functionsError ? (
+          <div className="workflow-error-banner" role="alert">
+            <span className="workflow-error-banner__message">{functionsError}</span>
+            <button
+              aria-label="Dismiss"
+              className="workflow-error-banner__dismiss"
+              onClick={() => setFunctionsError(null)}
+              type="button"
+            >
+              ×
+            </button>
           </div>
         ) : null}
 
@@ -2926,12 +2850,13 @@ function WorkflowEditorSurface({ hardwareMapRevision }: WorkflowEditorSurfacePro
 
 interface WorkflowEditorCardProps {
   hardwareMapRevision: number;
+  headerSlot: HTMLElement | null;
 }
 
-export function WorkflowEditorCard({ hardwareMapRevision }: WorkflowEditorCardProps) {
+export function WorkflowEditorCard({ hardwareMapRevision, headerSlot }: WorkflowEditorCardProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowEditorSurface hardwareMapRevision={hardwareMapRevision} />
+      <WorkflowEditorSurface hardwareMapRevision={hardwareMapRevision} headerSlot={headerSlot} />
     </ReactFlowProvider>
   );
 }

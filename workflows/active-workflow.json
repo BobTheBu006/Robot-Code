@@ -35,13 +35,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 43,
+        "runCount": 51,
         "benchmarkDurationMs": 20,
-        "lastDurationMs": 24
+        "lastDurationMs": 27
       },
       "measured": {
-        "width": 196,
-        "height": 133
+        "width": 210,
+        "height": 105
       },
       "selected": false,
       "dragging": false
@@ -426,9 +426,9 @@
           "tool_port": "/dev/ttyUSB0",
           "x_track_length_cm": "104,5",
           "y_track_length_cm": 55.5,
-          "speed_rpm": 300,
+          "speed_rpm": 500,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 50,
+          "acceleration_rpm_per_s": 600,
           "steps_per_rotation": 800,
           "max_probe_rotations": 120,
           "x_step_pin": 16,
@@ -443,13 +443,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 20,
-        "benchmarkDurationMs": 17943,
-        "lastDurationMs": 31439
+        "runCount": 28,
+        "benchmarkDurationMs": 19316,
+        "lastDurationMs": 29536
       },
       "measured": {
-        "width": 196,
-        "height": 235
+        "width": 210,
+        "height": 120
       },
       "selected": false
     },
@@ -881,9 +881,9 @@
           "tool_port": "/dev/ttyUSB0",
           "x_cm": 52,
           "y_cm": 25,
-          "speed_rpm": 240,
+          "speed_rpm": 3000,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 50,
+          "acceleration_rpm_per_s": 2500,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -898,15 +898,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 0,
-        "benchmarkDurationMs": null,
-        "lastDurationMs": null
+        "runCount": 4,
+        "benchmarkDurationMs": 12783,
+        "lastDurationMs": 6094
       },
       "measured": {
-        "width": 196,
-        "height": 262
+        "width": 210,
+        "height": 120
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     },
     {
@@ -1337,9 +1337,9 @@
           "tool_port": "/dev/ttyUSB0",
           "x_cm": 0,
           "y_cm": 0,
-          "speed_rpm": 240,
+          "speed_rpm": 3500,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 600,
+          "acceleration_rpm_per_s": 3000,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -1354,13 +1354,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 0,
-        "benchmarkDurationMs": null,
-        "lastDurationMs": null
+        "runCount": 4,
+        "benchmarkDurationMs": 6963,
+        "lastDurationMs": 5084
       },
       "measured": {
-        "width": 196,
-        "height": 262
+        "width": 210,
+        "height": 120
       },
       "selected": false,
       "dragging": false
@@ -1793,9 +1793,9 @@
           "tool_port": "/dev/ttyUSB0",
           "x_cm": 100,
           "y_cm": "55,5",
-          "speed_rpm": 240,
+          "speed_rpm": 5000,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 600,
+          "acceleration_rpm_per_s": 50000,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -1810,15 +1810,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 0,
-        "benchmarkDurationMs": null,
-        "lastDurationMs": null
+        "runCount": 3,
+        "benchmarkDurationMs": 9341,
+        "lastDurationMs": 3747
       },
       "measured": {
-        "width": 196,
-        "height": 262
+        "width": 210,
+        "height": 120
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     }
   ],

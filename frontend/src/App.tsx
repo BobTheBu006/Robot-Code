@@ -2,7 +2,6 @@
 import { CameraFeedCard } from "./components/CameraFeedCard";
 import { HardwareDiagramCard } from "./components/HardwareDiagramCard";
 import { RobotStateCard } from "./components/RobotStateCard";
-import { StatusBadge } from "./components/StatusBadge";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
 import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, setCameraPower } from "./lib/api";
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
@@ -31,6 +30,7 @@ function App() {
   const [robotStateError, setRobotStateError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [hardwareMapRevision, setHardwareMapRevision] = useState(0);
+  const [workflowHeaderSlot, setWorkflowHeaderSlot] = useState<HTMLDivElement | null>(null);
   const [emergencyStopState, setEmergencyStopState] = useState<"idle" | "stopping" | "sent" | "error">("idle");
   const [emergencyStopMessage, setEmergencyStopMessage] = useState<string | null>(null);
 
@@ -136,15 +136,12 @@ function App() {
     try {
       const response = await emergencyStop();
       setEmergencyStopState(response.ok ? "sent" : "error");
-      setEmergencyStopMessage(response.message);
+      setEmergencyStopMessage(response.ok ? null : response.message);
     } catch (error) {
       setEmergencyStopState("error");
       setEmergencyStopMessage(error instanceof Error ? error.message : "Emergency stop request failed");
     }
   }
-
-  const isConnected = connectionStatus === "success";
-  const activePageLabel = APP_PAGES.find((page) => page.id === activePage)?.label ?? "Dashboard";
 
   function handleHardwareMapSaved() {
     setHardwareMapRevision((revision) => revision + 1);
@@ -179,28 +176,26 @@ function App() {
     }
 
     if (activePage === "workflow-editor") {
-      return <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} />;
+      return <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} headerSlot={workflowHeaderSlot} />;
     }
 
     if (activePage === "function-map") {
-      return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="function-map" />;
+      return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="function-map" headerSlot={workflowHeaderSlot} />;
     }
 
-    return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="hardware-map" />;
+    return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="hardware-map" headerSlot={workflowHeaderSlot} />;
   }
 
-  const appShellClassName = activePage === "workflow-editor" || activePage === "hardware-map"
-    ? "app-shell app-shell--no-scroll"
-    : "app-shell";
+  const appShellClassName = activePage === "workflow-editor"
+    ? "app-shell app-shell--no-scroll app-shell--workflow"
+    : activePage === "hardware-map"
+      ? "app-shell app-shell--no-scroll"
+      : "app-shell";
 
   return (
     <main className={appShellClassName}>
       <header className="app-header">
         <div className="app-header__inner">
-          <div className="app-header__identity">
-            <span>Robot Control</span>
-            <strong>{activePageLabel}</strong>
-          </div>
           <nav aria-label="Primary pages" className="app-nav">
             {APP_PAGES.map((page) => (
               <button
@@ -214,16 +209,7 @@ function App() {
               </button>
             ))}
           </nav>
-          <div className="app-header__status">
-            <span>Backend</span>
-            <StatusBadge
-              label={isConnected ? "Connected" : connectionStatus === "loading" ? "Checking" : "Disconnected"}
-              tone={isConnected ? "online" : connectionStatus === "loading" ? "neutral" : "offline"}
-            />
-            <small>
-              {connectionError ?? (lastUpdated ? `Updated ${lastUpdated}` : "Waiting")}
-            </small>
-          </div>
+          <div className="app-header__workflow-slot" ref={setWorkflowHeaderSlot} />
           <div className="app-header__estop">
             <button
               className={emergencyStopState === "stopping" ? "emergency-stop emergency-stop--active" : "emergency-stop"}

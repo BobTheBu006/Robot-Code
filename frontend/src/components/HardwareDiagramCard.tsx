@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 
 import {
   Background,
@@ -60,6 +61,7 @@ type HardwareContextMenuState = {
 interface HardwareDiagramCardProps {
   onHardwareMapSaved: () => void;
   view?: "full" | "function-map" | "hardware-map";
+  headerSlot?: HTMLElement | null;
 }
 
 interface HardwareNodeData extends Record<string, unknown> {
@@ -925,7 +927,7 @@ function deviceFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hard
   return hardwareMap.devices.find((device) => device.id === nodeId) ?? null;
 }
 
-function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareDiagramCardProps) {
+function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot = null }: HardwareDiagramCardProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const reactFlow = useReactFlow();
@@ -936,6 +938,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
   const [discoveredFunctions, setDiscoveredFunctions] = useState<DiscoveredFunctionDefinition[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const saveResetTimeoutRef = useRef<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
   const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
   const [hardwareDrawerOpen, setHardwareDrawerOpen] = useState(false);
@@ -1566,14 +1569,17 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
       return;
     }
 
+    if (saveResetTimeoutRef.current) {
+      window.clearTimeout(saveResetTimeoutRef.current);
+    }
     setSaveState("saving");
     setSaveMessage(null);
     try {
       const response = await saveHardwareMap(cleanedMap);
       setHardwareMap(response.hardware_map);
       setSaveState("saved");
-      setSaveMessage(`Saved ${response.path}`);
       onHardwareMapSaved();
+      saveResetTimeoutRef.current = window.setTimeout(() => setSaveState("idle"), 1600);
     } catch (saveError) {
       setSaveState("error");
       setSaveMessage(saveError instanceof Error ? saveError.message : "Could not save the hardware map.");
@@ -2118,49 +2124,46 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
     ? "Assign discovered function requirements to saved physical devices."
     : "Build the electronics map as connected blocks. Select a controller or IoT device to edit ports and pins.";
 
+  const mapHeaderControls = (
+    <div className="workflow-editor__actions">
+      <div className="toolbar-group">
+        <button
+          className={saveState === "saved"
+            ? "workflow-editor__action workflow-editor__action--primary workflow-editor__action--saved"
+            : "workflow-editor__action workflow-editor__action--primary"}
+          disabled={saveState === "saving"}
+          onClick={() => void handleSave()}
+          type="button"
+        >
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save map"}
+        </button>
+      </div>
+    </div>
+  );
+
+  const mapErrorMessage = status === "error" ? error : saveState === "error" ? saveMessage : null;
+  const mapErrorBanner = mapErrorMessage ? (
+    <div className="workflow-error-banner" role="alert">
+      <span className="workflow-error-banner__message">{mapErrorMessage}</span>
+      <button
+        aria-label="Dismiss"
+        className="workflow-error-banner__dismiss"
+        onClick={() => {
+          setSaveState("idle");
+          setSaveMessage(null);
+        }}
+        type="button"
+      >
+        ×
+      </button>
+    </div>
+  ) : null;
+
   if (view === "hardware-map") {
     return (
       <section className="editor-workspace editor-workspace--map-page hardware-map">
-        <div className="editor-workspace__toolbar">
-          <div>
-            <strong>Hardware Map</strong>
-            <p>{hardwareMap.boards.length} controller blocks, {hardwareMap.devices.length} IoT device blocks</p>
-          </div>
-          <div className="workflow-editor__actions">
-            <StatusBadge
-              label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
-              tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
-            />
-            <div className="toolbar-group">
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void loadHardwareMap()} type="button">
-                Refresh
-              </button>
-            </div>
-            <div className="toolbar-group">
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={handleAddBoard} type="button">
-                Add controller
-              </button>
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => handleAddDevice()} type="button">
-                Add IoT device
-              </button>
-            </div>
-            <button
-              className="workflow-editor__action workflow-editor__action--primary"
-              disabled={saveState === "saving"}
-              onClick={() => void handleSave()}
-              type="button"
-            >
-              {saveState === "saving" ? "Saving..." : "Save map"}
-            </button>
-          </div>
-        </div>
-
-        {status === "error" ? <p className="error-text">{error}</p> : null}
-        {saveMessage ? (
-          <p className={saveState === "error" ? "error-text" : "hardware-map__save-message"}>
-            {saveMessage}
-          </p>
-        ) : null}
+        {headerSlot ? createPortal(mapHeaderControls, headerSlot) : null}
+        {mapErrorBanner}
 
         {renderHardwareCanvas("drawer")}
       </section>
@@ -2170,38 +2173,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full" }: HardwareD
   if (view === "function-map") {
     return (
       <section className="editor-workspace editor-workspace--map-page function-map-page">
-        <div className="editor-workspace__toolbar">
-          <div>
-            <strong>Function Map</strong>
-            <p>{groupedFunctions.length} function group{groupedFunctions.length === 1 ? "" : "s"}, {hardwareMap.devices.length} available hardware device{hardwareMap.devices.length === 1 ? "" : "s"}</p>
-          </div>
-          <div className="workflow-editor__actions">
-            <StatusBadge
-              label={status === "success" ? "Map loaded" : status === "loading" ? "Loading" : "Map error"}
-              tone={status === "success" ? "online" : status === "loading" ? "neutral" : "offline"}
-            />
-            <div className="toolbar-group">
-              <button className="workflow-editor__action workflow-editor__action--ghost" onClick={() => void loadHardwareMap()} type="button">
-                Refresh
-              </button>
-            </div>
-            <button
-              className="workflow-editor__action workflow-editor__action--primary"
-              disabled={saveState === "saving"}
-              onClick={() => void handleSave()}
-              type="button"
-            >
-              {saveState === "saving" ? "Saving..." : "Save map"}
-            </button>
-          </div>
-        </div>
-
-        {status === "error" ? <p className="error-text">{error}</p> : null}
-        {saveMessage ? (
-          <p className={saveState === "error" ? "error-text" : "hardware-map__save-message"}>
-            {saveMessage}
-          </p>
-        ) : null}
+        {headerSlot ? createPortal(mapHeaderControls, headerSlot) : null}
+        {mapErrorBanner}
 
         <div className="function-map-page__surface">
           {renderFunctionHardwareMap()}

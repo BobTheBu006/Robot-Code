@@ -1388,6 +1388,34 @@ bool calibrateXY(
   Serial.println(maxProbeSteps);
   printXYMotorPinState("CALIBRATE");
   printXYLimitState("START");
+
+  // Refuse to start calibration while any limit switch is already pressed.
+  // Homing from a pressed switch measures garbage (a pressed X_MAX reads as
+  // an instant max touch and fails with MEASURED_ZERO after grinding the
+  // carriage into the min switch), and a stuck or miswired switch should be
+  // fixed before the gantry moves at all.
+  bool xMinPressed = isLimitActive(xAxis.minLimitPin);
+  bool xMaxPressed = isLimitActive(xAxis.maxLimitPin);
+  bool yMinPressed = isLimitActive(yAxis.minLimitPin);
+  bool yMaxPressed = isLimitActive(yAxis.maxLimitPin);
+  if (xMinPressed || xMaxPressed || yMinPressed || yMaxPressed) {
+    Serial.print("ERR XY LIMIT PRESSED BEFORE CALIBRATE");
+    if (xMinPressed) {
+      Serial.print(" X_MIN");
+    }
+    if (xMaxPressed) {
+      Serial.print(" X_MAX");
+    }
+    if (yMinPressed) {
+      Serial.print(" Y_MIN");
+    }
+    if (yMaxPressed) {
+      Serial.print(" Y_MAX");
+    }
+    Serial.println(" - FREE THE CARRIAGE OR CHECK SWITCH WIRING");
+    return false;
+  }
+
   setXYMotorsEnabled(true);
 
   // ---- Home X-min: the refined slow touch defines X = 0. ----
