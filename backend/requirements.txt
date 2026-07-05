@@ -3,3 +3,8 @@ uvicorn[standard]>=0.30,<1.0
 pydantic>=2.9,<3.0
 opencv-python-headless>=4.10,<5.0
 pyserial>=3.5,<4.0
+# Raspberry Pi GPIO for driving stepper drivers directly from the 40-pin header.
+# rpi-lgpio is a drop-in RPi.GPIO replacement that also supports the Pi 5 (RP1 chip).
+# It CONFLICTS with the legacy RPi.GPIO package: if that was ever installed manually
+# into this venv, run "pip uninstall -y RPi.GPIO" before installing requirements.
+rpi-lgpio>=0.4; sys_platform == "linux" and platform_machine in "aarch64 armv7l armv6l"

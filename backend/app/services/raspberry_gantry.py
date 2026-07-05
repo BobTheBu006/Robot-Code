@@ -1,4 +1,3 @@
-import importlib
 import math
 import os
 import time
@@ -7,6 +6,7 @@ from threading import Lock
 from typing import Any
 
 from app.models.gantry import GANTRY_WORKSPACE_X_CM, GANTRY_WORKSPACE_Y_CM, GantryXYCalibrationRequest, GantryXYMoveRequest
+from app.services.gpio_backend import load_gpio_backend
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
 XY_DEVICE_IDS = {
@@ -182,8 +182,9 @@ class RaspberryGantryGPIOService:
         if _bool_env("ROBOT_GPIO_REQUIRE_HARDWARE", False):
             raise RuntimeError(
                 "Raspberry Pi GPIO execution was required, but a compatible GPIO backend is not available."
-                f"{reason} Install a Pi-compatible GPIO package such as rpi-lgpio/python3-rpi-lgpio, "
-                "or unset ROBOT_GPIO_REQUIRE_HARDWARE for simulation."
+                f"{reason} On the Pi, reinstall backend dependencies (pip install -r requirements.txt "
+                "pulls in rpi-lgpio, which supports the Pi 5) — uninstall any manually added RPi.GPIO "
+                "package from the venv first, or unset ROBOT_GPIO_REQUIRE_HARDWARE for simulation."
             )
 
         return _GPIOExecution(
@@ -200,19 +201,7 @@ class RaspberryGantryGPIOService:
     def _gpio_module(self) -> tuple[Any | None, str | None]:
         if _bool_env("ROBOT_GPIO_SIMULATE", False):
             return None, "ROBOT_GPIO_SIMULATE is enabled."
-        try:
-            gpio = importlib.import_module("RPi.GPIO")
-        except ImportError as exc:
-            return None, str(exc)
-
-        try:
-            gpio.setwarnings(False)
-            gpio.setmode(gpio.BCM)
-            gpio.cleanup()
-        except Exception as exc:
-            return None, str(exc)
-
-        return gpio, None
+        return load_gpio_backend()
 
     def _pins_from_request(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> _GPIOPinPlan:
         return _GPIOPinPlan(
