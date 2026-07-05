@@ -26,27 +26,49 @@ export function WorkflowEdge({
   });
 
   const onDelete = typeof data?.onDelete === "function" ? data.onDelete as (edgeId: string) => void : null;
+  const onInsert = typeof data?.onInsert === "function" ? data.onInsert as (edgeId: string) => void : null;
   const isActive = Boolean(data?.isActive);
 
   return (
     <>
       <BaseEdge id={id} interactionWidth={24} markerEnd={markerEnd} path={edgePath} />
-      {isActive && onDelete ? (
+      {isActive && (onDelete || onInsert) ? (
         <EdgeLabelRenderer>
-          <button
-            className="workflow-edge__delete nodrag nopan"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(id);
-            }}
-            onMouseDown={(event) => event.stopPropagation()}
+          <div
+            className="workflow-edge__actions nodrag nopan"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}
-            type="button"
           >
-            x
-          </button>
+            {onInsert ? (
+              <button
+                className="workflow-edge__insert nodrag nopan"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onInsert(id);
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
+                title="Insert a block on this connection"
+                type="button"
+              >
+                +
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                className="workflow-edge__delete nodrag nopan"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(id);
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
+                title="Delete connection"
+                type="button"
+              >
+                x
+              </button>
+            ) : null}
+          </div>
         </EdgeLabelRenderer>
       ) : null}
     </>

@@ -17,6 +17,7 @@ import type {
   SavedWorkflowFile,
   WorkflowCanvasEdge,
   WorkflowCanvasNode,
+  WorkflowListResponse,
   WorkflowParameterValue,
   WorkflowSaveResponse,
 } from "../types/workflow";
@@ -189,6 +190,10 @@ export function deleteEsp32CustomBlock(
 
 export function fetchSavedWorkflow(): Promise<SavedWorkflowFile> {
   return request<SavedWorkflowFile>("/api/workflows/default");
+}
+
+export function fetchWorkflowList(): Promise<WorkflowListResponse> {
+  return request<WorkflowListResponse>("/api/workflows");
 }
 
 export function saveWorkflowToFile(

@@ -45,6 +45,10 @@ function scheduleFitView(fitView: (options?: { padding?: number; duration?: numb
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
   });
 }
+
+function serializeHardwareMapForDirtyCheck(map: HardwareMap): string {
+  return JSON.stringify(map);
+}
 type HardwareNodeKind = "raspberry" | "controller" | "device" | "group";
 type HardwareFlowNode = Node<HardwareNodeData>;
 type ControllerPortOption = {
@@ -62,6 +66,7 @@ interface HardwareDiagramCardProps {
   onHardwareMapSaved: () => void;
   view?: "full" | "function-map" | "hardware-map";
   headerSlot?: HTMLElement | null;
+  isActive?: boolean;
 }
 
 interface HardwareNodeData extends Record<string, unknown> {
@@ -927,7 +932,7 @@ function deviceFromNodeId(hardwareMap: HardwareMap, nodeId: string | null): Hard
   return hardwareMap.devices.find((device) => device.id === nodeId) ?? null;
 }
 
-function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot = null }: HardwareDiagramCardProps) {
+function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot = null, isActive = true }: HardwareDiagramCardProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const reactFlow = useReactFlow();
@@ -939,6 +944,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const saveResetTimeoutRef = useRef<number | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const savedHardwareMapSnapshotRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
   const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
   const [hardwareDrawerOpen, setHardwareDrawerOpen] = useState(false);
@@ -1023,21 +1030,53 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     return Array.from(groups.entries()).sort(([leftLabel], [rightLabel]) => leftLabel.localeCompare(rightLabel));
   }, [discoveredFunctions]);
 
+  function getFunctionAssignmentValue(
+    assignments: FunctionHardwareAssignment[],
+    functionId: string,
+    deviceId: string,
+  ): string {
+    return assignments.find((assignment) =>
+      assignment.function_id === functionId && assignment.device_id === deviceId,
+    )?.hardware_device_id ?? "";
+  }
+
   function updateFunctionHardwareAssignment(
     functionId: string,
     deviceId: string,
     hardwareDeviceId: string,
   ) {
     setHardwareMap((currentMap) => {
-      const assignments = (currentMap.function_assignments ?? []).filter((assignment) =>
-        !(assignment.function_id === functionId && assignment.device_id === deviceId),
+      const currentAssignments = currentMap.function_assignments ?? [];
+
+      // Functions in the same group (e.g. "Gantry XY") usually share the same
+      // physical devices. Assigning one function's still-unassigned slot
+      // defaults every sibling function's matching (also still-unassigned)
+      // slot to the same device too. Once a slot has any value — whether it
+      // came from this default fill or a manual choice — it's sticky and
+      // future edits to sibling functions won't touch it, so an explicit
+      // per-function override always sticks.
+      const ownerGroup = groupedFunctions.find(([, groupFunctions]) =>
+        groupFunctions.some((candidate) => candidate.manifest.id === functionId),
       );
+      const siblingFunctionIds = (ownerGroup?.[1] ?? [])
+        .filter((candidate) => candidate.manifest.id !== functionId)
+        .filter((candidate) => (candidate.manifest.hardware_devices ?? []).some((deviceReference) => deviceReference.id === deviceId))
+        .filter((candidate) => getFunctionAssignmentValue(currentAssignments, candidate.manifest.id, deviceId) === "")
+        .map((candidate) => candidate.manifest.id);
+
+      const affectedFunctionIds = new Set([functionId, ...siblingFunctionIds]);
+      const assignments = currentAssignments.filter((assignment) =>
+        !(affectedFunctionIds.has(assignment.function_id) && assignment.device_id === deviceId),
+      );
+
       if (hardwareDeviceId) {
-        assignments.push({
-          function_id: functionId,
-          device_id: deviceId,
-          hardware_device_id: hardwareDeviceId,
-        });
+        for (const affectedFunctionId of affectedFunctionIds) {
+          assignments.push({
+            function_id: affectedFunctionId,
+            device_id: deviceId,
+            hardware_device_id: hardwareDeviceId,
+          });
+        }
       }
 
       return {
@@ -1062,11 +1101,14 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     setDiscoveredFunctions(functionsResult.status === "fulfilled" ? functionsResult.value.functions : []);
 
     if (hardwareMapResult.status === "fulfilled") {
-      setHardwareMap(cleanHardwareMap(hardwareMapResult.value));
+      const cleanedMap = cleanHardwareMap(hardwareMapResult.value);
+      setHardwareMap(cleanedMap);
       setStatus("success");
       setSaveState("idle");
       setSaveMessage(null);
       scheduleFitView(reactFlow.fitView);
+      savedHardwareMapSnapshotRef.current = serializeHardwareMapForDirtyCheck(cleanedMap);
+      setHasUnsavedChanges(false);
       return;
     }
 
@@ -1077,6 +1119,28 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   useEffect(() => {
     void loadHardwareMap();
   }, []);
+
+  useEffect(() => {
+    if (savedHardwareMapSnapshotRef.current === null) {
+      return;
+    }
+
+    setHasUnsavedChanges(serializeHardwareMapForDirtyCheck(hardwareMap) !== savedHardwareMapSnapshotRef.current);
+  }, [hardwareMap]);
+
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     setNodes((currentNodes) => buildHardwareNodes(hardwareMap, detectedBoards, currentNodes));
@@ -1577,6 +1641,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     try {
       const response = await saveHardwareMap(cleanedMap);
       setHardwareMap(response.hardware_map);
+      savedHardwareMapSnapshotRef.current = serializeHardwareMapForDirtyCheck(response.hardware_map);
+      setHasUnsavedChanges(false);
       setSaveState("saved");
       onHardwareMapSaved();
       saveResetTimeoutRef.current = window.setTimeout(() => setSaveState("idle"), 1600);
@@ -1706,6 +1772,41 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
             />
             <span>Enabled</span>
           </label>
+          <label className="hardware-settings__check">
+            <input
+              checked={Boolean(selectedBoard.dynamic)}
+              onChange={(event) => updateBoard(selectedBoard.id, { dynamic: event.target.checked })}
+              type="checkbox"
+            />
+            <span>Dynamically connected (swapped on this port during workflow runs)</span>
+          </label>
+          {selectedBoard.dynamic ? (
+            <div className="hardware-settings__connection-row">
+              <div>
+                <span>Expected device</span>
+                <strong>
+                  {selectedBoard.expected_serial_number
+                    ? (selectedBoard.expected_device_label || selectedBoard.expected_serial_number)
+                    : "Not captured yet"}
+                </strong>
+              </div>
+              <button
+                className="workflow-editor__action"
+                disabled={!detectedSelectedBoard?.serial_number}
+                onClick={() => updateBoard(selectedBoard.id, {
+                  expected_serial_number: detectedSelectedBoard?.serial_number ?? null,
+                  expected_hardware_id: detectedSelectedBoard?.hardware_id ?? null,
+                  expected_device_label: detectedSelectedBoard?.display_name ?? detectedSelectedBoard?.board_id ?? null,
+                })}
+                title={detectedSelectedBoard?.serial_number
+                  ? `Capture the device currently on ${selectedBoard.usb_port} as the expected one`
+                  : "No USB serial number detected on this port right now"}
+                type="button"
+              >
+                Use currently detected device
+              </button>
+            </div>
+          ) : null}
           <label className="hardware-settings__field">
             <span>Notes</span>
             <textarea
@@ -2133,9 +2234,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
             : "workflow-editor__action workflow-editor__action--primary"}
           disabled={saveState === "saving"}
           onClick={() => void handleSave()}
+          title={hasUnsavedChanges ? "You have unsaved changes" : undefined}
           type="button"
         >
           {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save map"}
+          {saveState === "idle" && hasUnsavedChanges ? <span className="toolbar-unsaved-dot toolbar-unsaved-dot--on-primary" /> : null}
         </button>
       </div>
     </div>
@@ -2162,7 +2265,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   if (view === "hardware-map") {
     return (
       <section className="editor-workspace editor-workspace--map-page hardware-map">
-        {headerSlot ? createPortal(mapHeaderControls, headerSlot) : null}
+        {headerSlot && isActive ? createPortal(mapHeaderControls, headerSlot) : null}
         {mapErrorBanner}
 
         {renderHardwareCanvas("drawer")}
@@ -2173,7 +2276,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   if (view === "function-map") {
     return (
       <section className="editor-workspace editor-workspace--map-page function-map-page">
-        {headerSlot ? createPortal(mapHeaderControls, headerSlot) : null}
+        {headerSlot && isActive ? createPortal(mapHeaderControls, headerSlot) : null}
         {mapErrorBanner}
 
         <div className="function-map-page__surface">

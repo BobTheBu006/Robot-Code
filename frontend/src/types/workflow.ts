@@ -131,6 +131,18 @@ export interface WorkflowSaveResponse {
   saved_at: string;
 }
 
+export interface WorkflowFileSummary {
+  filename: string;
+  path: string;
+  updated_at: string;
+  size_bytes: number;
+}
+
+export interface WorkflowListResponse {
+  default_filename: string;
+  workflows: WorkflowFileSummary[];
+}
+
 export interface WorkflowCompoundDefinition {
   entryNodeId: string;
   nodes: WorkflowCanvasNode[];

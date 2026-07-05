@@ -2,9 +2,11 @@
 import { CameraFeedCard } from "./components/CameraFeedCard";
 import { HardwareDiagramCard } from "./components/HardwareDiagramCard";
 import { RobotStateCard } from "./components/RobotStateCard";
+import { WorkflowsCard } from "./components/WorkflowsCard";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
-import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, setCameraPower } from "./lib/api";
+import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, fetchWorkflowList, setCameraPower } from "./lib/api";
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
+import type { WorkflowFileSummary } from "./types/workflow";
 
 type RequestStatus = "loading" | "success" | "error";
 type AppPage = "dashboard" | "workflow-editor" | "function-map" | "hardware-map";
@@ -33,6 +35,53 @@ function App() {
   const [workflowHeaderSlot, setWorkflowHeaderSlot] = useState<HTMLDivElement | null>(null);
   const [emergencyStopState, setEmergencyStopState] = useState<"idle" | "stopping" | "sent" | "error">("idle");
   const [emergencyStopMessage, setEmergencyStopMessage] = useState<string | null>(null);
+  const [hasVisitedWorkflowEditor, setHasVisitedWorkflowEditor] = useState(false);
+  const [hasVisitedHardwareDiagram, setHasVisitedHardwareDiagram] = useState(false);
+  const [workflowList, setWorkflowList] = useState<WorkflowFileSummary[]>([]);
+  const [defaultWorkflowFilename, setDefaultWorkflowFilename] = useState<string | null>(null);
+  const [workflowListStatus, setWorkflowListStatus] = useState<RequestStatus>("loading");
+  const [workflowListError, setWorkflowListError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activePage === "workflow-editor") {
+      setHasVisitedWorkflowEditor(true);
+    } else if (activePage === "function-map" || activePage === "hardware-map") {
+      setHasVisitedHardwareDiagram(true);
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    if (activePage !== "dashboard") {
+      return;
+    }
+
+    let cancelled = false;
+    setWorkflowListStatus("loading");
+
+    fetchWorkflowList()
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        setWorkflowList(response.workflows);
+        setDefaultWorkflowFilename(response.default_filename);
+        setWorkflowListStatus("success");
+        setWorkflowListError(null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        setWorkflowListStatus("error");
+        setWorkflowListError(error instanceof Error ? error.message : "Could not load the workflow list.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage]);
 
   async function loadDashboard() {
     const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
@@ -147,43 +196,83 @@ function App() {
     setHardwareMapRevision((revision) => revision + 1);
   }
 
-  function renderActivePage() {
-    if (activePage === "dashboard") {
-      return (
-        <>
-          <section className="page-heading">
-            <p className="eyebrow">Local Raspberry Pi Controller</p>
-            <h1>Dashboard</h1>
-          </section>
-          <div className="overview-grid">
-            <RobotStateCard
-              robotState={robotState}
-              status={robotStateStatus}
-              error={robotStateError}
-              lastUpdated={lastUpdated}
-            />
+  const isWorkflowEditorActive = activePage === "workflow-editor";
+  const isHardwareDiagramActive = activePage === "function-map" || activePage === "hardware-map";
 
-            <CameraFeedCard
-              cameraStatus={cameraStatus}
-              status={cameraFeedStatus}
-              error={cameraFeedError}
-              isToggling={isCameraToggling}
-              onTogglePower={handleToggleCameraPower}
+  function renderDashboard() {
+    if (activePage !== "dashboard") {
+      return null;
+    }
+
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">Local Raspberry Pi Controller</p>
+          <h1>Dashboard</h1>
+        </section>
+        <div className="overview-grid">
+          <RobotStateCard
+            robotState={robotState}
+            status={robotStateStatus}
+            error={robotStateError}
+            lastUpdated={lastUpdated}
+          />
+
+          <CameraFeedCard
+            cameraStatus={cameraStatus}
+            status={cameraFeedStatus}
+            error={cameraFeedError}
+            isToggling={isCameraToggling}
+            onTogglePower={handleToggleCameraPower}
+          />
+        </div>
+
+        <div className="overview-grid overview-grid--single">
+          <WorkflowsCard
+            defaultFilename={defaultWorkflowFilename}
+            error={workflowListError}
+            onOpenFunctionMap={() => setActivePage("function-map")}
+            onOpenHardwareMap={() => setActivePage("hardware-map")}
+            onOpenWorkflowEditor={() => setActivePage("workflow-editor")}
+            status={workflowListStatus}
+            workflows={workflowList}
+          />
+        </div>
+      </>
+    );
+  }
+
+  // The workflow editor and hardware/function map pages stay mounted even while
+  // hidden (instead of being unmounted by conditional rendering) so that
+  // unsaved in-progress edits survive switching tabs and only go away on an
+  // explicit Save or an actual page close/refresh.
+  function renderActivePage() {
+    return (
+      <>
+        {renderDashboard()}
+
+        {hasVisitedWorkflowEditor ? (
+          <div style={{ display: isWorkflowEditorActive ? "contents" : "none" }}>
+            <WorkflowEditorCard
+              hardwareMapRevision={hardwareMapRevision}
+              headerSlot={workflowHeaderSlot}
+              isActive={isWorkflowEditorActive}
             />
           </div>
-        </>
-      );
-    }
+        ) : null}
 
-    if (activePage === "workflow-editor") {
-      return <WorkflowEditorCard hardwareMapRevision={hardwareMapRevision} headerSlot={workflowHeaderSlot} />;
-    }
-
-    if (activePage === "function-map") {
-      return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="function-map" headerSlot={workflowHeaderSlot} />;
-    }
-
-    return <HardwareDiagramCard onHardwareMapSaved={handleHardwareMapSaved} view="hardware-map" headerSlot={workflowHeaderSlot} />;
+        {hasVisitedHardwareDiagram ? (
+          <div style={{ display: isHardwareDiagramActive ? "contents" : "none" }}>
+            <HardwareDiagramCard
+              isActive={isHardwareDiagramActive}
+              onHardwareMapSaved={handleHardwareMapSaved}
+              view={activePage === "function-map" ? "function-map" : "hardware-map"}
+              headerSlot={workflowHeaderSlot}
+            />
+          </div>
+        ) : null}
+      </>
+    );
   }
 
   const appShellClassName = activePage === "workflow-editor"

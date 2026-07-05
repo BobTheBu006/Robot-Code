@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "disconnect_controller",
+  "display_name": "Disconnect Controller",
+  "category": "Robot Actions",
+  "description": "Confirms that a dynamically-connected controller has actually been physically unplugged before the workflow continues (e.g. before swapping in a different hardware group on the same USB port).",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "controller_id",
+      "label": "Controller",
+      "type": "select",
+      "description": "Which dynamically-connected controller (from the Hardware Map) should now be unplugged.",
+      "options": [
+        { "label": "(configure dynamic controllers in Hardware Map)", "value": "" }
+      ]
+    }
+  ],
+  "outputs": [
+    { "key": "next", "label": "Next", "type": "flow" }
+  ]
+}

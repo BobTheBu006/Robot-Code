@@ -7,6 +7,10 @@ export interface HardwareBoardMapping {
   usb_port: string;
   enabled?: boolean;
   notes?: string | null;
+  dynamic?: boolean;
+  expected_serial_number?: string | null;
+  expected_hardware_id?: string | null;
+  expected_device_label?: string | null;
 }
 
 export interface HardwarePinMapping {

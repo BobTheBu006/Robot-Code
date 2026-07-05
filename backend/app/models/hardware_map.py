@@ -13,6 +13,16 @@ class HardwareBoardMapping(BaseModel):
     usb_port: str = Field(min_length=1)
     enabled: bool = True
     notes: str | None = None
+    # A "dynamic" controller isn't permanently wired to usb_port — it's
+    # physically swapped in/out of that port during a workflow run (e.g. the
+    # 7-syringe-pump ESP32 today, a USB camera in the future). expected_serial_number
+    # is the real USB descriptor serial number captured from whichever board was
+    # on usb_port when the user confirmed "this is the one", used to verify the
+    # right physical device is connected before a workflow acts on it.
+    dynamic: bool = False
+    expected_serial_number: str | None = None
+    expected_hardware_id: str | None = None
+    expected_device_label: str | None = None
 
 
 class HardwarePinMapping(BaseModel):
@@ -107,3 +117,16 @@ class HardwareMapSaveResponse(BaseModel):
     path: str
     saved_at: datetime
     hardware_map: HardwareMap
+
+
+class HardwareBoardConnectionStatus(BaseModel):
+    board_id: str
+    label: str
+    usb_port: str
+    dynamic: bool
+    expected_serial_number: str | None
+    detected_serial_number: str | None
+    detected_hardware_id: str | None
+    connected: bool
+    matched: bool
+    message: str

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "connect_controller",
+  "display_name": "Connect Controller",
+  "category": "Robot Actions",
+  "description": "Verifies that the expected dynamically-connected controller (e.g. the 7 syringe pump ESP32) is physically plugged into its USB port right now. Use this after swapping hardware onto a shared USB port so the workflow fails loudly instead of silently talking to the wrong device.",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "controller_id",
+      "label": "Controller",
+      "type": "select",
+      "description": "Which dynamically-connected controller (from the Hardware Map) should be plugged in right now.",
+      "options": [
+        { "label": "(configure dynamic controllers in Hardware Map)", "value": "" }
+      ]
+    }
+  ],
+  "outputs": [
+    { "key": "next", "label": "Next", "type": "flow" }
+  ]
+}

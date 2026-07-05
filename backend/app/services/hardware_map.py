@@ -6,12 +6,14 @@ from pydantic import ValidationError
 
 from app.models.function_manifest import FunctionManifest
 from app.models.hardware_map import (
+    HardwareBoardConnectionStatus,
     HardwareBoardMapping,
     HardwareDeviceMapping,
     HardwareMap,
     HardwareMapSaveResponse,
     HardwarePinMapping,
 )
+from app.services.serial_ports import list_serial_ports
 
 
 class HardwareMapError(RuntimeError):
@@ -61,6 +63,81 @@ class HardwareMapService:
             path=str(self._hardware_map_path),
             saved_at=saved_at,
             hardware_map=payload,
+        )
+
+    def verify_board_connection(self, board_id: str) -> HardwareBoardConnectionStatus:
+        """Check whether the physical device on a board's usb_port is the one
+        expected — used by the "Connect controller"/"Disconnect controller"
+        workflow blocks to catch a missed or wrong USB swap before a workflow
+        acts on the wrong hardware.
+        """
+        hardware_map = self.load_map()
+        board = next((candidate for candidate in hardware_map.boards if candidate.id == board_id), None)
+        if board is None:
+            raise HardwareMapError(f"Unknown controller '{board_id}' in the hardware map.")
+
+        live_ports = {port.device: port for port in list_serial_ports()}
+        live_port = live_ports.get(board.usb_port)
+        detected_serial_number = live_port.serial_number if live_port else None
+        detected_hardware_id = live_port.hardware_id if live_port else None
+        connected = live_port is not None
+
+        if not board.dynamic:
+            # Non-dynamic controllers are expected to just always be there;
+            # presence on the port is enough, there's no identity to compare.
+            matched = connected
+            message = (
+                f"{board.label} is connected on {board.usb_port}."
+                if connected
+                else f"Nothing is connected on {board.usb_port} (expected {board.label})."
+            )
+            return HardwareBoardConnectionStatus(
+                board_id=board.id,
+                label=board.label,
+                usb_port=board.usb_port,
+                dynamic=board.dynamic,
+                expected_serial_number=board.expected_serial_number,
+                detected_serial_number=detected_serial_number,
+                detected_hardware_id=detected_hardware_id,
+                connected=connected,
+                matched=matched,
+                message=message,
+            )
+
+        if not board.expected_serial_number:
+            raise HardwareMapError(
+                f"{board.label} is marked as dynamically connected but has no expected device identity "
+                "captured yet. Open it in the Hardware Map and capture the currently connected device first."
+            )
+
+        if not connected:
+            message = f"Nothing is connected on {board.usb_port} (expected {board.label})."
+        elif detected_serial_number and detected_serial_number == board.expected_serial_number:
+            message = f"{board.label} is connected on {board.usb_port}."
+        elif detected_serial_number:
+            message = (
+                f"The device on {board.usb_port} does not match {board.label} "
+                f"(expected serial {board.expected_serial_number}, found {detected_serial_number})."
+            )
+        else:
+            message = (
+                f"The device on {board.usb_port} does not report a USB serial number, "
+                f"so it cannot be confirmed as {board.label}."
+            )
+
+        matched = connected and detected_serial_number is not None and detected_serial_number == board.expected_serial_number
+
+        return HardwareBoardConnectionStatus(
+            board_id=board.id,
+            label=board.label,
+            usb_port=board.usb_port,
+            dynamic=board.dynamic,
+            expected_serial_number=board.expected_serial_number,
+            detected_serial_number=detected_serial_number,
+            detected_hardware_id=detected_hardware_id,
+            connected=connected,
+            matched=matched,
+            message=message,
         )
 
     def sync_manifest_devices(self, manifests: list[FunctionManifest]) -> HardwareMap:

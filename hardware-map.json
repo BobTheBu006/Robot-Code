@@ -802,7 +802,45 @@
       "notes": null
     }
   ],
-  "groups": [],
+  "groups": [
+    {
+      "id": "group-m29ldf",
+      "name": "XY ZZ axis hardware",
+      "member_ids": [
+        "ttyUSB0",
+        "x-axis-motor",
+        "y-axis-motor",
+        "x-min-limit-switch",
+        "x-max-limit-switch",
+        "y-min-limit-switch",
+        "y-max-limit-switch",
+        "left-z-motor",
+        "right-z-motor",
+        "z-left-min-limit-switch",
+        "z-left-max-limit-switch",
+        "z-right-min-limit-switch",
+        "z-right-max-limit-switch"
+      ],
+      "enabled": true,
+      "notes": null
+    },
+    {
+      "id": "group-1fhsjs",
+      "name": "7 syringe group",
+      "member_ids": [
+        "controller-x83xnc",
+        "syringe-head-a",
+        "syringe-head-b",
+        "syringe-head-c",
+        "syringe-head-d",
+        "syringe-head-e",
+        "syringe-head-f",
+        "syringe-head-g"
+      ],
+      "enabled": true,
+      "notes": null
+    }
+  ],
   "function_assignments": [
     {
       "function_id": "calibrate_xy",
@@ -823,119 +861,89 @@
       "function_id": "calibrate_xy",
       "device_id": "x-max-limit-switch",
       "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "y-max-limit-switch",
+      "hardware_device_id": "y-max-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_xy",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-a",
+      "hardware_device_id": "syringe-head-a"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-b",
+      "hardware_device_id": "syringe-head-b"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-c",
+      "hardware_device_id": "syringe-head-c"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-d",
+      "hardware_device_id": "syringe-head-d"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-e",
+      "hardware_device_id": "syringe-head-e"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-f",
+      "hardware_device_id": "syringe-head-f"
+    },
+    {
+      "function_id": "7_syringe_dispenser_slow_and_good",
+      "device_id": "syringe-head-g",
+      "hardware_device_id": "syringe-head-g"
     }
   ],
   "node_positions": [
     {
+      "node_id": "group-m29ldf",
+      "x": 482.0,
+      "y": 1222.0
+    },
+    {
+      "node_id": "group-1fhsjs",
+      "x": 478.0,
+      "y": 958.0
+    },
+    {
       "node_id": "raspberry-pi",
-      "x": 40.0,
-      "y": 180.0
-    },
-    {
-      "node_id": "ttyUSB0",
-      "x": 28.0,
-      "y": 788.0
-    },
-    {
-      "node_id": "x-axis-motor",
-      "x": 680.0,
-      "y": 850.0
-    },
-    {
-      "node_id": "y-axis-motor",
-      "x": 680.0,
-      "y": 960.0
-    },
-    {
-      "node_id": "x-min-limit-switch",
-      "x": 680.0,
-      "y": 1070.0
-    },
-    {
-      "node_id": "x-max-limit-switch",
-      "x": 680.0,
-      "y": 1180.0
-    },
-    {
-      "node_id": "y-min-limit-switch",
-      "x": 680.0,
-      "y": 1290.0
-    },
-    {
-      "node_id": "y-max-limit-switch",
-      "x": 683.39,
-      "y": 1398.31
-    },
-    {
-      "node_id": "left-z-motor",
-      "x": 680.0,
-      "y": 1510.0
-    },
-    {
-      "node_id": "right-z-motor",
-      "x": 677.02,
-      "y": 1636.84
-    },
-    {
-      "node_id": "z-left-min-limit-switch",
-      "x": 680.0,
-      "y": 1730.0
-    },
-    {
-      "node_id": "z-left-max-limit-switch",
-      "x": 680.0,
-      "y": 1840.0
-    },
-    {
-      "node_id": "z-right-min-limit-switch",
-      "x": 691.47,
-      "y": 2005.92
-    },
-    {
-      "node_id": "z-right-max-limit-switch",
-      "x": 576.76,
-      "y": 2121.66
-    },
-    {
-      "node_id": "controller-x83xnc",
-      "x": 350.0,
-      "y": 270.0
-    },
-    {
-      "node_id": "syringe-head-a",
-      "x": 680.0,
-      "y": 80.0
-    },
-    {
-      "node_id": "syringe-head-b",
-      "x": 680.0,
-      "y": 190.0
-    },
-    {
-      "node_id": "syringe-head-c",
-      "x": 680.0,
-      "y": 300.0
-    },
-    {
-      "node_id": "syringe-head-d",
-      "x": 680.0,
-      "y": 410.0
-    },
-    {
-      "node_id": "syringe-head-e",
-      "x": 680.0,
-      "y": 520.0
-    },
-    {
-      "node_id": "syringe-head-f",
-      "x": 680.0,
-      "y": 630.0
-    },
-    {
-      "node_id": "syringe-head-g",
-      "x": 680.0,
-      "y": 740.0
+      "x": 108.66,
+      "y": 1038.29
     }
   ],
-  "updated_at": "2026-07-01T08:56:23.452212Z"
+  "updated_at": "2026-07-03T20:18:12.075195Z"
 }

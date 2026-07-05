@@ -6,8 +6,8 @@
       "id": "start-seed-start",
       "type": "workflowBlock",
       "position": {
-        "x": -64.05130926408673,
-        "y": 178.78930120835918
+        "x": -75.87809247448706,
+        "y": 78.5144340775756
       },
       "data": {
         "block": {
@@ -43,15 +43,15 @@
         "width": 210,
         "height": 105
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     },
     {
       "id": "calibrate_xy-rymf4",
       "type": "workflowBlock",
       "position": {
-        "x": 274.88231051474116,
-        "y": 52.606635357943816
+        "x": 228.63810420620177,
+        "y": 70.55214825379495
       },
       "data": {
         "block": {
@@ -244,8 +244,8 @@
             }
           ],
           "builderBoardId": "ttyUSB0",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
+          "builderSourcePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0\\workflow-functions\\calibrate_xy.json",
+          "builderWorkspacePath": "C:\\BOB\\masters\\Thesis\\Robot Code\\functions\\esp 32 code\\esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
           "builderBaseFunctionId": null,
           "hardwareDevices": [
@@ -451,14 +451,15 @@
         "width": 210,
         "height": 120
       },
-      "selected": false
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "move_gantry_xy-lb4zu",
       "type": "workflowBlock",
       "position": {
-        "x": 548.453125,
-        "y": 67.8515625
+        "x": 541.5510046554418,
+        "y": 71.30262267227906
       },
       "data": {
         "block": {
@@ -794,7 +795,7 @@
               "notes": null
             },
             {
-              "id": "x-max-limit-switch",
+              "id": "x-min-limit-switch",
               "name": "X Max Limit Switch",
               "kind": "sensor",
               "board_id": "ttyUSB0",
@@ -804,10 +805,10 @@
               "calibration_ml_per_200_steps": null,
               "pins": [
                 {
-                  "id": "x-max-limit",
+                  "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "13",
-                  "function_input_key": "x_max_limit_pin",
+                  "gpio": "12",
+                  "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
               ],
@@ -868,7 +869,7 @@
                 "x-axis-motor",
                 "y-axis-motor",
                 "x-min-limit-switch",
-                "x-max-limit-switch",
+                "x-min-limit-switch",
                 "y-min-limit-switch",
                 "y-max-limit-switch"
               ],
@@ -906,7 +907,7 @@
         "width": 210,
         "height": 120
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     },
     {
@@ -1250,7 +1251,7 @@
               "notes": null
             },
             {
-              "id": "x-max-limit-switch",
+              "id": "x-min-limit-switch",
               "name": "X Max Limit Switch",
               "kind": "sensor",
               "board_id": "ttyUSB0",
@@ -1260,10 +1261,10 @@
               "calibration_ml_per_200_steps": null,
               "pins": [
                 {
-                  "id": "x-max-limit",
+                  "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "13",
-                  "function_input_key": "x_max_limit_pin",
+                  "gpio": "12",
+                  "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
               ],
@@ -1324,7 +1325,7 @@
                 "x-axis-motor",
                 "y-axis-motor",
                 "x-min-limit-switch",
-                "x-max-limit-switch",
+                "x-min-limit-switch",
                 "y-min-limit-switch",
                 "y-max-limit-switch"
               ],
@@ -1369,8 +1370,8 @@
       "id": "move_gantry_xy-l1o9f",
       "type": "workflowBlock",
       "position": {
-        "x": 1106.3727596475392,
-        "y": 78.31435228480136
+        "x": 1129.8399688190368,
+        "y": 70.72201990578742
       },
       "data": {
         "block": {
@@ -1706,7 +1707,7 @@
               "notes": null
             },
             {
-              "id": "x-max-limit-switch",
+              "id": "x-min-limit-switch",
               "name": "X Max Limit Switch",
               "kind": "sensor",
               "board_id": "ttyUSB0",
@@ -1716,10 +1717,10 @@
               "calibration_ml_per_200_steps": null,
               "pins": [
                 {
-                  "id": "x-max-limit",
+                  "id": "x-min-limit",
                   "signal": "signal",
-                  "gpio": "13",
-                  "function_input_key": "x_max_limit_pin",
+                  "gpio": "12",
+                  "function_input_key": "x_min_limit_pin",
                   "notes": null
                 }
               ],
@@ -1780,7 +1781,7 @@
                 "x-axis-motor",
                 "y-axis-motor",
                 "x-min-limit-switch",
-                "x-max-limit-switch",
+                "x-min-limit-switch",
                 "y-min-limit-switch",
                 "y-max-limit-switch"
               ],
@@ -1837,7 +1838,8 @@
       "target": "move_gantry_xy-lb4zu",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__calibrate_xy-rymf4next-move_gantry_xy-lb4zuinput"
+      "id": "xy-edge__calibrate_xy-rymf4next-move_gantry_xy-lb4zuinput",
+      "selected": false
     },
     {
       "source": "move_gantry_xy-lb4zu",

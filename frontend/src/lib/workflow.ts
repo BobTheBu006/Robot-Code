@@ -440,6 +440,16 @@ export function mapDiscoveredFunctionToBlock(
       };
     }
 
+    if (input.key === "controller_id") {
+      const dynamicBoards = (hardwareMap?.boards ?? []).filter((board) => board.dynamic);
+      return {
+        ...input,
+        options: dynamicBoards.length > 0
+          ? dynamicBoards.map((board) => ({ label: board.label, value: board.id }))
+          : [{ label: "(no dynamic controllers configured in Hardware Map)", value: "" }],
+      };
+    }
+
     return input;
   };
 

@@ -44,6 +44,7 @@ import {
   createBrokenWorkflowBlock,
   createStarterWorkflow,
   createWorkflowNode,
+  formatDurationShort,
   getAllBlockInputs,
   getWorkflowNodeOutputs,
   resolveWorkflowParameters,
@@ -95,6 +96,10 @@ type WorkflowContextMenuState = {
   nodeId: string;
 } | null;
 type WorkflowDrawerMode = "blocks" | null;
+type QuickAddSource =
+  | { kind: "port"; nodeId: string; outputKey: string }
+  | { kind: "edge"; edgeId: string }
+  | null;
 type CompoundOutputBuild = WorkflowOutputDefinition & {
   sourceNodeId: string;
   sourceHandle?: string | null;
@@ -104,6 +109,30 @@ const RASPBERRY_BOARD_ID = "raspberry-pi";
 function scheduleFitView(fitView: (options?: { padding?: number; duration?: number }) => void) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+  });
+}
+
+function serializeWorkflowForDirtyCheck(nodes: WorkflowFlowNode[], edges: Edge[]): string {
+  // Only compare fields the user can actually edit. `node.data.block` is
+  // excluded because it gets re-resolved asynchronously (hardware device
+  // links, disabled reasons) once function discovery / hardware map data
+  // finishes loading, which would otherwise look like an edit that never happened.
+  return JSON.stringify({
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      blockId: node.data.block.id,
+      x: Math.round(node.position.x),
+      y: Math.round(node.position.y),
+      parameters: node.data.parameters,
+      settings: node.data.settings,
+      isActive: node.data.isActive !== false,
+    })),
+    edges: edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? null,
+      targetHandle: edge.targetHandle ?? null,
+    })),
   });
 }
 
@@ -815,9 +844,10 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
 interface WorkflowEditorSurfaceProps {
   hardwareMapRevision: number;
   headerSlot: HTMLElement | null;
+  isActive: boolean;
 }
 
-function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEditorSurfaceProps) {
+function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: WorkflowEditorSurfaceProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const starterWorkflow = useMemo(() => createStarterWorkflow(), []);
@@ -845,9 +875,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
   const [saveAsName] = useState("active-workflow");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveResetTimeoutRef = useRef<number | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const savedWorkflowSnapshotRef = useRef<string | null>(null);
   const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
-  const [quickAddSource, setQuickAddSource] = useState<{ nodeId: string; outputKey: string } | null>(null);
+  const [quickAddSource, setQuickAddSource] = useState<QuickAddSource>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
     isRunning: false,
     phase: "idle",
@@ -932,6 +964,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
       ...(edge.data ?? {}),
       isActive: edge.id === activeEdgeId,
       onDelete: handleDeleteEdge,
+      onInsert: handleQuickAddFromEdge,
     },
   }));
 
@@ -1070,6 +1103,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
         setEdges(parsedEdges);
         setCompoundBlocks(extractCompoundBlocksFromNodes(parsedNodes));
         scheduleFitView(reactFlow.fitView);
+        savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(parsedNodes, parsedEdges);
+        setHasUnsavedChanges(false);
       } catch (error) {
         if (cancelled) {
           return;
@@ -1077,6 +1112,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
 
         const status = (error as Error & { status?: number }).status;
         if (status === 404) {
+          // No workflow has ever been saved yet: treat the starter workflow as the clean baseline.
+          savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(starterWorkflow.nodes, starterWorkflow.edges);
           return;
         }
 
@@ -1089,7 +1126,30 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
     return () => {
       cancelled = true;
     };
-  }, [setEdges, setNodes]);
+  }, [setEdges, setNodes, starterWorkflow]);
+
+  useEffect(() => {
+    if (savedWorkflowSnapshotRef.current === null) {
+      return;
+    }
+
+    const currentSnapshot = serializeWorkflowForDirtyCheck(nodes, edges);
+    setHasUnsavedChanges(currentSnapshot !== savedWorkflowSnapshotRef.current);
+  }, [nodes, edges]);
+
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const robotActionBlocks = useMemo(
     () => discoveredFunctions.map((discoveredFunction) =>
@@ -1323,7 +1383,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
   }
 
   function handleQuickAddFromPort(nodeId: string, outputKey: string) {
-    setQuickAddSource({ nodeId, outputKey });
+    setQuickAddSource({ kind: "port", nodeId, outputKey });
     setWorkflowDrawer("blocks");
     setSelectedNodeId(nodeId);
     setOpenedNodeId(null);
@@ -1331,19 +1391,26 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
     setContextMenu(null);
   }
 
-  function handleQuickAddSelectBlock(block: WorkflowBlockDefinition) {
-    if (!quickAddSource) {
-      return;
-    }
+  function handleQuickAddFromEdge(edgeId: string) {
+    setQuickAddSource({ kind: "edge", edgeId });
+    setWorkflowDrawer("blocks");
+    setSelectedNodeId(null);
+    setOpenedNodeId(null);
+    setActiveEdgeId(edgeId);
+    setContextMenu(null);
+  }
 
-    const sourceNode = nodeLookup.get(quickAddSource.nodeId);
+  function handleQuickAddSelectBlockFromPort(
+    source: Extract<QuickAddSource, { kind: "port" }>,
+    block: WorkflowBlockDefinition,
+  ) {
+    const sourceNode = nodeLookup.get(source.nodeId);
     if (!sourceNode) {
-      setQuickAddSource(null);
       return;
     }
 
     const outputs = getWorkflowNodeOutputs(sourceNode.data);
-    const outputIndex = Math.max(outputs.findIndex((output) => output.key === quickAddSource.outputKey), 0);
+    const outputIndex = Math.max(outputs.findIndex((output) => output.key === source.outputKey), 0);
     const nextNode = createWorkflowNode(block, {
       x: sourceNode.position.x + 300,
       y: sourceNode.position.y + outputIndex * 140,
@@ -1355,8 +1422,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
       setEdges((currentEdges) =>
         addEdge(
           {
-            source: quickAddSource.nodeId,
-            sourceHandle: quickAddSource.outputKey,
+            source: source.nodeId,
+            sourceHandle: source.outputKey,
             target: nextNode.id,
             targetHandle: "input",
             type: "workflowEdge",
@@ -1378,6 +1445,87 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
     });
 
     setSelectedNodeId(nextNode.id);
+  }
+
+  function handleQuickAddSelectBlockFromEdge(
+    source: Extract<QuickAddSource, { kind: "edge" }>,
+    block: WorkflowBlockDefinition,
+  ) {
+    const edge = edges.find((candidateEdge) => candidateEdge.id === source.edgeId);
+    if (!edge) {
+      return;
+    }
+
+    const sourceNode = nodeLookup.get(edge.source);
+    const targetNode = nodeLookup.get(edge.target);
+    // Offset below the midpoint (rather than sitting exactly on it) so the new
+    // node doesn't land overlapping either of its now-tightened-up neighbors.
+    const position = sourceNode && targetNode
+      ? { x: (sourceNode.position.x + targetNode.position.x) / 2, y: Math.max(sourceNode.position.y, targetNode.position.y) + 160 }
+      : sourceNode
+        ? { x: sourceNode.position.x + 300, y: sourceNode.position.y }
+        : { x: 0, y: 0 };
+    const nextNode = createWorkflowNode(block, position);
+    const nextNodeOutputs = getWorkflowNodeOutputs(nextNode.data);
+
+    setNodes((currentNodes) => [...currentNodes, nextNode]);
+    setEdges((currentEdges) => {
+      let nextEdges = currentEdges.filter((candidateEdge) => candidateEdge.id !== edge.id);
+
+      if (block.acceptsInput) {
+        nextEdges = addEdge(
+          {
+            source: edge.source,
+            sourceHandle: edge.sourceHandle ?? null,
+            target: nextNode.id,
+            targetHandle: "input",
+            type: "workflowEdge",
+          } satisfies Connection & { type: string },
+          nextEdges,
+        );
+      }
+
+      if (nextNodeOutputs.length > 0) {
+        nextEdges = addEdge(
+          {
+            source: nextNode.id,
+            sourceHandle: nextNodeOutputs[0].key,
+            target: edge.target,
+            targetHandle: edge.targetHandle ?? null,
+            type: "workflowEdge",
+          } satisfies Connection & { type: string },
+          nextEdges,
+        );
+      }
+
+      return nextEdges;
+    });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        reactFlow.fitView({
+          nodes: [{ id: edge.source }, { id: nextNode.id }, { id: edge.target }],
+          padding: 0.4,
+          duration: 300,
+          maxZoom: 1,
+        });
+      });
+    });
+
+    setSelectedNodeId(nextNode.id);
+  }
+
+  function handleQuickAddSelectBlock(block: WorkflowBlockDefinition) {
+    if (!quickAddSource) {
+      return;
+    }
+
+    if (quickAddSource.kind === "port") {
+      handleQuickAddSelectBlockFromPort(quickAddSource, block);
+    } else {
+      handleQuickAddSelectBlockFromEdge(quickAddSource, block);
+    }
+
     setOpenedNodeId(null);
     setActiveEdgeId(null);
     setWorkflowDrawer(null);
@@ -1753,6 +1901,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
         saveAsName,
       );
       setSaveState("saved");
+      savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(nodes, edges);
+      setHasUnsavedChanges(false);
       saveResetTimeoutRef.current = window.setTimeout(() => setSaveState("idle"), 1600);
     } catch (error) {
       setSaveState("idle");
@@ -1765,6 +1915,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
       const savedWorkflow = await fetchSavedWorkflow();
       const parsedNodes = normalizeWorkflowNodes((savedWorkflow.workflow.nodes ?? []) as WorkflowFlowNode[]);
       const parsedEdges = (savedWorkflow.workflow.edges ?? []) as Edge[];
+      savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(parsedNodes, parsedEdges);
+      setHasUnsavedChanges(false);
       setNodes(parsedNodes);
       setEdges(parsedEdges);
       setCompoundBlocks(extractCompoundBlocksFromNodes(parsedNodes));
@@ -2628,9 +2780,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
             : "workflow-editor__action workflow-editor__action--ghost"}
           disabled={saveState === "saving"}
           onClick={() => void handleSaveWorkflow()}
+          title={hasUnsavedChanges ? "You have unsaved changes" : undefined}
           type="button"
         >
           {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+          {saveState === "idle" && hasUnsavedChanges ? <span className="toolbar-unsaved-dot" /> : null}
         </button>
       </div>
 
@@ -2658,7 +2812,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
 
   return (
     <section className="editor-workspace editor-workspace--workflow-page workflow-editor">
-        {headerSlot ? createPortal(headerControls, headerSlot) : null}
+        {headerSlot && isActive ? createPortal(headerControls, headerSlot) : null}
 
         {functionsError ? (
           <div className="workflow-error-banner" role="alert">
@@ -2681,6 +2835,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
             onDrop={handleDrop}
             onPointerDownCapture={handleControlDragPan}
           >
+            <div className="workflow-editor__stats">
+              <span>{nodes.length} block{nodes.length === 1 ? "" : "s"}</span>
+              <span>Est. total {formatDurationShort(nodes.reduce((total, node) => total + estimateNodeDuration(node), 0))}</span>
+            </div>
+
             <div className="workflow-editor__canvas">
               <ReactFlow
                 edges={renderedEdges}
@@ -2851,12 +3010,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot }: WorkflowEdit
 interface WorkflowEditorCardProps {
   hardwareMapRevision: number;
   headerSlot: HTMLElement | null;
+  isActive: boolean;
 }
 
-export function WorkflowEditorCard({ hardwareMapRevision, headerSlot }: WorkflowEditorCardProps) {
+export function WorkflowEditorCard({ hardwareMapRevision, headerSlot, isActive }: WorkflowEditorCardProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowEditorSurface hardwareMapRevision={hardwareMapRevision} headerSlot={headerSlot} />
+      <WorkflowEditorSurface hardwareMapRevision={hardwareMapRevision} headerSlot={headerSlot} isActive={isActive} />
     </ReactFlowProvider>
   );
 }

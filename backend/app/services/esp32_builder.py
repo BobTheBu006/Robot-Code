@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 import re
@@ -6,7 +5,6 @@ import shutil
 import signal
 import subprocess
 import tempfile
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -27,18 +25,12 @@ from app.models.esp32_builder import (
     Esp32WorkflowFirmwarePlanResponse,
     Esp32WorkflowFirmwarePlanRoutine,
 )
+from app.services.serial_ports import SerialPortInfo as _SerialPortInfo
+from app.services.serial_ports import list_serial_ports
 
 
 class Esp32BuilderError(RuntimeError):
     pass
-
-
-@dataclass
-class _SerialPortInfo:
-    device: str
-    description: str | None = None
-    hardware_id: str | None = None
-    serial_number: str | None = None
 
 
 class Esp32BuilderService:
@@ -914,30 +906,7 @@ class Esp32BuilderService:
         )
 
     def _list_serial_ports(self) -> list[_SerialPortInfo]:
-        try:
-            from serial.tools import list_ports  # type: ignore
-
-            ports = []
-            for port in list_ports.comports():
-                if not (str(port.device).startswith("/dev/ttyUSB") or str(port.device).startswith("/dev/ttyACM")):
-                    continue
-
-                ports.append(
-                    _SerialPortInfo(
-                        device=str(port.device),
-                        description=getattr(port, "description", None),
-                        hardware_id=getattr(port, "hwid", None),
-                        serial_number=getattr(port, "serial_number", None),
-                    )
-                )
-
-            if ports:
-                return sorted(ports, key=lambda item: item.device)
-        except Exception:
-            pass
-
-        fallback_ports = sorted(glob.glob("/dev/ttyUSB*")) + sorted(glob.glob("/dev/ttyACM*"))
-        return [_SerialPortInfo(device=port) for port in fallback_ports]
+        return list_serial_ports()
 
     def _ensure_cli_config_file(self) -> None:
         if self._arduino_cli_config_file.exists():
