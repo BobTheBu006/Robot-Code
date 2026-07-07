@@ -86,8 +86,15 @@ function coerceInputValue(
       return nextValue;
     }
 
-    const parsed = Number(nextValue);
-    return Number.isFinite(parsed) ? parsed : nextValue;
+    // Accept both "." and "," as the decimal separator. Only collapse to a real
+    // number once the text is already a canonical number, so mid-entry values like
+    // "104.", "104,5" or "1.50" are preserved instead of being stripped while typing.
+    const normalized = nextValue.replace(",", ".");
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed) && String(parsed) === normalized) {
+      return parsed;
+    }
+    return nextValue;
   }
 
   return event.target.value;

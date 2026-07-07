@@ -222,6 +222,46 @@ function createExpandedCompoundNodes(
   return { nodes, nodeIdMap };
 }
 
+function cloneNodesForPaste(
+  sourceNodes: WorkflowFlowNode[],
+  sourceEdges: Edge[],
+  offset: number,
+): { nodes: WorkflowFlowNode[]; edges: Edge[] } {
+  const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const nodeIdMap = new Map<string, string>();
+  const nodes = sourceNodes.map((node, index) => {
+    const nextId = `${node.data.block.id}-copy-${key}-${index}`;
+    nodeIdMap.set(node.id, nextId);
+    return {
+      ...node,
+      id: nextId,
+      selected: true,
+      dragging: false,
+      position: {
+        x: node.position.x + offset,
+        y: node.position.y + offset,
+      },
+      data: {
+        ...node.data,
+        parameters: { ...node.data.parameters },
+        settings: { ...node.data.settings },
+        executionStatus: "idle" as WorkflowExecutionStatus,
+        executionEtaMs: null,
+      },
+    };
+  });
+  const edges = sourceEdges
+    .filter((edge) => nodeIdMap.has(edge.source) && nodeIdMap.has(edge.target))
+    .map((edge, index) => ({
+      ...edge,
+      id: `edge-copy-${key}-${index}`,
+      source: nodeIdMap.get(edge.source) as string,
+      target: nodeIdMap.get(edge.target) as string,
+      selected: false,
+    }));
+  return { nodes, edges };
+}
+
 function createExpandedEdgeId(prefix: string, compoundNodeId: string, edgeId: string, index: number): string {
   return `${prefix}-${compoundNodeId}-${edgeId}-${index}-${Date.now().toString(36)}`;
 }
@@ -702,8 +742,14 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
     }
 
     if (input.type === "number" && !value.includes("{{")) {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : value;
+      // Accept both "." and "," as the decimal separator, and preserve mid-entry
+      // text like "104." or "1.50" instead of collapsing it while typing.
+      const normalized = value.replace(",", ".");
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed) && String(parsed) === normalized) {
+        return parsed;
+      }
+      return value;
     }
 
     return value;
@@ -871,6 +917,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
   const testAbortControllersRef = useRef<Record<string, AbortController>>({});
   const flashAbortControllerRef = useRef<AbortController | null>(null);
+  const clipboardRef = useRef<{ nodes: WorkflowFlowNode[]; edges: Edge[] } | null>(null);
   const [saveAsPath] = useState("");
   const [saveAsName] = useState("active-workflow");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -1287,20 +1334,92 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     return true;
   }
 
+  function handleCopySelectedNodes(extraNodeId?: string): boolean {
+    const selectedIds = new Set(nodes.filter((node) => node.selected).map((node) => node.id));
+    if (selectedNodeId) {
+      selectedIds.add(selectedNodeId);
+    }
+    if (extraNodeId) {
+      selectedIds.add(extraNodeId);
+    }
+
+    if (selectedIds.size === 0) {
+      return false;
+    }
+
+    clipboardRef.current = {
+      nodes: nodes.filter((node) => selectedIds.has(node.id)),
+      edges: edges.filter((edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target)),
+    };
+    return true;
+  }
+
+  function handlePasteClipboard(): boolean {
+    const clipboard = clipboardRef.current;
+    if (!clipboard || clipboard.nodes.length === 0) {
+      return false;
+    }
+
+    const pasted = cloneNodesForPaste(clipboard.nodes, clipboard.edges, 48);
+
+    // Re-register any pasted compound blocks so they resolve in the palette/lookup.
+    const pastedCompoundBlocks = extractCompoundBlocksFromNodes(pasted.nodes);
+    if (pastedCompoundBlocks.length > 0) {
+      setCompoundBlocks((currentBlocks) => {
+        const existingIds = new Set(currentBlocks.map((block) => block.id));
+        const additions = pastedCompoundBlocks.filter((block) => !existingIds.has(block.id));
+        return additions.length > 0 ? [...currentBlocks, ...additions] : currentBlocks;
+      });
+    }
+
+    setNodes((currentNodes) => [
+      ...currentNodes.map((node) => ({ ...node, selected: false })),
+      ...pasted.nodes,
+    ]);
+    setEdges((currentEdges) => [...currentEdges, ...pasted.edges]);
+    // Cascade subsequent pastes and keep the copied connections wired together.
+    clipboardRef.current = { nodes: pasted.nodes, edges: pasted.edges };
+    setSelectedNodeId(pasted.nodes.length === 1 ? pasted.nodes[0].id : null);
+    setOpenedNodeId(null);
+    setActiveEdgeId(null);
+    setContextMenu(null);
+    return true;
+  }
+
+  function handleDuplicateSelectedNodes(extraNodeId?: string): boolean {
+    return handleCopySelectedNodes(extraNodeId) && handlePasteClipboard();
+  }
+
   useEffect(() => {
     function handleWorkflowKeyDown(event: KeyboardEvent) {
-      if ((event.key !== "Delete" && event.key !== "Backspace") || isEditableKeyboardTarget(event.target)) {
+      if (isEditableKeyboardTarget(event.target)) {
         return;
       }
 
-      if (handleDeleteSelectedNodes()) {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (handleDeleteSelectedNodes()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "c" && handleCopySelectedNodes()) {
+        event.preventDefault();
+      } else if (key === "v" && handlePasteClipboard()) {
+        event.preventDefault();
+      } else if (key === "d" && handleDuplicateSelectedNodes()) {
         event.preventDefault();
       }
     }
 
     window.addEventListener("keydown", handleWorkflowKeyDown);
     return () => window.removeEventListener("keydown", handleWorkflowKeyDown);
-  }, [nodes, selectedNodeId]);
+  }, [nodes, edges, selectedNodeId]);
 
   function handleToggleNodeActive(nodeId: string) {
     setNodes((currentNodes) =>
@@ -2920,6 +3039,12 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                       </button>
                     </>
                   ) : null}
+                  <button
+                    onClick={() => handleDuplicateSelectedNodes(contextMenu.nodeId)}
+                    type="button"
+                  >
+                    Duplicate
+                  </button>
                   <button
                     onClick={() => handleCreateCompoundFunction(contextMenu.nodeId)}
                     type="button"
