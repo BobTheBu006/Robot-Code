@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "id": "move_gantry_xy",
-  "display_name": "Move Gantry XY",
+  "id": "move_gantry_circle",
+  "display_name": "Move Gantry Circle",
   "category": "Robot Actions",
-  "description": "Move the CoreXY gantry in a straight line from its current position to an absolute (X, Y) position in cm, with trapezoidal acceleration. Requires a prior Calibrate Gantry XY run (X steps-per-cm is reused for Y). The gantry is assumed parked at Y = max at the start. Errors and stops immediately if the target is outside the workspace or a limit switch is hit.",
-  "version": "0.2.0",
+  "description": "Trace a full circle with the CoreXY gantry around a given center (X, Y) position with a given radius, using trapezoidal acceleration over the whole lap. Moves to the circle start point first. Requires a prior Calibrate Gantry XY run. Errors and stops immediately if the circle does not fit the workspace or a limit switch is hit.",
+  "version": "0.1.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -18,23 +18,34 @@
       "options": []
     },
     {
-      "key": "x_cm",
-      "label": "Target X (cm)",
+      "key": "center_x_cm",
+      "label": "Center X (cm)",
       "type": "number",
-      "description": "Absolute X position in cm from X-min (0) toward X-max, within the calibrated X track length.",
+      "description": "Absolute X position of the circle center in cm from X-min (0).",
       "required": true,
-      "default": 0.0,
+      "default": 10.0,
       "placeholder": null,
       "advanced": false,
       "options": []
     },
     {
-      "key": "y_cm",
-      "label": "Target Y (cm)",
+      "key": "center_y_cm",
+      "label": "Center Y (cm)",
       "type": "number",
-      "description": "Absolute Y position in cm from Y-min (0) toward Y-max, within the Y track length.",
+      "description": "Absolute Y position of the circle center in cm from Y-min (0).",
       "required": true,
-      "default": 0.0,
+      "default": 10.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "radius_cm",
+      "label": "Radius (cm)",
+      "type": "number",
+      "description": "Circle radius in cm. The whole circle must fit inside the calibrated workspace.",
+      "required": true,
+      "default": 2.0,
       "placeholder": null,
       "advanced": false,
       "options": []
@@ -43,7 +54,7 @@
       "key": "speed_rpm",
       "label": "Move Speed (RPM)",
       "type": "number",
-      "description": "Numeric target motor speed for the move.",
+      "description": "Numeric target motor speed for the circle move.",
       "required": true,
       "default": 400.0,
       "placeholder": null,
@@ -54,7 +65,7 @@
       "key": "trapezoidal_speed",
       "label": "Trapezoidal Speed",
       "type": "boolean",
-      "description": "Ramp acceleration and deceleration instead of jumping straight to target speed.",
+      "description": "Ramp acceleration and deceleration over the whole circle instead of jumping straight to target speed.",
       "required": false,
       "default": true,
       "placeholder": null,
@@ -168,7 +179,7 @@
       "key": "next",
       "label": "Next",
       "type": "flow",
-      "description": "Continue when the XY move completes."
+      "description": "Continue when the circle move completes."
     }
   ],
   "hardware_devices": [
@@ -315,11 +326,11 @@
   ],
   "firmware_requirements": [
     {
-      "routine_id": "move_gantry_xy",
+      "routine_id": "move_gantry_circle",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves in a straight line using the calibrated steps-per-cm and Y track length restored from NVS, with trapezoidal ramping, and faults on workspace or limit violations.",
-      "entry_point": "moveGantryXYTo",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across the whole lap, and faults on workspace or limit violations.",
+      "entry_point": "circleGantryXY",
       "required_device_ids": [
         "x-axis-motor",
         "y-axis-motor",
@@ -328,7 +339,7 @@
         "y-min-limit-switch",
         "y-max-limit-switch"
       ],
-      "description": "Firmware routine required by the Move Gantry XY block."
+      "description": "Firmware routine required by the Move Gantry Circle block."
     }
   ],
   "builder_board_id": "ttyUSB0",

@@ -192,6 +192,10 @@ export function fetchSavedWorkflow(): Promise<SavedWorkflowFile> {
   return request<SavedWorkflowFile>("/api/workflows/default");
 }
 
+export function fetchWorkflowFile(filename: string): Promise<SavedWorkflowFile> {
+  return request<SavedWorkflowFile>(`/api/workflows/${encodeURIComponent(filename)}`);
+}
+
 export function fetchWorkflowList(): Promise<WorkflowListResponse> {
   return request<WorkflowListResponse>("/api/workflows");
 }

@@ -75,9 +75,10 @@ long rampIterationsForMotion(long totalIterations, int targetRpm, int accelerati
     return 0;
   }
 
-  float rampSeconds = ((float)targetRpm) / ((float)accelerationRpmPerSecond);
-  float targetStepsPerSecond = (targetRpm * stepsPerRevolution) / 60.0f;
-  long rampIterations = (long)((targetStepsPerSecond * rampSeconds) / 2.0f);
+  // Constant-acceleration ramp distance to reach the target speed: v^2 / (2a), in steps.
+  float accelStepsPerSecond2 = (accelerationRpmPerSecond * (float)stepsPerRevolution) / 60.0f;
+  float targetStepsPerSecond = (targetRpm * (float)stepsPerRevolution) / 60.0f;
+  long rampIterations = (long)((targetStepsPerSecond * targetStepsPerSecond) / (2.0f * accelStepsPerSecond2));
   if (rampIterations < 1) {
     return 1;
   }
@@ -98,12 +99,18 @@ int rpmForTrapezoidIteration(long iteration, long totalIterations, int targetRpm
 
   long remaining = totalIterations - iteration - 1;
   long rampPosition = min(iteration + 1, remaining + 1);
-  if (rampPosition >= rampIterations) {
-    return targetRpm;
+  if (rampPosition > rampIterations) {
+    rampPosition = rampIterations;
   }
 
-  float rampFraction = ((float)rampPosition) / ((float)rampIterations);
-  int nextRpm = (int)(targetRpm * rampFraction);
+  // Constant-acceleration speed after rampPosition steps: v = sqrt(2 * a * s).
+  // On short moves rampIterations is clamped to half the distance, so the peak
+  // becomes sqrt(a * distance) instead of the requested target speed - the move
+  // accelerates to the midpoint and decelerates to 0, honoring the acceleration
+  // value no matter how high the target speed is.
+  float accelStepsPerSecond2 = (accelerationRpmPerSecond * (float)stepsPerRevolution) / 60.0f;
+  float stepsPerSecond = sqrtf(2.0f * accelStepsPerSecond2 * (float)rampPosition);
+  int nextRpm = (int)(((stepsPerSecond * 60.0f) / (float)stepsPerRevolution) + 0.5f);
   return max(10, min(targetRpm, nextRpm));
 }
 
@@ -202,6 +209,7 @@ bool runDualAxisMove(
   int accelerationRpmPerSecond,
   int limitMode,
   bool useLimitChecks,
+  bool stopOnAnyNewLimit,
   bool &firstBlocked,
   bool &secondBlocked,
   bool &stopRequested
@@ -230,10 +238,49 @@ bool runDualAxisMove(
   secondBlocked = false;
   stopRequested = false;
 
+  // Switches already pressed when the move starts stay latched until they
+  // release, so a move can still escape a limit it is parked on. Any switch
+  // that becomes pressed during the move stops the whole move instantly.
+  bool firstMinWasActive = useLimitChecks && stopOnAnyNewLimit && isLimitActive(firstAxis.minLimitPin);
+  bool firstMaxWasActive = useLimitChecks && stopOnAnyNewLimit && limitMode == 4 && isLimitActive(firstAxis.maxLimitPin);
+  bool secondMinWasActive = useLimitChecks && stopOnAnyNewLimit && isLimitActive(secondAxis.minLimitPin);
+  bool secondMaxWasActive = useLimitChecks && stopOnAnyNewLimit && limitMode == 4 && isLimitActive(secondAxis.maxLimitPin);
+
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
       stopRequested = true;
       return false;
+    }
+
+    if (useLimitChecks && stopOnAnyNewLimit) {
+      bool firstMinActive = isLimitActive(firstAxis.minLimitPin);
+      bool firstMaxActive = limitMode == 4 && isLimitActive(firstAxis.maxLimitPin);
+      bool secondMinActive = isLimitActive(secondAxis.minLimitPin);
+      bool secondMaxActive = limitMode == 4 && isLimitActive(secondAxis.maxLimitPin);
+
+      if (!firstMinActive) {
+        firstMinWasActive = false;
+      }
+      if (!firstMaxActive) {
+        firstMaxWasActive = false;
+      }
+      if (!secondMinActive) {
+        secondMinWasActive = false;
+      }
+      if (!secondMaxActive) {
+        secondMaxWasActive = false;
+      }
+
+      if ((firstMinActive && !firstMinWasActive) || (firstMaxActive && !firstMaxWasActive)) {
+        firstBlocked = true;
+      }
+      if ((secondMinActive && !secondMinWasActive) || (secondMaxActive && !secondMaxWasActive)) {
+        secondBlocked = true;
+      }
+
+      if (firstBlocked || secondBlocked) {
+        return false;
+      }
     }
 
     bool stepFirst = false;
@@ -257,6 +304,13 @@ bool runDualAxisMove(
       } else {
         stepSecond = true;
       }
+    }
+
+    // Normal moves stop everything as soon as either axis hits a limit;
+    // homing/probing keeps the per-axis behavior so each axis can finish
+    // reaching its own switch.
+    if (stopOnAnyNewLimit && (firstBlocked || secondBlocked)) {
+      return false;
     }
 
     if (stepFirst) {
@@ -338,6 +392,15 @@ bool runCoreXYCartesianMove(
   long absX = labs(deltaXSteps);
   long absY = labs(deltaYSteps);
 
+  // Switches already pressed when the move starts stay latched until they
+  // release, so a move can still escape a limit it is parked on (e.g. after
+  // calibration). Any switch that becomes pressed during the move stops the
+  // whole move instantly, regardless of travel direction.
+  bool xMinWasActive = useLimitChecks && isLimitActive(xAxis.minLimitPin);
+  bool xMaxWasActive = useLimitChecks && xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin);
+  bool yMinWasActive = useLimitChecks && isLimitActive(yAxis.minLimitPin);
+  bool yMaxWasActive = useLimitChecks && xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin);
+
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
       stopRequested = true;
@@ -345,19 +408,46 @@ bool runCoreXYCartesianMove(
     }
 
     if (useLimitChecks) {
-      if (xSign > 0 && xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin)) {
+      bool xMinActive = isLimitActive(xAxis.minLimitPin);
+      bool xMaxActive = xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin);
+      bool yMinActive = isLimitActive(yAxis.minLimitPin);
+      bool yMaxActive = xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin);
+
+      if (!xMinActive) {
+        xMinWasActive = false;
+      }
+      if (!xMaxActive) {
+        xMaxWasActive = false;
+      }
+      if (!yMinActive) {
+        yMinWasActive = false;
+      }
+      if (!yMaxActive) {
+        yMaxWasActive = false;
+      }
+
+      if ((xMinActive && !xMinWasActive) || (xMaxActive && !xMaxWasActive)) {
         xBlocked = true;
       }
-      if (xSign < 0 && isLimitActive(xAxis.minLimitPin)) {
+      if ((yMinActive && !yMinWasActive) || (yMaxActive && !yMaxWasActive)) {
+        yBlocked = true;
+      }
+
+      // Never drive further into a pressed switch, latched or not.
+      if (xSign > 0 && xMaxActive) {
         xBlocked = true;
       }
-      if (ySign > 0 && xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin)) {
+      if (xSign < 0 && xMinActive) {
+        xBlocked = true;
+      }
+      if (ySign > 0 && yMaxActive) {
         yBlocked = true;
       }
-      if (ySign < 0 && isLimitActive(yAxis.minLimitPin)) {
+      if (ySign < 0 && yMinActive) {
         yBlocked = true;
       }
-      if ((xBlocked && xSign != 0) || (yBlocked && ySign != 0)) {
+
+      if (xBlocked || yBlocked) {
         return false;
       }
     }
@@ -648,6 +738,7 @@ bool moveZTo(float targetLeftCm, float targetRightCm, int rpm, bool trapezoidalS
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    true,
     leftBlocked,
     rightBlocked,
     stopRequested
@@ -791,6 +882,7 @@ bool checkZCalibrationNearLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    true,
     ignoredLeft,
     ignoredRight,
     returnStop
@@ -918,6 +1010,7 @@ bool homeAxesToMinimum(
     accelerationRpmPerSecond,
     limitMode,
     true,
+    false,
     firstBlocked,
     secondBlocked,
     stopRequested
@@ -1074,6 +1167,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    false,
     leftBlocked,
     rightBlocked,
     stopRequested
@@ -1096,6 +1190,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     false,
+    false,
     ignoredLeft,
     ignoredRight,
     backoffStop
@@ -1117,6 +1212,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    false,
     leftBlocked,
     rightBlocked,
     stopRequested

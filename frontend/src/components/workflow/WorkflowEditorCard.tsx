@@ -36,7 +36,6 @@ import {
 } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
-  formatWorkflowParameterValue,
   WORKFLOW_BLOCK_MIME,
   createBuiltInBlocks,
   createDefaultParameters,
@@ -147,10 +146,6 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 
 function isEsp32WorkflowBoardId(boardId: string | null | undefined): boardId is string {
   return Boolean(boardId) && boardId !== RASPBERRY_BOARD_ID;
-}
-
-function isVisibleWorkflowInput(input: WorkflowInputDefinition): boolean {
-  return !input.hidden && input.key !== "tool_port" && !input.key.includes("pin");
 }
 
 function isClientExecutedBlock(block: WorkflowBlockDefinition): boolean {
@@ -651,11 +646,23 @@ function useControlDragPan() {
 
 interface CompoundFunctionEditorProps {
   node: WorkflowFlowNode;
+  testStateByNodeId: Record<string, NodeTestState>;
   onClose: () => void;
   onSave: (nodeId: string, innerNodes: WorkflowFlowNode[], innerEdges: Edge[]) => void;
+  onRunNode: (node: WorkflowFlowNode) => void;
+  onCancelNode: (node: WorkflowFlowNode) => void;
+  onSaveCustomBlock: (node: WorkflowFlowNode, displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
 }
 
-function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEditorProps) {
+function CompoundFunctionEditor({
+  node,
+  testStateByNodeId,
+  onClose,
+  onSave,
+  onRunNode,
+  onCancelNode,
+  onSaveCustomBlock,
+}: CompoundFunctionEditorProps) {
   const controlKeyPressed = useControlKeyPressed();
   const handleControlDragPan = useControlDragPan();
   const compound = node.data.block.compound;
@@ -669,8 +676,17 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
   );
   const [editorNodes, setEditorNodes, onEditorNodesChange] = useNodesState<WorkflowFlowNode>(initialNodes);
   const [editorEdges, setEditorEdges, onEditorEdgesChange] = useEdgesState<Edge>(initialEdges);
-  const [selectedInnerNodeId, setSelectedInnerNodeId] = useState<string | null>(null);
-  const selectedInnerNode = editorNodes.find((innerNode) => innerNode.id === selectedInnerNodeId) ?? null;
+  const [openedInnerNodeId, setOpenedInnerNodeId] = useState<string | null>(null);
+  const openedInnerNode = editorNodes.find((innerNode) => innerNode.id === openedInnerNodeId) ?? null;
+  const openedInnerNodeTestState = openedInnerNodeId
+    ? testStateByNodeId[openedInnerNodeId] ?? { status: "idle" as const, result: null, error: null }
+    : { status: "idle" as const, result: null, error: null };
+  const previousInnerNode = openedInnerNode
+    ? editorNodes.find((innerNode) => innerNode.id === editorEdges.find((edge) => edge.target === openedInnerNode.id)?.source) ?? null
+    : null;
+  const previousInnerNodeTestState = previousInnerNode
+    ? testStateByNodeId[previousInnerNode.id] ?? { status: "idle" as const, result: null, error: null }
+    : { status: "idle" as const, result: null, error: null };
   const projectedOutputs = buildCompoundOutputsFromGraph(editorNodes, editorEdges);
 
   function handleEditorConnect(connection: Connection) {
@@ -690,7 +706,6 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
     setEditorEdges((currentEdges) =>
       currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
     );
-    setSelectedInnerNodeId((currentNodeId) => (currentNodeId === nodeId ? null : currentNodeId));
   }
 
   function handleToggleInnerNodeActive(nodeId: string) {
@@ -732,37 +747,51 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
     );
   }
 
-  function coerceEditorInputValue(
-    input: WorkflowInputDefinition,
-    value: string,
-    checked = false,
-  ): WorkflowParameterValue {
-    if (input.type === "boolean") {
-      return checked;
-    }
+  function handleUpdateInnerSettings(
+    nodeId: string,
+    updates: Partial<{ failureMode: WorkflowFailureMode; retryCount: number }>,
+  ) {
+    setEditorNodes((currentNodes) =>
+      currentNodes.map((innerNode) => {
+        if (innerNode.id !== nodeId) {
+          return innerNode;
+        }
 
-    if (input.type === "number" && !value.includes("{{")) {
-      // Accept both "." and "," as the decimal separator, and preserve mid-entry
-      // text like "104." or "1.50" instead of collapsing it while typing.
-      const normalized = value.replace(",", ".");
-      const parsed = Number(normalized);
-      if (Number.isFinite(parsed) && String(parsed) === normalized) {
-        return parsed;
-      }
-      return value;
-    }
+        return {
+          ...innerNode,
+          data: {
+            ...innerNode.data,
+            settings: {
+              ...innerNode.data.settings,
+              failureMode: updates.failureMode
+                ? normalizeFailureMode(updates.failureMode)
+                : innerNode.data.settings.failureMode,
+              retryCount: updates.retryCount !== undefined
+                ? normalizeRetryCount(updates.retryCount)
+                : innerNode.data.settings.retryCount,
+            },
+          },
+        };
+      }),
+    );
 
-    return value;
+    if (updates.failureMode === "stop_flow") {
+      setEditorEdges((currentEdges) =>
+        currentEdges.filter((edge) => !(edge.source === nodeId && edge.sourceHandle === "error")),
+      );
+    }
   }
 
   const renderedEditorNodes = editorNodes.map((innerNode) => ({
     ...innerNode,
     data: {
       ...innerNode.data,
-      executionStatus: "idle" as WorkflowExecutionStatus,
+      executionStatus: testStateByNodeId[innerNode.id]?.status ?? ("idle" as WorkflowExecutionStatus),
       executionEtaMs: null,
       onDelete: () => handleDeleteInnerNode(innerNode.id),
       onToggleActive: () => handleToggleInnerNodeActive(innerNode.id),
+      onRun: () => onRunNode(innerNode),
+      onCancel: () => onCancelNode(innerNode),
     },
   }));
   const renderedEditorEdges = editorEdges.map((edge) => ({
@@ -812,11 +841,17 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
               onEdgesChange={onEditorEdgesChange}
               onNodeClick={(event, innerNode) => {
                 event.stopPropagation();
-                setSelectedInnerNodeId(innerNode.id);
+                setOpenedInnerNodeId(null);
+              }}
+              onNodeDoubleClick={(event, innerNode) => {
+                event.stopPropagation();
+                setOpenedInnerNodeId(innerNode.id);
               }}
               onNodesChange={onEditorNodesChange}
               onPointerDownCapture={handleControlDragPan}
-              onPaneClick={() => setSelectedInnerNodeId(null)}
+              onPaneClick={() => {
+                setOpenedInnerNodeId(null);
+              }}
               nodesDraggable={!controlKeyPressed}
               panActivationKeyCode="Control"
               panOnDrag={false}
@@ -827,6 +862,43 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
               <Controls />
               <Background gap={24} size={1} />
             </ReactFlow>
+
+            {openedInnerNode ? (
+              <WorkflowInspector
+                allNodeTestEntries={editorNodes.map((innerNode) => ({
+                  nodeId: innerNode.id,
+                  nodeName: innerNode.data.block.displayName,
+                  status: testStateByNodeId[innerNode.id]?.status ?? "idle",
+                  result: testStateByNodeId[innerNode.id]?.result ?? null,
+                  error: testStateByNodeId[innerNode.id]?.error ?? null,
+                }))}
+                edges={editorEdges}
+                nodes={editorNodes}
+                onClose={() => setOpenedInnerNodeId(null)}
+                onNavigateToNode={(nodeId) => {
+                  setOpenedInnerNodeId(nodeId);
+                }}
+                onCancel={() => onCancelNode(openedInnerNode)}
+                onEditCompound={() => {}}
+                onRunTest={() => onRunNode(openedInnerNode)}
+                onRunNode={(nodeId) => {
+                  const innerNode = editorNodes.find((candidate) => candidate.id === nodeId);
+                  if (innerNode) {
+                    onRunNode(innerNode);
+                  }
+                }}
+                onSaveCustomBlock={(displayName) => onSaveCustomBlock(openedInnerNode, displayName)}
+                onUpdateParameter={handleUpdateInnerParameter}
+                onUpdateSettings={handleUpdateInnerSettings}
+                previousNodeTestError={previousInnerNodeTestState.error}
+                previousNodeTestResult={previousInnerNodeTestState.result}
+                previousNodeTestStatus={previousInnerNodeTestState.status}
+                selectedNode={openedInnerNode}
+                testError={openedInnerNodeTestState.error}
+                testResult={openedInnerNodeTestState.result}
+                testStatus={openedInnerNodeTestState.status}
+              />
+            ) : null}
           </div>
 
           <aside className="workflow-compound-editor__panel">
@@ -840,46 +912,7 @@ function CompoundFunctionEditor({ node, onClose, onSave }: CompoundFunctionEdito
               </div>
             </section>
 
-            {selectedInnerNode ? (
-              <section>
-                <h4>{selectedInnerNode.data.block.displayName}</h4>
-                <div className="workflow-compound-editor__fields">
-                  {getAllBlockInputs(selectedInnerNode.data.block).filter(isVisibleWorkflowInput).map((input) => (
-                    <label className="workflow-compound-editor__field" key={input.key}>
-                      <span>{input.label}</span>
-                      {input.type === "select" ? (
-                        <select
-                          onChange={(event) => handleUpdateInnerParameter(selectedInnerNode.id, input, event.target.value)}
-                          value={String(selectedInnerNode.data.parameters[input.key] ?? "")}
-                        >
-                          {input.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : input.type === "boolean" ? (
-                        <input
-                          checked={Boolean(selectedInnerNode.data.parameters[input.key])}
-                          onChange={(event) =>
-                            handleUpdateInnerParameter(selectedInnerNode.id, input, coerceEditorInputValue(input, event.target.value, event.target.checked))}
-                          type="checkbox"
-                        />
-                      ) : (
-                        <input
-                          onChange={(event) =>
-                            handleUpdateInnerParameter(selectedInnerNode.id, input, coerceEditorInputValue(input, event.target.value))}
-                          type="text"
-                          value={formatWorkflowParameterValue(selectedInnerNode.data.parameters[input.key])}
-                        />
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </section>
-            ) : (
-              <p className="workflow-compound-editor__empty">Select a block inside the compound to edit its parameters.</p>
-            )}
+            <p className="workflow-compound-editor__empty">Double-click a block to open and edit it, exactly like on the main canvas.</p>
           </aside>
         </div>
       </div>
@@ -918,6 +951,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const testAbortControllersRef = useRef<Record<string, AbortController>>({});
   const flashAbortControllerRef = useRef<AbortController | null>(null);
   const clipboardRef = useRef<{ nodes: WorkflowFlowNode[]; edges: Edge[] } | null>(null);
+  const lastValidSpeedByNodeIdRef = useRef<Record<string, number>>({});
   const [saveAsPath] = useState("");
   const [saveAsName] = useState("active-workflow");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -1396,6 +1430,12 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         return;
       }
 
+      if (event.key === " " && !event.ctrlKey && !event.metaKey && !editingCompoundNodeId) {
+        reactFlow.fitView({ padding: 0.2, duration: 300 });
+        event.preventDefault();
+        return;
+      }
+
       if (event.key === "Delete" || event.key === "Backspace") {
         if (handleDeleteSelectedNodes()) {
           event.preventDefault();
@@ -1419,7 +1459,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
     window.addEventListener("keydown", handleWorkflowKeyDown);
     return () => window.removeEventListener("keydown", handleWorkflowKeyDown);
-  }, [nodes, edges, selectedNodeId]);
+  }, [nodes, edges, selectedNodeId, editingCompoundNodeId]);
 
   function handleToggleNodeActive(nodeId: string) {
     setNodes((currentNodes) =>
@@ -2059,11 +2099,62 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     setActiveEdgeId(null);
   }
 
+  function parseSpeedNumber(value: WorkflowParameterValue | undefined): number | null {
+    if (typeof value === "number") {
+      return Number.isFinite(value) && value > 0 ? value : null;
+    }
+    if (typeof value === "string" && !value.includes("{{")) {
+      const parsed = Number(value.replace(",", "."));
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+    return null;
+  }
+
+  // Keep acceleration proportional to speed: doubling the speed doubles the
+  // acceleration, preserving whatever speed/acceleration ratio the node had.
+  function getLinkedAccelerationUpdate(
+    nodeId: string,
+    input: WorkflowInputDefinition,
+    value: WorkflowParameterValue,
+  ): Record<string, WorkflowParameterValue> {
+    const node = nodeLookup.get(nodeId);
+    if (!node || input.key !== "speed_rpm") {
+      return {};
+    }
+    if (!getAllBlockInputs(node.data.block).some((blockInput) => blockInput.key === "acceleration_rpm_per_s")) {
+      return {};
+    }
+
+    // The anchor speed survives the field being cleared mid-edit, so retyping
+    // a value still scales relative to the last real speed.
+    const currentSpeed = parseSpeedNumber(node.data.parameters.speed_rpm);
+    if (lastValidSpeedByNodeIdRef.current[nodeId] === undefined && currentSpeed !== null) {
+      lastValidSpeedByNodeIdRef.current[nodeId] = currentSpeed;
+    }
+
+    const nextSpeed = parseSpeedNumber(value);
+    if (nextSpeed === null) {
+      return {};
+    }
+
+    const previousSpeed = lastValidSpeedByNodeIdRef.current[nodeId];
+    lastValidSpeedByNodeIdRef.current[nodeId] = nextSpeed;
+    const currentAcceleration = parseSpeedNumber(node.data.parameters.acceleration_rpm_per_s);
+    if (previousSpeed === undefined || previousSpeed === nextSpeed || currentAcceleration === null) {
+      return {};
+    }
+
+    return {
+      acceleration_rpm_per_s: Math.round((currentAcceleration * nextSpeed / previousSpeed) * 100) / 100,
+    };
+  }
+
   function handleUpdateParameter(
     nodeId: string,
     input: WorkflowInputDefinition,
     value: WorkflowParameterValue,
   ) {
+    const linkedUpdates = getLinkedAccelerationUpdate(nodeId, input, value);
     setNodes((currentNodes) =>
       currentNodes.map((node) =>
         node.id === nodeId
@@ -2074,6 +2165,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                 parameters: {
                   ...node.data.parameters,
                   [input.key]: value,
+                  ...linkedUpdates,
                 },
               },
             }
@@ -2251,8 +2343,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   async function executeNode(
     nodeId: string,
     inputData: Record<string, unknown> | null,
+    nodeOverride?: WorkflowFlowNode,
   ): Promise<FunctionTestResponse> {
-    const node = nodeLookup.get(nodeId);
+    const node = nodeOverride ?? nodeLookup.get(nodeId);
     if (!node) {
       throw new Error(`Could not find node '${nodeId}' for execution.`);
     }
@@ -2359,8 +2452,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
   }
 
-  async function handleCancelNodeExecution(nodeId: string) {
-    const node = nodeLookup.get(nodeId);
+  async function handleCancelNodeExecution(nodeId: string, nodeOverride?: WorkflowFlowNode) {
+    const node = nodeOverride ?? nodeLookup.get(nodeId);
     if (!node) {
       return;
     }
@@ -2459,11 +2552,22 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
   }
 
+  // Runs a node that lives outside the main canvas (e.g. inside the compound
+  // editor). It executes standalone, without resolving upstream inputs.
+  async function handleRunDetachedNode(node: WorkflowFlowNode) {
+    try {
+      await executeNode(node.id, null, node);
+    } catch {
+      // executeNode already records the failure in the node's test state.
+    }
+  }
+
   async function handleSaveCustomBlock(
     nodeId: string,
     displayName: string,
+    nodeOverride?: WorkflowFlowNode,
   ): Promise<Esp32CustomBlockSaveResponse> {
-    const node = nodeLookup.get(nodeId);
+    const node = nodeOverride ?? nodeLookup.get(nodeId);
     if (!node) {
       throw new Error("Could not find the selected block.");
     }
@@ -2954,6 +3058,20 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
             onDrop={handleDrop}
             onPointerDownCapture={handleControlDragPan}
           >
+            {workflowDrawer !== "blocks" ? (
+              <button
+                aria-label="Add blocks"
+                className="workflow-canvas-add"
+                onClick={() => {
+                  setWorkflowDrawer("blocks");
+                  setQuickAddSource(null);
+                }}
+                title="Add blocks"
+                type="button"
+              >
+                +
+              </button>
+            ) : null}
             <div className="workflow-editor__stats">
               <span>{nodes.length} block{nodes.length === 1 ? "" : "s"}</span>
               <span>Est. total {formatDurationShort(nodes.reduce((total, node) => total + estimateNodeDuration(node), 0))}</span>
@@ -3123,8 +3241,12 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
           <CompoundFunctionEditor
             key={editingCompoundNode.id}
             node={editingCompoundNode}
+            testStateByNodeId={testStateByNodeId}
             onClose={() => setEditingCompoundNodeId(null)}
             onSave={handleSaveCompoundEdit}
+            onRunNode={(innerNode) => void handleRunDetachedNode(innerNode)}
+            onCancelNode={(innerNode) => void handleCancelNodeExecution(innerNode.id, innerNode)}
+            onSaveCustomBlock={(innerNode, displayName) => handleSaveCustomBlock(innerNode.id, displayName, innerNode)}
           />
         ) : null}
 

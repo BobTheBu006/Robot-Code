@@ -68,11 +68,21 @@ function scrollPageNearViewportEdge(clientY: number) {
   }
 }
 
+function blockMatchesSearch(block: WorkflowBlockDefinition, query: string): boolean {
+  const haystack = `${block.displayName} ${block.description} ${getPaletteCategory(block)}`.toLowerCase();
+  return query.split(/\s+/).every((term) => haystack.includes(term));
+}
+
 export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, onSelectBlock }: WorkflowPaletteProps) {
   const [hiddenBlockIds, setHiddenBlockIds] = useState<Set<string>>(() => new Set());
   const [showAllBlocks, setShowAllBlocks] = useState(false);
   const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
-  const visibleBlocks = showAllBlocks ? blocks : blocks.filter((block) => !hiddenBlockIds.has(block.id));
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const unhiddenBlocks = showAllBlocks ? blocks : blocks.filter((block) => !hiddenBlockIds.has(block.id));
+  const visibleBlocks = normalizedQuery
+    ? unhiddenBlocks.filter((block) => blockMatchesSearch(block, normalizedQuery))
+    : unhiddenBlocks;
   const hiddenBlocks = blocks.filter((block) => hiddenBlockIds.has(block.id));
   const hiddenBlockCount = hiddenBlocks.length;
   const groupedBlocks = visibleBlocks.reduce<Record<string, WorkflowBlockDefinition[]>>((groups, block) => {
@@ -149,6 +159,16 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
         </button>
       </div>
 
+      <div className="workflow-palette__search">
+        <input
+          autoFocus
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search blocks..."
+          type="search"
+          value={searchQuery}
+        />
+      </div>
+
       {visibleBlocks.length > 0 ? (
         <>
           <div className="workflow-palette__scroll">
@@ -218,6 +238,8 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
             </section>
           ) : null}
         </>
+      ) : normalizedQuery ? (
+        <p className="workflow-palette__empty">No blocks match "{searchQuery.trim()}".</p>
       ) : (
         <p className="workflow-palette__empty">All blocks are hidden. Use Show all to show them again, then press Unhide on the ones you want to keep visible.</p>
       )}

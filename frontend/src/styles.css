@@ -1753,6 +1753,47 @@ body {
   min-height: 810px;
 }
 
+.workflow-canvas-add {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 50%;
+  background: #17322a;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 10px 24px rgba(23, 50, 42, 0.22);
+}
+
+.workflow-canvas-add:hover {
+  background: #24493d;
+}
+
+.workflow-palette__search {
+  margin-bottom: 10px;
+}
+
+.workflow-palette__search input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+}
+
+.workflow-palette__search input:focus-visible {
+  border-color: #ef8b2c;
+  outline: 2px solid rgba(239, 139, 44, 0.25);
+}
+
 .workflow-editor__stats {
   position: absolute;
   top: 12px;
@@ -1860,6 +1901,7 @@ body {
 }
 
 .workflow-compound-editor__canvas {
+  position: relative;
   min-height: 0;
   border: 1px solid rgba(23, 50, 42, 0.1);
   border-radius: 18px;

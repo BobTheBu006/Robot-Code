@@ -142,9 +142,10 @@ long rampIterationsForMotion(long totalIterations, int targetRpm, int accelerati
     return 0;
   }
 
-  float rampSeconds = ((float)targetRpm) / ((float)accelerationRpmPerSecond);
-  float targetStepsPerSecond = (targetRpm * stepsPerRevolution) / 60.0f;
-  long rampIterations = (long)((targetStepsPerSecond * rampSeconds) / 2.0f);
+  // Constant-acceleration ramp distance to reach the target speed: v^2 / (2a), in steps.
+  float accelStepsPerSecond2 = (accelerationRpmPerSecond * (float)stepsPerRevolution) / 60.0f;
+  float targetStepsPerSecond = (targetRpm * (float)stepsPerRevolution) / 60.0f;
+  long rampIterations = (long)((targetStepsPerSecond * targetStepsPerSecond) / (2.0f * accelStepsPerSecond2));
   if (rampIterations < 1) {
     return 1;
   }
@@ -165,12 +166,18 @@ int rpmForTrapezoidIteration(long iteration, long totalIterations, int targetRpm
 
   long remaining = totalIterations - iteration - 1;
   long rampPosition = min(iteration + 1, remaining + 1);
-  if (rampPosition >= rampIterations) {
-    return targetRpm;
+  if (rampPosition > rampIterations) {
+    rampPosition = rampIterations;
   }
 
-  float rampFraction = ((float)rampPosition) / ((float)rampIterations);
-  int nextRpm = (int)(targetRpm * rampFraction);
+  // Constant-acceleration speed after rampPosition steps: v = sqrt(2 * a * s).
+  // On short moves rampIterations is clamped to half the distance, so the peak
+  // becomes sqrt(a * distance) instead of the requested target speed - the move
+  // accelerates to the midpoint and decelerates to 0, honoring the acceleration
+  // value no matter how high the target speed is.
+  float accelStepsPerSecond2 = (accelerationRpmPerSecond * (float)stepsPerRevolution) / 60.0f;
+  float stepsPerSecond = sqrtf(2.0f * accelStepsPerSecond2 * (float)rampPosition);
+  int nextRpm = (int)(((stepsPerSecond * 60.0f) / (float)stepsPerRevolution) + 0.5f);
   return max(10, min(targetRpm, nextRpm));
 }
 
@@ -302,6 +309,7 @@ bool runDualAxisMove(
   int accelerationRpmPerSecond,
   int limitMode,
   bool useLimitChecks,
+  bool stopOnAnyNewLimit,
   bool &firstBlocked,
   bool &secondBlocked,
   bool &stopRequested
@@ -330,10 +338,49 @@ bool runDualAxisMove(
   secondBlocked = false;
   stopRequested = false;
 
+  // Switches already pressed when the move starts stay latched until they
+  // release, so a move can still escape a limit it is parked on. Any switch
+  // that becomes pressed during the move stops the whole move instantly.
+  bool firstMinWasActive = useLimitChecks && stopOnAnyNewLimit && isLimitActive(firstAxis.minLimitPin);
+  bool firstMaxWasActive = useLimitChecks && stopOnAnyNewLimit && limitMode == 4 && isLimitActive(firstAxis.maxLimitPin);
+  bool secondMinWasActive = useLimitChecks && stopOnAnyNewLimit && isLimitActive(secondAxis.minLimitPin);
+  bool secondMaxWasActive = useLimitChecks && stopOnAnyNewLimit && limitMode == 4 && isLimitActive(secondAxis.maxLimitPin);
+
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
       stopRequested = true;
       return false;
+    }
+
+    if (useLimitChecks && stopOnAnyNewLimit) {
+      bool firstMinActive = isLimitActive(firstAxis.minLimitPin);
+      bool firstMaxActive = limitMode == 4 && isLimitActive(firstAxis.maxLimitPin);
+      bool secondMinActive = isLimitActive(secondAxis.minLimitPin);
+      bool secondMaxActive = limitMode == 4 && isLimitActive(secondAxis.maxLimitPin);
+
+      if (!firstMinActive) {
+        firstMinWasActive = false;
+      }
+      if (!firstMaxActive) {
+        firstMaxWasActive = false;
+      }
+      if (!secondMinActive) {
+        secondMinWasActive = false;
+      }
+      if (!secondMaxActive) {
+        secondMaxWasActive = false;
+      }
+
+      if ((firstMinActive && !firstMinWasActive) || (firstMaxActive && !firstMaxWasActive)) {
+        firstBlocked = true;
+      }
+      if ((secondMinActive && !secondMinWasActive) || (secondMaxActive && !secondMaxWasActive)) {
+        secondBlocked = true;
+      }
+
+      if (firstBlocked || secondBlocked) {
+        return false;
+      }
     }
 
     bool stepFirst = false;
@@ -357,6 +404,13 @@ bool runDualAxisMove(
       } else {
         stepSecond = true;
       }
+    }
+
+    // Normal moves stop everything as soon as either axis hits a limit;
+    // homing/probing keeps the per-axis behavior so each axis can finish
+    // reaching its own switch.
+    if (stopOnAnyNewLimit && (firstBlocked || secondBlocked)) {
+      return false;
     }
 
     if (stepFirst) {
@@ -438,6 +492,15 @@ bool runCoreXYCartesianMove(
   long absX = labs(deltaXSteps);
   long absY = labs(deltaYSteps);
 
+  // Switches already pressed when the move starts stay latched until they
+  // release, so a move can still escape a limit it is parked on (e.g. after
+  // calibration). Any switch that becomes pressed during the move stops the
+  // whole move instantly, regardless of travel direction.
+  bool xMinWasActive = useLimitChecks && isLimitActive(xAxis.minLimitPin);
+  bool xMaxWasActive = useLimitChecks && xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin);
+  bool yMinWasActive = useLimitChecks && isLimitActive(yAxis.minLimitPin);
+  bool yMaxWasActive = useLimitChecks && xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin);
+
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
       stopRequested = true;
@@ -445,19 +508,46 @@ bool runCoreXYCartesianMove(
     }
 
     if (useLimitChecks) {
-      if (xSign > 0 && xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin)) {
+      bool xMinActive = isLimitActive(xAxis.minLimitPin);
+      bool xMaxActive = xyLimitSwitchMode == 4 && isLimitActive(xAxis.maxLimitPin);
+      bool yMinActive = isLimitActive(yAxis.minLimitPin);
+      bool yMaxActive = xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin);
+
+      if (!xMinActive) {
+        xMinWasActive = false;
+      }
+      if (!xMaxActive) {
+        xMaxWasActive = false;
+      }
+      if (!yMinActive) {
+        yMinWasActive = false;
+      }
+      if (!yMaxActive) {
+        yMaxWasActive = false;
+      }
+
+      if ((xMinActive && !xMinWasActive) || (xMaxActive && !xMaxWasActive)) {
         xBlocked = true;
       }
-      if (xSign < 0 && isLimitActive(xAxis.minLimitPin)) {
+      if ((yMinActive && !yMinWasActive) || (yMaxActive && !yMaxWasActive)) {
+        yBlocked = true;
+      }
+
+      // Never drive further into a pressed switch, latched or not.
+      if (xSign > 0 && xMaxActive) {
         xBlocked = true;
       }
-      if (ySign > 0 && xyLimitSwitchMode == 4 && isLimitActive(yAxis.maxLimitPin)) {
+      if (xSign < 0 && xMinActive) {
+        xBlocked = true;
+      }
+      if (ySign > 0 && yMaxActive) {
         yBlocked = true;
       }
-      if (ySign < 0 && isLimitActive(yAxis.minLimitPin)) {
+      if (ySign < 0 && yMinActive) {
         yBlocked = true;
       }
-      if ((xBlocked && xSign != 0) || (yBlocked && ySign != 0)) {
+
+      if (xBlocked || yBlocked) {
         return false;
       }
     }
@@ -751,6 +841,7 @@ bool moveZTo(float targetLeftCm, float targetRightCm, int rpm, bool trapezoidalS
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    true,
     leftBlocked,
     rightBlocked,
     stopRequested
@@ -895,6 +986,7 @@ bool checkZCalibrationNearLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    true,
     ignoredLeft,
     ignoredRight,
     returnStop
@@ -1022,6 +1114,7 @@ bool homeAxesToMinimum(
     accelerationRpmPerSecond,
     limitMode,
     true,
+    false,
     firstBlocked,
     secondBlocked,
     stopRequested
@@ -1191,6 +1284,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    false,
     leftBlocked,
     rightBlocked,
     stopRequested
@@ -1213,6 +1307,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     false,
+    false,
     ignoredLeft,
     ignoredRight,
     backoffStop
@@ -1234,6 +1329,7 @@ bool probeZLimit(
     accelerationRpmPerSecond,
     zLimitSwitchMode,
     true,
+    false,
     leftBlocked,
     rightBlocked,
     stopRequested
@@ -1702,6 +1798,128 @@ bool moveGantryXYTo(
   return true;
 }
 
+bool circleGantryXY(
+  float centerXCm,
+  float centerYCm,
+  float radiusCm,
+  int rpm,
+  bool trapezoidalSpeed,
+  int accelerationRpmPerSecond
+) {
+  if (!xyCalibrated) {
+    Serial.println("ERR X NOT CALIBRATED");
+    return false;
+  }
+
+  if (radiusCm <= 0.0f) {
+    Serial.println("ERR CIRCLE RADIUS");
+    return false;
+  }
+
+  // The full circle must fit inside the calibrated workspace.
+  if (centerXCm - radiusCm < 0.0f || centerXCm + radiusCm > xAxis.trackLengthCm
+      || centerYCm - radiusCm < 0.0f || centerYCm + radiusCm > yAxis.trackLengthCm) {
+    Serial.print("ERR CIRCLE RANGE CENTER ");
+    Serial.print(centerXCm, 3);
+    Serial.print(" ");
+    Serial.print(centerYCm, 3);
+    Serial.print(" RADIUS ");
+    Serial.print(radiusCm, 3);
+    Serial.print(" LIMITS ");
+    Serial.print(xAxis.trackLengthCm, 3);
+    Serial.print(" ");
+    Serial.println(yAxis.trackLengthCm, 3);
+    return false;
+  }
+
+  // Travel to the circle start point (angle 0, right of center) as a normal
+  // straight move with its own ramp.
+  if (!moveGantryXYTo(centerXCm + radiusCm, centerYCm, rpm, trapezoidalSpeed, accelerationRpmPerSecond)) {
+    return false;
+  }
+
+  Serial.print("ACTIVE CIRCLE XY CENTER ");
+  Serial.print(centerXCm, 3);
+  Serial.print(" ");
+  Serial.print(centerYCm, 3);
+  Serial.print(" RADIUS ");
+  Serial.print(radiusCm, 3);
+  Serial.print(" RPM ");
+  Serial.print(rpm);
+  Serial.print(" TRAPEZOID ");
+  Serial.print(trapezoidalSpeed ? 1 : 0);
+  Serial.print(" ACCEL ");
+  Serial.println(accelerationRpmPerSecond);
+
+  setXYMotorsEnabled(true);
+
+  // Short chords approximate the arc; ~0.5 mm keeps the path visibly round.
+  float circumferenceCm = 2.0f * PI * radiusCm;
+  int segments = max(24, (int)ceilf(circumferenceCm / 0.05f));
+  // Motor iterations per chord are |dx| + |dy| steps, which integrates to
+  // (4 / pi) x circumference over a lap; used to shape one acceleration and
+  // deceleration profile across the whole circle instead of per chord.
+  long totalProfileIterations = lroundf(circumferenceCm * xStepsPerCm * 4.0f / PI);
+  long profileIterationsDone = 0;
+
+  for (int segment = 1; segment <= segments; segment++) {
+    float angle = (2.0f * PI * segment) / segments;
+    long targetXSteps = lroundf((centerXCm + radiusCm * cosf(angle)) * xStepsPerCm);
+    long targetYSteps = lroundf((centerYCm + radiusCm * sinf(angle)) * yStepsPerCm);
+    long deltaX = targetXSteps - currentXSteps;
+    long deltaY = targetYSteps - currentYSteps;
+    if (deltaX == 0 && deltaY == 0) {
+      continue;
+    }
+
+    long chordIterations = labs(deltaX) + labs(deltaY);
+    int segmentRpm = trapezoidalSpeed
+      ? rpmForTrapezoidIteration(
+          profileIterationsDone + chordIterations / 2,
+          totalProfileIterations,
+          rpm,
+          true,
+          accelerationRpmPerSecond
+        )
+      : rpm;
+
+    bool xBlocked = false;
+    bool yBlocked = false;
+    bool stopRequested = false;
+    bool moved = runCoreXYCartesianMove(
+      deltaX,
+      deltaY,
+      segmentRpm,
+      false,
+      accelerationRpmPerSecond,
+      true,
+      xBlocked,
+      yBlocked,
+      stopRequested
+    );
+
+    if (!moved) {
+      saveXCalibrationState();
+      if (stopRequested) {
+        // consumeStopCommandIfPresent already acknowledged with OK STOP.
+        return false;
+      }
+      Serial.println("ERR ESTOP XY LIMIT");
+      return false;
+    }
+
+    profileIterationsDone += chordIterations;
+  }
+
+  saveXCalibrationState();
+  Serial.print("XY POSITION CM ");
+  Serial.print(stepsToCm(currentXSteps, xStepsPerCm), 3);
+  Serial.print(" ");
+  Serial.println(stepsToCm(currentYSteps, xStepsPerCm), 3);
+  Serial.println("OK CIRCLE XY");
+  return true;
+}
+
 bool calibrateZ(float leftTrackLengthCm, float rightTrackLengthCm, int calibrationRPM, bool trapezoidalSpeed, int accelerationRpmPerSecond) {
   long leftExpectedSteps = cmToSteps(leftTrackLengthCm, Z_STEPS_PER_CM);
   long rightExpectedSteps = cmToSteps(rightTrackLengthCm, Z_STEPS_PER_CM);
@@ -1811,6 +2029,38 @@ bool handleGotoXYCommand(const String &cmd) {
     parsed >= 3 ? rpm : 240,
     parsed >= 4 ? trapezoidFlag != 0 : true,
     parsed >= 5 ? accelerationRpmPerSecond : 600
+  );
+  return true;
+}
+
+bool handleCircleXYCommand(const String &cmd) {
+  float centerXCm = 0.0f;
+  float centerYCm = 0.0f;
+  float radiusCm = 0.0f;
+  int rpm = 400;
+  int trapezoidFlag = 1;
+  int accelerationRpmPerSecond = 600;
+  int parsed = sscanf(
+    cmd.c_str(),
+    "CIRCLEXY %f %f %f %d %d %d",
+    &centerXCm,
+    &centerYCm,
+    &radiusCm,
+    &rpm,
+    &trapezoidFlag,
+    &accelerationRpmPerSecond
+  );
+  if (parsed < 3) {
+    return false;
+  }
+
+  circleGantryXY(
+    centerXCm,
+    centerYCm,
+    radiusCm,
+    parsed >= 4 ? rpm : 400,
+    parsed >= 5 ? trapezoidFlag != 0 : true,
+    parsed >= 6 ? accelerationRpmPerSecond : 600
   );
   return true;
 }
@@ -2036,6 +2286,8 @@ void loop() {
   else if (handleMoveXYCommand(cmd)) {
   }
   else if (handleGotoXYCommand(cmd)) {
+  }
+  else if (handleCircleXYCommand(cmd)) {
   }
   else if (handleMoveXCommand(cmd)) {
   }

@@ -6,6 +6,8 @@ from threading import Lock
 
 from app.models.gantry import (
     GANTRY_WORKSPACE_X_CM,
+    GantryCircleXYRequest,
+    GantryCircleXYResponse,
     GantryGotoXYRequest,
     GantryGotoXYResponse,
     GantryXYCalibrationRequest,
@@ -642,6 +644,63 @@ class GantryControllerService:
             trapezoidal_speed=request.trapezoidal_speed,
             acceleration_rpm_per_s=request.acceleration_rpm_per_s,
             target={"x_cm": request.x_cm, "y_cm": request.y_cm},
+            pin_command_sent=pin_command,
+            pin_reply=pin_reply,
+            pins_applied=True,
+            limit_command_sent=limit_command,
+            limit_reply=limit_reply,
+            limits_applied=True,
+            move_command_sent=move_command,
+            move_reply=move_reply,
+            move_applied=True,
+            configured_pins={
+                "x_step_pin": request.x_step_pin,
+                "x_dir_pin": request.x_dir_pin,
+                "y_step_pin": request.y_step_pin,
+                "y_dir_pin": request.y_dir_pin,
+            },
+            configured_limits={
+                "limit_switch_mode": request.limit_switch_mode,
+                "x_min_limit_pin": request.x_min_limit_pin,
+                "x_max_limit_pin": request.x_max_limit_pin,
+                "y_min_limit_pin": request.y_min_limit_pin,
+                "y_max_limit_pin": request.y_max_limit_pin,
+                "speed_rpm": _effective_move_rpm(request),
+            },
+        )
+
+    def circle_xy(self, request: GantryCircleXYRequest) -> GantryCircleXYResponse:
+        port = self._selected_port(request.tool_port)
+        baud_rate = request.baud_rate or self._baud_rate()
+        pin_command = self._build_xy_pin_command(request)
+        limit_command = self._build_xy_limit_command(request)
+        move_command = (
+            f"CIRCLEXY {request.center_x_cm:.3f} {request.center_y_cm:.3f} {request.radius_cm:.3f} "
+            f"{_effective_move_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
+        )
+        # Approach move plus the full circumference, with generous headroom.
+        circle_steps = (2.0 * math.pi * request.radius_cm + GANTRY_WORKSPACE_X_CM * 2.0) * XY_STEPS_PER_CM * 8.0
+        action_deadline = self._move_deadline(circle_steps, _effective_move_rpm(request))
+        pin_reply, limit_reply, move_reply = self._send_config_and_action(
+            port=port,
+            baud_rate=baud_rate,
+            pin_command=pin_command,
+            enable_command=self._build_xy_enable_command(request),
+            limit_command=limit_command,
+            action_command=move_command,
+            action_prefix="OK CIRCLE XY",
+            action_deadline=action_deadline,
+        )
+
+        return GantryCircleXYResponse(
+            port=port,
+            baud_rate=baud_rate,
+            speed_profile=request.speed_profile,
+            speed_rpm=_effective_move_rpm(request),
+            trapezoidal_speed=request.trapezoidal_speed,
+            acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+            center={"x_cm": request.center_x_cm, "y_cm": request.center_y_cm},
+            radius_cm=request.radius_cm,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
