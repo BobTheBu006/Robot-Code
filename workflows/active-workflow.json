@@ -880,8 +880,8 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
-          "x_cm": 80,
-          "y_cm": 25,
+          "x_cm": 50,
+          "y_cm": 15,
           "speed_rpm": 3000,
           "trapezoidal_speed": true,
           "acceleration_rpm_per_s": 2500,
@@ -899,15 +899,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 54,
-        "benchmarkDurationMs": 4885,
-        "lastDurationMs": 42
+        "runCount": 59,
+        "benchmarkDurationMs": 4906,
+        "lastDurationMs": 556
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     },
     {
@@ -18088,6 +18088,17 @@
               "options": []
             },
             {
+              "key": "repeat_count",
+              "label": "Repeat Count",
+              "type": "number",
+              "description": "Number of full circles to trace before continuing.",
+              "required": false,
+              "default": 1,
+              "placeholder": null,
+              "advanced": false,
+              "options": []
+            },
+            {
               "key": "speed_rpm",
               "label": "Move Speed (RPM)",
               "type": "number",
@@ -18443,7 +18454,7 @@
               "routine_id": "move_gantry_circle",
               "controller_role": "builder_board",
               "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across the whole lap, and faults on workspace or limit violations.",
+              "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The backend sends CIRCLEXY once per requested repeat. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across each lap, and faults on workspace or limit violations.",
               "entry_point": "circleGantryXY",
               "required_device_ids": [
                 "x-axis-motor",
@@ -18460,12 +18471,13 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
-          "center_x_cm": 80,
-          "center_y_cm": 25,
+          "center_x_cm": 50,
+          "center_y_cm": 15,
           "radius_cm": 5,
-          "speed_rpm": 800,
+          "repeat_count": 30,
+          "speed_rpm": 500,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 1200,
+          "acceleration_rpm_per_s": 750,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -18480,15 +18492,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 15,
-        "benchmarkDurationMs": 4065,
-        "lastDurationMs": 3879
+        "runCount": 24,
+        "benchmarkDurationMs": 27905,
+        "lastDurationMs": 97602
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     },
     {

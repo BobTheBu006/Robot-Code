@@ -257,6 +257,7 @@ class GantryCircleXYRequest(BaseModel):
     center_x_cm: float = Field(default=0.0, ge=0.0)
     center_y_cm: float = Field(default=0.0, ge=0.0)
     radius_cm: float = Field(default=1.0, gt=0.0)
+    repeat_count: int = Field(default=1, ge=1)
     speed_profile: GantrySpeedProfile = "normal"
     speed_rpm: int = Field(default=400, gt=0)
     trapezoidal_speed: bool = Field(default=True)
@@ -311,6 +312,7 @@ class GantryCircleXYResponse(BaseModel):
     acceleration_rpm_per_s: int
     center: dict[str, float]
     radius_cm: float
+    repeat_count: int
     pin_command_sent: str
     pin_reply: str | None = None
     pins_applied: bool = False

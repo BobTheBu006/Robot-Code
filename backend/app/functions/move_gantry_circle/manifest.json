@@ -51,6 +51,17 @@
       "options": []
     },
     {
+      "key": "repeat_count",
+      "label": "Repeat Count",
+      "type": "number",
+      "description": "Number of full circles to trace before continuing.",
+      "required": false,
+      "default": 1.0,
+      "placeholder": null,
+      "advanced": false,
+      "options": []
+    },
+    {
       "key": "speed_rpm",
       "label": "Move Speed (RPM)",
       "type": "number",
@@ -329,7 +340,7 @@
       "routine_id": "move_gantry_circle",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across the whole lap, and faults on workspace or limit violations.",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The backend sends CIRCLEXY once per requested repeat. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across each lap, and faults on workspace or limit violations.",
       "entry_point": "circleGantryXY",
       "required_device_ids": [
         "x-axis-motor",

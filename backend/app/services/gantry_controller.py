@@ -308,7 +308,7 @@ class GantryControllerService:
         baud_rate: int,
         pin_command: str | list[str],
         limit_command: str | list[str],
-        action_command: str,
+        action_command: str | list[str],
         action_prefix: str,
         action_deadline: float,
         enable_command: str | list[str] | None = None,
@@ -374,24 +374,29 @@ class GantryControllerService:
                                 limit_replies.append(limit_reply)
                         limit_reply = "\n".join(limit_replies) if limit_replies else None
 
-                        action_reply, action_completed = self._send_command(
-                            serial_port,
-                            action_command,
-                            terminal_prefixes=(action_prefix, "OK STOP", "ERR "),
-                            deadline_seconds=action_deadline,
-                            active_session=active_session,
-                        )
-                        if self._reply_contains_prefix(action_reply, ("OK STOP",)):
-                            raise GantryControllerError("Gantry command was cancelled.")
-                        if self._reply_contains_prefix(action_reply, ("ERR ",)):
-                            terminal_error = self._reply_last_prefixed_line(action_reply, ("ERR ",))
-                            raise GantryControllerReportedError(
-                                f"ESP32 reported gantry error: {terminal_error}. Full reply: {action_reply}"
+                        action_replies: list[str] = []
+                        for next_action_command in self._command_list(action_command):
+                            action_reply, action_completed = self._send_command(
+                                serial_port,
+                                next_action_command,
+                                terminal_prefixes=(action_prefix, "OK STOP", "ERR "),
+                                deadline_seconds=action_deadline,
+                                active_session=active_session,
                             )
-                        if not action_completed or not self._reply_contains_prefix(action_reply, (action_prefix,)):
-                            raise GantryControllerError(
-                                f"ESP32 did not send expected completion '{action_prefix}'. Full reply: {action_reply}"
-                            )
+                            if self._reply_contains_prefix(action_reply, ("OK STOP",)):
+                                raise GantryControllerError("Gantry command was cancelled.")
+                            if self._reply_contains_prefix(action_reply, ("ERR ",)):
+                                terminal_error = self._reply_last_prefixed_line(action_reply, ("ERR ",))
+                                raise GantryControllerReportedError(
+                                    f"ESP32 reported gantry error: {terminal_error}. Full reply: {action_reply}"
+                                )
+                            if not action_completed or not self._reply_contains_prefix(action_reply, (action_prefix,)):
+                                raise GantryControllerError(
+                                    f"ESP32 did not send expected completion '{action_prefix}'. Full reply: {action_reply}"
+                                )
+                            if action_reply:
+                                action_replies.append(action_reply)
+                        action_reply = "\n".join(action_replies) if action_replies else None
                     finally:
                         self._unregister_active_session(port, active_session)
                 except Exception:
@@ -409,13 +414,13 @@ class GantryControllerService:
     def _command_list(self, command: str | list[str]) -> list[str]:
         return command if isinstance(command, list) else [command]
 
-    def _build_xy_pin_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
+    def _build_xy_pin_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest | GantryCircleXYRequest) -> str:
         return (
             f"SET XY PINS {request.x_step_pin} {request.x_dir_pin} "
             f"{request.y_step_pin} {request.y_dir_pin}"
         )
 
-    def _build_xy_limit_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str:
+    def _build_xy_limit_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest | GantryCircleXYRequest) -> str:
         if isinstance(request, GantryXYCalibrationRequest):
             return (
                 f"SET XY LIMITS {request.x_min_limit_pin} {request.x_max_limit_pin} "
@@ -426,7 +431,7 @@ class GantryControllerService:
             f"{request.x_max_limit_pin} {request.y_min_limit_pin} {request.y_max_limit_pin}"
         )
 
-    def _build_xy_enable_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> str | None:
+    def _build_xy_enable_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest | GantryCircleXYRequest) -> str | None:
         # Only configure driver enable pins when at least one is wired. When both
         # are unassigned (-1) the drivers are assumed hardwired-enabled, and we
         # skip the command entirely so older firmware without SET XY ENABLE keeps
@@ -674,10 +679,11 @@ class GantryControllerService:
         baud_rate = request.baud_rate or self._baud_rate()
         pin_command = self._build_xy_pin_command(request)
         limit_command = self._build_xy_limit_command(request)
-        move_command = (
+        circle_command = (
             f"CIRCLEXY {request.center_x_cm:.3f} {request.center_y_cm:.3f} {request.radius_cm:.3f} "
             f"{_effective_move_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
         )
+        move_command = [circle_command for _ in range(request.repeat_count)]
         # Approach move plus the full circumference, with generous headroom.
         circle_steps = (2.0 * math.pi * request.radius_cm + GANTRY_WORKSPACE_X_CM * 2.0) * XY_STEPS_PER_CM * 8.0
         action_deadline = self._move_deadline(circle_steps, _effective_move_rpm(request))
@@ -701,13 +707,14 @@ class GantryControllerService:
             acceleration_rpm_per_s=request.acceleration_rpm_per_s,
             center={"x_cm": request.center_x_cm, "y_cm": request.center_y_cm},
             radius_cm=request.radius_cm,
+            repeat_count=request.repeat_count,
             pin_command_sent=pin_command,
             pin_reply=pin_reply,
             pins_applied=True,
             limit_command_sent=limit_command,
             limit_reply=limit_reply,
             limits_applied=True,
-            move_command_sent=move_command,
+            move_command_sent="\n".join(move_command),
             move_reply=move_reply,
             move_applied=True,
             configured_pins={

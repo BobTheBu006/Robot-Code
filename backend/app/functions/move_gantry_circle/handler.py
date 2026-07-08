@@ -9,12 +9,14 @@ def execute(context: dict, inputs: dict) -> dict:
     return {
         "status": "completed",
         "message": (
-            f"Gantry traced a circle around X = {request.center_x_cm:.3f} cm, "
+            f"Gantry traced {request.repeat_count} circle"
+            f"{'' if request.repeat_count == 1 else 's'} around X = {request.center_x_cm:.3f} cm, "
             f"Y = {request.center_y_cm:.3f} cm with radius {request.radius_cm:.3f} cm."
         ),
         "tool_port": response.port,
         "center": response.center,
         "radius_cm": response.radius_cm,
+        "repeat_count": response.repeat_count,
         "speed_profile": response.speed_profile,
         "speed_rpm": response.speed_rpm,
         "trapezoidal_speed": response.trapezoidal_speed,
