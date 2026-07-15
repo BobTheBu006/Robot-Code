@@ -25,3 +25,6 @@ Thumbs.db
 
 # Local tooling
 tools/arduino-cli/
+
+# Runtime machine state: which toolhead is physically on the gantry right now.
+toolhead-state.json

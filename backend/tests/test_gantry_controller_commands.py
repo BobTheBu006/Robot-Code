@@ -41,7 +41,46 @@ class GantryControllerCommandTests(unittest.TestCase):
 
         self.assertEqual(
             service._build_calibrate_xy_command(request),
-            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90",
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 3.200 0.500",
+        )
+
+    def test_xy_calibration_command_sends_requested_limit_buffer(self) -> None:
+        service = GantryControllerService()
+        request = GantryXYCalibrationRequest(
+            x_track_length_cm=111,
+            y_track_length_cm=55.5,
+            speed_rpm=500,
+            trapezoidal_speed=True,
+            acceleration_rpm_per_s=2000,
+            steps_per_rotation=800,
+            max_probe_rotations=90,
+            limit_buffer_cm=1.0,
+        )
+
+        # The firmware persists this buffer and maps every later move through it.
+        self.assertEqual(
+            service._build_calibrate_xy_command(request),
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 3.200 1.000",
+        )
+
+    def test_xy_calibration_command_sends_requested_calibration_y(self) -> None:
+        service = GantryControllerService()
+        request = GantryXYCalibrationRequest(
+            x_track_length_cm=111,
+            y_track_length_cm=55.5,
+            speed_rpm=500,
+            trapezoidal_speed=True,
+            acceleration_rpm_per_s=2000,
+            steps_per_rotation=800,
+            max_probe_rotations=90,
+            x_calibration_y_cm=5.0,
+        )
+
+        # The park Y is appended last so firmware built before it still parses
+        # the command and falls back to its own default.
+        self.assertEqual(
+            service._build_calibrate_xy_command(request),
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 5.000 0.500",
         )
 
     def test_xy_calibration_ignores_unused_y_limit_pins(self) -> None:

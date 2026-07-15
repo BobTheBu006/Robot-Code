@@ -1,0 +1,498 @@
+{
+  "schema_version": 1,
+  "id": "pickup_toolhead",
+  "display_name": "Pick Up Toolhead",
+  "category": "Robot Actions",
+  "description": "Pick up a gantry toolhead from the rack. Approaches the slot at the chosen speed, then engages at a fixed 50 RPM: onto the tool, dip along -Y, lift back to seat it, and withdraw along +X. If another toolhead is already held it is dropped into its own slot first. Errors before moving if the sequence would leave the usable workspace.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "Selected ESP32",
+      "type": "file/path",
+      "description": "Connected ESP32 board that drives the CoreXY gantry.",
+      "required": true,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0",
+      "advanced": false,
+      "options": [],
+      "min": null,
+      "max": null
+    },
+    {
+      "key": "toolhead_index",
+      "label": "Toolhead",
+      "type": "number",
+      "description": "Which toolhead to pick up (1-6). If a different toolhead is already held it is automatically returned to its own slot first.",
+      "required": true,
+      "default": 1.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": 1.0,
+      "max": 6.0,
+      "options": []
+    },
+    {
+      "key": "approach_speed_rpm",
+      "label": "Approach Speed (RPM)",
+      "type": "number",
+      "description": "Speed for the initial approach move only. Every step after it runs at a fixed 50 RPM.",
+      "required": true,
+      "default": 400.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": 1.0,
+      "max": null,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "x_step_pin",
+      "label": "CoreXY A Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO step pin for the CoreXY A driver.",
+      "required": false,
+      "default": 16.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_dir_pin",
+      "label": "CoreXY A Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO direction pin for the CoreXY A driver.",
+      "required": false,
+      "default": 17.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_step_pin",
+      "label": "CoreXY B Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO step pin for the CoreXY B driver.",
+      "required": false,
+      "default": 18.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_dir_pin",
+      "label": "CoreXY B Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO direction pin for the CoreXY B driver.",
+      "required": false,
+      "default": 19.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_min_limit_pin",
+      "label": "X Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the X minimum/home limit switch.",
+      "required": false,
+      "default": 21.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_max_limit_pin",
+      "label": "X Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the X maximum limit switch.",
+      "required": false,
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_min_limit_pin",
+      "label": "Y Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Y minimum limit switch.",
+      "required": false,
+      "default": 23.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_max_limit_pin",
+      "label": "Y Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead.",
+      "required": false,
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "tool_1_x_cm",
+      "label": "Toolhead 1 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 1 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_1_y_cm",
+      "label": "Toolhead 1 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 1 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 3.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_2_x_cm",
+      "label": "Toolhead 2 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 2 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_2_y_cm",
+      "label": "Toolhead 2 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 2 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 13.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_3_x_cm",
+      "label": "Toolhead 3 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 3 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_3_y_cm",
+      "label": "Toolhead 3 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 3 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 23.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_4_x_cm",
+      "label": "Toolhead 4 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 4 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_4_y_cm",
+      "label": "Toolhead 4 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 4 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 33.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_5_x_cm",
+      "label": "Toolhead 5 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 5 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_5_y_cm",
+      "label": "Toolhead 5 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 5 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 42.8,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_6_x_cm",
+      "label": "Toolhead 6 X (cm)",
+      "type": "number",
+      "description": "Exact X position of toolhead 6 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "tool_6_y_cm",
+      "label": "Toolhead 6 Y (cm)",
+      "type": "number",
+      "description": "Exact Y position of toolhead 6 in its holder. Edited values become the new default.",
+      "required": true,
+      "default": 53.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "clearance_cm",
+      "label": "Approach Clearance (cm)",
+      "type": "number",
+      "description": "How far along +X the gantry stands off the rack when approaching and leaving.",
+      "required": true,
+      "default": 2.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "dip_depth_cm",
+      "label": "Dip Depth (cm)",
+      "type": "number",
+      "description": "How far along -Y the gantry pulls to engage or release a tool. Needs this much room below the tool.",
+      "required": true,
+      "default": 3.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "lift_cm",
+      "label": "Engage Lift (cm)",
+      "type": "number",
+      "description": "Small +Y move back after the dip that seats the tool on the gantry.",
+      "required": true,
+      "default": 0.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "release_cm",
+      "label": "Release Offset (cm)",
+      "type": "number",
+      "description": "Small -Y move that releases the tool into its slot during a drop.",
+      "required": true,
+      "default": 0.2,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0.0,
+      "max": null,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue when the tool change completes."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "x-axis-motor",
+      "name": "CoreXY A Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "x_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "x-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "x_step_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-x-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "y-axis-motor",
+      "name": "CoreXY B Motor",
+      "kind": "stepper_motor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "y_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "y-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "y_step_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-y-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "x-min-limit-switch",
+      "name": "X Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "x_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "x-max-limit-switch",
+      "name": "X Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "x_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-max-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "y-min-limit-switch",
+      "name": "Y Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "ttyUSB0",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-min-limit-switch",
+      "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "pickup_toolhead",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The block issues the tool-change waypoints as a series of GOTOXY moves; no dedicated firmware routine is required.",
+      "entry_point": "pickup_toolhead",
+      "required_device_ids": [
+        "x-axis-motor",
+        "y-axis-motor",
+        "x-min-limit-switch",
+        "x-max-limit-switch",
+        "y-min-limit-switch"
+      ],
+      "description": "Firmware routine required by the Pick Up Toolhead block."
+    }
+  ],
+  "builder_board_id": "ttyUSB0",
+  "builder_source_path": null,
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
+  "builder_base_function_id": null
+}

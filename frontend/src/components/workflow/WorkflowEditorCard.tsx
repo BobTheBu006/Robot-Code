@@ -45,6 +45,7 @@ import {
   createWorkflowNode,
   formatDurationShort,
   getAllBlockInputs,
+  getWorkflowNodeDisplayName,
   getWorkflowNodeOutputs,
   resolveWorkflowParameters,
   normalizeFailureMode,
@@ -654,7 +655,18 @@ interface CompoundFunctionEditorProps {
   onSaveCustomBlock: (node: WorkflowFlowNode, displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
 }
 
-function CompoundFunctionEditor({
+// The inner canvas needs its own ReactFlowProvider. Without one it shares the
+// main editor's store, so opening the compound editor overwrites the main
+// canvas nodes/edges and closing it leaves the connections gone.
+function CompoundFunctionEditor(props: CompoundFunctionEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <CompoundFunctionEditorSurface {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function CompoundFunctionEditorSurface({
   node,
   testStateByNodeId,
   onClose,
@@ -747,6 +759,25 @@ function CompoundFunctionEditor({
     );
   }
 
+  function handleRenameInnerNode(nodeId: string, displayName: string) {
+    const trimmedName = displayName.trim();
+    setEditorNodes((currentNodes) =>
+      currentNodes.map((innerNode) =>
+        innerNode.id === nodeId
+          ? {
+              ...innerNode,
+              data: {
+                ...innerNode.data,
+                customName: !trimmedName || trimmedName === innerNode.data.block.displayName
+                  ? null
+                  : trimmedName,
+              },
+            }
+          : innerNode,
+      ),
+    );
+  }
+
   function handleUpdateInnerSettings(
     nodeId: string,
     updates: Partial<{ failureMode: WorkflowFailureMode; retryCount: number }>,
@@ -813,7 +844,7 @@ function CompoundFunctionEditor({
         <header className="workflow-compound-editor__header">
           <div>
             <span>Compound editor</span>
-            <strong>{node.data.block.displayName}</strong>
+            <strong>{getWorkflowNodeDisplayName(node.data)}</strong>
           </div>
           <div className="workflow-compound-editor__actions">
             <button className="workflow-editor__action" onClick={onClose} type="button">
@@ -867,7 +898,7 @@ function CompoundFunctionEditor({
               <WorkflowInspector
                 allNodeTestEntries={editorNodes.map((innerNode) => ({
                   nodeId: innerNode.id,
-                  nodeName: innerNode.data.block.displayName,
+                  nodeName: getWorkflowNodeDisplayName(innerNode.data),
                   status: testStateByNodeId[innerNode.id]?.status ?? "idle",
                   result: testStateByNodeId[innerNode.id]?.result ?? null,
                   error: testStateByNodeId[innerNode.id]?.error ?? null,
@@ -888,6 +919,7 @@ function CompoundFunctionEditor({
                   }
                 }}
                 onSaveCustomBlock={(displayName) => onSaveCustomBlock(openedInnerNode, displayName)}
+                onRenameNode={handleRenameInnerNode}
                 onUpdateParameter={handleUpdateInnerParameter}
                 onUpdateSettings={handleUpdateInnerSettings}
                 previousNodeTestError={previousInnerNodeTestState.error}
@@ -1460,6 +1492,57 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     window.addEventListener("keydown", handleWorkflowKeyDown);
     return () => window.removeEventListener("keydown", handleWorkflowKeyDown);
   }, [nodes, edges, selectedNodeId, editingCompoundNodeId]);
+
+  function handleRenameNode(nodeId: string, displayName: string) {
+    const node = nodeLookup.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    const trimmedName = displayName.trim();
+    // A compound function is user-created, so renaming it also renames the
+    // reusable definition (and its palette entry) on every node that uses it.
+    // Discovered function blocks keep their manifest name; only this instance
+    // is renamed, via customName on the node.
+    const isCompound = node.data.block.kind === "compound";
+    const compoundBlockId = node.data.block.id;
+    const nextCompoundName = trimmedName || node.data.block.displayName;
+
+    setNodes((currentNodes) =>
+      currentNodes.map((candidate) => {
+        const sharesCompoundBlock = isCompound && candidate.data.block.id === compoundBlockId;
+        if (candidate.id !== nodeId && !sharesCompoundBlock) {
+          return candidate;
+        }
+
+        const nextBlock = sharesCompoundBlock
+          ? { ...candidate.data.block, displayName: nextCompoundName }
+          : candidate.data.block;
+        // Clearing the field, or typing the block's own name, drops the override
+        // instead of storing a redundant copy of it.
+        const nextCustomName = !trimmedName || trimmedName === nextBlock.displayName
+          ? null
+          : trimmedName;
+
+        return {
+          ...candidate,
+          data: {
+            ...candidate.data,
+            customName: candidate.id === nodeId ? nextCustomName : candidate.data.customName,
+            block: nextBlock,
+          },
+        };
+      }),
+    );
+
+    if (isCompound) {
+      setCompoundBlocks((currentBlocks) =>
+        currentBlocks.map((block) =>
+          block.id === compoundBlockId ? { ...block, displayName: nextCompoundName } : block,
+        ),
+      );
+    }
+  }
 
   function handleToggleNodeActive(nodeId: string) {
     setNodes((currentNodes) =>
@@ -3058,7 +3141,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
             onDrop={handleDrop}
             onPointerDownCapture={handleControlDragPan}
           >
-            {workflowDrawer !== "blocks" ? (
+            {/* Hidden while a block is opened: the inspector overlay sits below
+                this button, which would otherwise cover its close (x) button. */}
+            {workflowDrawer !== "blocks" && !openedNode ? (
               <button
                 aria-label="Add blocks"
                 className="workflow-canvas-add"
@@ -3177,7 +3262,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
               <WorkflowInspector
                 allNodeTestEntries={nodes.map((node) => ({
                   nodeId: node.id,
-                  nodeName: node.data.block.displayName,
+                  nodeName: getWorkflowNodeDisplayName(node.data),
                   status: testStateByNodeId[node.id]?.status ?? "idle",
                   result: testStateByNodeId[node.id]?.result ?? null,
                   error: testStateByNodeId[node.id]?.error ?? null,
@@ -3195,6 +3280,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                 onEditCompound={() => handleEditCompoundFunction(openedNode.id)}
                 onRunTest={handleRunTest}
                 onRunNode={(nodeId) => void handleRunTestForNode(nodeId)}
+                onRenameNode={handleRenameNode}
                 onSaveCustomBlock={(displayName) => handleSaveCustomBlock(openedNode.id, displayName)}
                 onUpdateParameter={handleUpdateParameter}
                 onUpdateSettings={handleUpdateNodeSettings}

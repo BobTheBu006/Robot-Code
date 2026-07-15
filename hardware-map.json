@@ -6,14 +6,22 @@
       "label": "Calibrate Gantry XY Controller",
       "usb_port": "/dev/ttyUSB0",
       "enabled": true,
-      "notes": "Auto-created because Calibrate Gantry XY declares hardware devices."
+      "notes": "Auto-created because Calibrate Gantry XY declares hardware devices.",
+      "dynamic": false,
+      "expected_serial_number": null,
+      "expected_hardware_id": null,
+      "expected_device_label": null
     },
     {
       "id": "controller-x83xnc",
       "label": "7 syringe pump controller",
       "usb_port": "/dev/ttyUSB0",
       "enabled": false,
-      "notes": null
+      "notes": null,
+      "dynamic": false,
+      "expected_serial_number": null,
+      "expected_hardware_id": null,
+      "expected_device_label": null
     }
   ],
   "devices": [
@@ -185,29 +193,8 @@
         {
           "id": "y-min-limit",
           "signal": "signal",
-          "gpio": "23",
+          "gpio": "26",
           "function_input_key": "y_min_limit_pin",
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "y-max-limit-switch",
-      "board_id": "ttyUSB0",
-      "name": "Y Max Limit Switch",
-      "kind": "sensor",
-      "enabled": true,
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "y-max-limit",
-          "signal": "signal",
-          "gpio": "22",
-          "function_input_key": "y_max_limit_pin",
           "notes": null
         }
       ],
@@ -800,30 +787,30 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "y-max-limit-switch",
+      "board_id": "",
+      "name": "Y Max Limit Switch",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-max-limit",
+          "signal": "signal",
+          "gpio": "22",
+          "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
     }
   ],
   "groups": [
-    {
-      "id": "group-m29ldf",
-      "name": "XY ZZ axis hardware",
-      "member_ids": [
-        "ttyUSB0",
-        "x-axis-motor",
-        "y-axis-motor",
-        "x-min-limit-switch",
-        "x-max-limit-switch",
-        "y-min-limit-switch",
-        "y-max-limit-switch",
-        "left-z-motor",
-        "right-z-motor",
-        "z-left-min-limit-switch",
-        "z-left-max-limit-switch",
-        "z-right-min-limit-switch",
-        "z-right-max-limit-switch"
-      ],
-      "enabled": true,
-      "notes": null
-    },
     {
       "id": "group-1fhsjs",
       "name": "7 syringe group",
@@ -837,7 +824,7 @@
         "syringe-head-f",
         "syringe-head-g"
       ],
-      "enabled": true,
+      "enabled": false,
       "notes": null
     }
   ],
@@ -880,12 +867,7 @@
     {
       "function_id": "move_gantry_xy",
       "device_id": "x-max-limit-switch",
-      "hardware_device_id": "x-min-limit-switch"
-    },
-    {
-      "function_id": "move_gantry_xy",
-      "device_id": "y-max-limit-switch",
-      "hardware_device_id": "y-max-limit-switch"
+      "hardware_device_id": "x-max-limit-switch"
     },
     {
       "function_id": "move_gantry_xy",
@@ -926,24 +908,94 @@
       "function_id": "7_syringe_dispenser_slow_and_good",
       "device_id": "syringe-head-g",
       "hardware_device_id": "syringe-head-g"
+    },
+    {
+      "function_id": "calibrate_xy",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_circle",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
     }
   ],
   "node_positions": [
     {
-      "node_id": "group-m29ldf",
-      "x": 482.0,
-      "y": 1222.0
-    },
-    {
       "node_id": "group-1fhsjs",
-      "x": 478.0,
-      "y": 958.0
+      "x": 152.0,
+      "y": 1024.0
     },
     {
       "node_id": "raspberry-pi",
-      "x": 108.66,
-      "y": 1038.29
+      "x": 40.0,
+      "y": 180.0
+    },
+    {
+      "node_id": "y-max-limit-switch",
+      "x": 680.0,
+      "y": 80.0
+    },
+    {
+      "node_id": "ttyUSB0",
+      "x": 350.0,
+      "y": 80.0
+    },
+    {
+      "node_id": "x-axis-motor",
+      "x": 680.0,
+      "y": 80.0
+    },
+    {
+      "node_id": "y-axis-motor",
+      "x": 680.0,
+      "y": 190.0
+    },
+    {
+      "node_id": "x-min-limit-switch",
+      "x": 680.0,
+      "y": 300.0
+    },
+    {
+      "node_id": "x-max-limit-switch",
+      "x": 680.0,
+      "y": 410.0
+    },
+    {
+      "node_id": "y-min-limit-switch",
+      "x": 680.0,
+      "y": 520.0
+    },
+    {
+      "node_id": "left-z-motor",
+      "x": 680.0,
+      "y": 740.0
+    },
+    {
+      "node_id": "right-z-motor",
+      "x": 680.0,
+      "y": 850.0
+    },
+    {
+      "node_id": "z-left-min-limit-switch",
+      "x": 680.0,
+      "y": 960.0
+    },
+    {
+      "node_id": "z-left-max-limit-switch",
+      "x": 680.0,
+      "y": 1070.0
+    },
+    {
+      "node_id": "z-right-min-limit-switch",
+      "x": 680.0,
+      "y": 1180.0
+    },
+    {
+      "node_id": "z-right-max-limit-switch",
+      "x": 680.0,
+      "y": 1290.0
     }
   ],
-  "updated_at": "2026-07-03T20:18:12.075195Z"
+  "updated_at": "2026-07-15T15:52:25.434372Z"
 }

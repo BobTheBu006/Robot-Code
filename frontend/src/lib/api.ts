@@ -17,7 +17,9 @@ import type {
   SavedWorkflowFile,
   WorkflowCanvasEdge,
   WorkflowCanvasNode,
+  WorkflowDeleteResponse,
   WorkflowListResponse,
+  WorkflowRenameResponse,
   WorkflowParameterValue,
   WorkflowSaveResponse,
 } from "../types/workflow";
@@ -198,6 +200,19 @@ export function fetchWorkflowFile(filename: string): Promise<SavedWorkflowFile> 
 
 export function fetchWorkflowList(): Promise<WorkflowListResponse> {
   return request<WorkflowListResponse>("/api/workflows");
+}
+
+export function renameWorkflowFile(filename: string, nextFilename: string): Promise<WorkflowRenameResponse> {
+  return request<WorkflowRenameResponse>(`/api/workflows/${encodeURIComponent(filename)}/rename`, {
+    method: "POST",
+    body: JSON.stringify({ filename: nextFilename }),
+  });
+}
+
+export function deleteWorkflowFile(filename: string): Promise<WorkflowDeleteResponse> {
+  return request<WorkflowDeleteResponse>(`/api/workflows/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+  });
 }
 
 export function saveWorkflowToFile(

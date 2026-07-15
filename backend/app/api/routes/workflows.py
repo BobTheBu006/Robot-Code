@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException
 
 from app.models.workflows import (
+    WorkflowDeleteResponse,
     WorkflowFileResponse,
     WorkflowListResponse,
+    WorkflowRenameRequest,
+    WorkflowRenameResponse,
     WorkflowSaveRequest,
     WorkflowSaveResponse,
 )
@@ -51,5 +54,25 @@ def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
             )
 
         return workflow_storage_service.save_default_workflow(request.workflow)
+    except WorkflowStorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{filename}/rename", response_model=WorkflowRenameResponse)
+def rename_workflow_file(filename: str, request: WorkflowRenameRequest) -> WorkflowRenameResponse:
+    try:
+        return workflow_storage_service.rename_workflow(filename, request.filename)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkflowStorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/{filename}", response_model=WorkflowDeleteResponse)
+def delete_workflow_file(filename: str) -> WorkflowDeleteResponse:
+    try:
+        return workflow_storage_service.delete_workflow(filename)
+    except WorkflowNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except WorkflowStorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

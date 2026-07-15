@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
-import { formatDurationShort, getWorkflowNodeOutputs } from "../../lib/workflow";
+import { formatDurationShort, getWorkflowNodeDisplayName, getWorkflowNodeOutputs } from "../../lib/workflow";
 import type { WorkflowNodeData } from "../../types/workflow";
 
 type WorkflowFlowNode = Node<WorkflowNodeData>;
@@ -85,7 +85,7 @@ export function WorkflowNode({ data, selected }: NodeProps<WorkflowFlowNode>) {
 
       <div className="workflow-node__header">
         <span className="workflow-node__kind">{kindLabel}</span>
-        <strong title={data.block.displayName}>{data.block.displayName}</strong>
+        <strong title={getWorkflowNodeDisplayName(data)}>{getWorkflowNodeDisplayName(data)}</strong>
         <p title={data.block.description}>{data.block.description}</p>
         {disabledReason ? <p className="workflow-node__disabled-reason">{disabledReason}</p> : null}
         {isBroken ? <p className="workflow-node__repair">{data.block.missingReference?.suggestedFix}</p> : null}

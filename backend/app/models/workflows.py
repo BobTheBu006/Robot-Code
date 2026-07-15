@@ -34,3 +34,20 @@ class WorkflowSaveResponse(BaseModel):
     filename: str
     path: str
     saved_at: datetime
+
+
+class WorkflowRenameRequest(BaseModel):
+    filename: str
+
+
+class WorkflowRenameResponse(BaseModel):
+    filename: str
+    path: str
+    previous_filename: str
+    renamed_at: datetime
+
+
+class WorkflowDeleteResponse(BaseModel):
+    filename: str
+    path: str
+    deleted_at: datetime

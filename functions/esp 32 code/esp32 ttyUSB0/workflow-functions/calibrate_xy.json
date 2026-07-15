@@ -4,8 +4,8 @@
     "id": "calibrate_xy",
     "display_name": "Calibrate Gantry XY",
     "category": "Robot Actions",
-    "description": "First-pass X-only CoreXY calibration. Move toward X min until the X-min switch trips, then move toward X max until the X-max switch trips, and measure X steps per centimeter from the entered track length.",
-    "version": "0.4.0",
+    "description": "CoreXY calibration. Homes Y against the Y-min switch first to establish the Y origin, parks the gantry a short distance clear of that switch, then probes X min and X max and measures X steps per centimetre from the entered track length. A limit switch already pressed at the start is nudged clear rather than treated as an error.",
+    "version": "0.7.0",
     "inputs": [
       {
         "key": "tool_port",
@@ -24,7 +24,7 @@
         "type": "number",
         "description": "Physical X travel in cm between the X-min and X-max limit switches.",
         "required": true,
-        "default": 104.5,
+        "default": 105.7,
         "placeholder": null,
         "advanced": false,
         "options": []
@@ -33,9 +33,31 @@
         "key": "y_track_length_cm",
         "label": "Y Track Length (cm)",
         "type": "number",
-        "description": "Physical Y travel in cm. Y is not probed; the gantry is assumed parked at Y = this value (Y max) when calibration runs.",
+        "description": "Physical Y travel in cm from the Y-min switch to the far end. Y is homed against the Y-min switch, which defines Y = 0; this value sets the Y track length used to bound later moves.",
         "required": true,
-        "default": 55.5,
+        "default": 55.3,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
+      },
+      {
+        "key": "x_calibration_y_cm",
+        "label": "X Calibration Y (cm)",
+        "type": "number",
+        "description": "Y position the gantry parks at, clear of the Y-min switch, while X is calibrated. Sweeping X while the carriage still rests on the Y switch loads the frame against its stop. Y is corrected onto this exact value once X measures the true steps per cm.",
+        "required": false,
+        "default": 3.2,
+        "placeholder": null,
+        "advanced": false,
+        "options": []
+      },
+      {
+        "key": "limit_buffer_cm",
+        "label": "Limit Buffer (cm)",
+        "type": "number",
+        "description": "Safety gap kept between the usable workspace and every limit switch. User coordinate 0 sits this far off the min switch and the usable max is the track length minus one buffer at each end, so moves to 0 or to the max stop short of the switches instead of tripping them. Changing it re-derives the ranges on the move blocks.",
+        "required": false,
+        "default": 0.1,
         "placeholder": null,
         "advanced": false,
         "options": []
@@ -162,6 +184,17 @@
         "placeholder": null,
         "advanced": true,
         "options": []
+      },
+      {
+        "key": "y_min_limit_pin",
+        "label": "Y Min Limit Pin",
+        "type": "number",
+        "description": "GPIO pin for the Y minimum/home limit switch at Y = 0. Probed first to establish the Y origin before X calibration runs.",
+        "required": false,
+        "default": 23.0,
+        "placeholder": null,
+        "advanced": true,
+        "options": []
       }
     ],
     "outputs": [
@@ -284,6 +317,27 @@
         ],
         "basic_block_id": "basic-sensor-x-max-limit-switch",
         "notes": null
+      },
+      {
+        "id": "y-min-limit-switch",
+        "name": "Y Min Limit Switch",
+        "kind": "sensor",
+        "board_id": "ttyUSB0",
+        "sensor_kind": "position_limit_switch",
+        "rotation_min_deg": null,
+        "rotation_max_deg": null,
+        "calibration_ml_per_200_steps": null,
+        "pins": [
+          {
+            "id": "y-min-limit",
+            "signal": "signal",
+            "gpio": null,
+            "function_input_key": "y_min_limit_pin",
+            "notes": null
+          }
+        ],
+        "basic_block_id": "basic-sensor-y-min-limit-switch",
+        "notes": null
       }
     ],
     "firmware_requirements": [
@@ -291,15 +345,16 @@
         "routine_id": "calibrate_xy",
         "controller_role": "builder_board",
         "source": "firmware/main.ino",
-        "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>. Firmware probes X min then X max and records measured X steps per centimeter.",
+        "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYCm> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks at xCalibrationYCm clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
         "entry_point": "calibrate_xy",
         "required_device_ids": [
           "x-axis-motor",
           "y-axis-motor",
           "x-min-limit-switch",
-          "x-max-limit-switch"
+          "x-max-limit-switch",
+          "y-min-limit-switch"
         ],
-        "description": "Firmware routine required by the X-only Calibrate Gantry XY block."
+        "description": "Firmware routine required by the Calibrate Gantry XY block."
       }
     ],
     "builder_board_id": "ttyUSB0",
@@ -309,10 +364,10 @@
     "builder_base_function_id": null
   },
   "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations>.",
+  "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYCm> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks at xCalibrationYCm clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
   "notes": "X-only gantry bring-up calibration: home to X-min, move to X-max, and measure X steps per centimeter.",
   "schema_version": 1,
   "inputs": [],
-  "version": "0.4.0",
+  "version": "0.7.0",
   "advanced_inputs": []
 }

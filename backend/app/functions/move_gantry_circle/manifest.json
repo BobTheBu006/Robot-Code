@@ -21,22 +21,26 @@
       "key": "center_x_cm",
       "label": "Center X (cm)",
       "type": "number",
-      "description": "Absolute X position of the circle center in cm from X-min (0).",
+      "description": "Absolute X position of the circle center in cm. 0 is the safe X-min end (5 mm off the switch); the max is the X track length minus the 5 mm buffer at each end. The whole circle must also fit inside this range.",
       "required": true,
       "default": 10.0,
       "placeholder": null,
       "advanced": false,
+      "min": 0.0,
+      "max": 105.5,
       "options": []
     },
     {
       "key": "center_y_cm",
       "label": "Center Y (cm)",
       "type": "number",
-      "description": "Absolute Y position of the circle center in cm from Y-min (0).",
+      "description": "Absolute Y position of the circle center in cm. 0 is the safe Y-min end (5 mm off the switch); the max is the Y track length minus the 5 mm buffer at each end. The whole circle must also fit inside this range.",
       "required": true,
       "default": 10.0,
       "placeholder": null,
       "advanced": false,
+      "min": 0.0,
+      "max": 55.1,
       "options": []
     },
     {
@@ -177,7 +181,7 @@
       "key": "y_max_limit_pin",
       "label": "Y Max Limit Pin",
       "type": "number",
-      "description": "GPIO pin for the Y maximum limit switch.",
+      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead.",
       "required": false,
       "default": 22.0,
       "placeholder": null,
@@ -312,27 +316,6 @@
       ],
       "basic_block_id": "basic-sensor-y-min-limit-switch",
       "notes": null
-    },
-    {
-      "id": "y-max-limit-switch",
-      "name": "Y Max Limit Switch",
-      "kind": "sensor",
-      "board_id": "ttyUSB0",
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "y-max-limit",
-          "signal": "signal",
-          "gpio": null,
-          "function_input_key": "y_max_limit_pin",
-          "notes": null
-        }
-      ],
-      "basic_block_id": "basic-sensor-y-max-limit-switch",
-      "notes": null
     }
   ],
   "firmware_requirements": [
@@ -347,8 +330,7 @@
         "y-axis-motor",
         "x-min-limit-switch",
         "x-max-limit-switch",
-        "y-min-limit-switch",
-        "y-max-limit-switch"
+        "y-min-limit-switch"
       ],
       "description": "Firmware routine required by the Move Gantry Circle block."
     }

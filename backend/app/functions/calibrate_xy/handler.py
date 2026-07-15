@@ -1,6 +1,7 @@
 from app.models.gantry import GantryXYCalibrationRequest
 from app.services.gantry_controller import gantry_controller_service
 from app.services.raspberry_gantry import planned_calibrate_xy_result, xy_hardware_is_on_raspberry_pi
+from app.services.workspace_defaults import workspace_defaults_service
 
 
 def execute(context: dict, inputs: dict) -> dict:
@@ -10,7 +11,15 @@ def execute(context: dict, inputs: dict) -> dict:
 
     response = gantry_controller_service.calibrate_xy(request)
 
+    # The track lengths just calibrated against become the new defaults, and the
+    # usable ranges on the move blocks are re-derived from them, so the whole app
+    # follows the machine as measured instead of the values authored by hand.
+    workspace = workspace_defaults_service.apply_track_lengths(
+        request.x_track_length_cm, request.y_track_length_cm, request.limit_buffer_cm
+    )
+
     return {
+        "workspace_defaults": workspace,
         "calibrated": response.calibrated,
         "status": "completed",
         "message": "X gantry calibration completed.",

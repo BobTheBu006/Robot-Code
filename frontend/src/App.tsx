@@ -4,7 +4,7 @@ import { HardwareDiagramCard } from "./components/HardwareDiagramCard";
 import { RobotStateCard } from "./components/RobotStateCard";
 import { WorkflowsCard } from "./components/WorkflowsCard";
 import { WorkflowEditorCard } from "./components/workflow/WorkflowEditorCard";
-import { emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, fetchWorkflowList, setCameraPower } from "./lib/api";
+import { deleteWorkflowFile, emergencyStop, fetchCameraStatus, fetchHealth, fetchRobotState, fetchWorkflowList, renameWorkflowFile, saveWorkflowToFile, setCameraPower } from "./lib/api";
 import type { CameraStatus, HealthResponse, RobotState } from "./types/robot";
 import type { WorkflowFileSummary } from "./types/workflow";
 
@@ -41,6 +41,7 @@ function App() {
   const [defaultWorkflowFilename, setDefaultWorkflowFilename] = useState<string | null>(null);
   const [workflowListStatus, setWorkflowListStatus] = useState<RequestStatus>("loading");
   const [workflowListError, setWorkflowListError] = useState<string | null>(null);
+  const [workflowListRevision, setWorkflowListRevision] = useState(0);
 
   useEffect(() => {
     if (activePage === "workflow-editor") {
@@ -81,7 +82,22 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [activePage]);
+  }, [activePage, workflowListRevision]);
+
+  async function handleCreateWorkflow(name: string) {
+    await saveWorkflowToFile([], [], "", name);
+    setWorkflowListRevision((revision) => revision + 1);
+  }
+
+  async function handleRenameWorkflow(filename: string, name: string) {
+    await renameWorkflowFile(filename, name);
+    setWorkflowListRevision((revision) => revision + 1);
+  }
+
+  async function handleDeleteWorkflow(filename: string) {
+    await deleteWorkflowFile(filename);
+    setWorkflowListRevision((revision) => revision + 1);
+  }
 
   async function loadDashboard() {
     const [healthResult, cameraResult, robotStateResult] = await Promise.allSettled([
@@ -231,9 +247,9 @@ function App() {
           <WorkflowsCard
             defaultFilename={defaultWorkflowFilename}
             error={workflowListError}
-            onOpenFunctionMap={() => setActivePage("function-map")}
-            onOpenHardwareMap={() => setActivePage("hardware-map")}
-            onOpenWorkflowEditor={() => setActivePage("workflow-editor")}
+            onCreateWorkflow={handleCreateWorkflow}
+            onRenameWorkflow={handleRenameWorkflow}
+            onDeleteWorkflow={handleDeleteWorkflow}
             status={workflowListStatus}
             workflows={workflowList}
           />

@@ -25,6 +25,8 @@ class FunctionInputDefinition(BaseModel):
     default: str | float | bool | None = None
     placeholder: str | None = None
     advanced: bool = False
+    min: float | None = None
+    max: float | None = None
     options: list[FunctionInputOption] = Field(default_factory=list)
 
     @model_validator(mode="after")

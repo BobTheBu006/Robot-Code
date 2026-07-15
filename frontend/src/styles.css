@@ -446,16 +446,60 @@ body {
 }
 
 .workflows-card__list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 4px;
   border-bottom: 1px solid rgba(23, 50, 42, 0.08);
 }
 
 .workflows-card__list li:last-child {
   border-bottom: 0;
+}
+
+.workflows-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflows-card__row:hover {
+  background: #f4f8f6;
+}
+
+.workflows-card__row--selected {
+  border-color: rgba(239, 139, 44, 0.5);
+  background: rgba(239, 139, 44, 0.1);
+}
+
+.workflows-card__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.workflows-card__name-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+}
+
+.workflows-card__name-row input:focus-visible {
+  border-color: #ef8b2c;
+  outline: 2px solid rgba(239, 139, 44, 0.25);
 }
 
 .workflows-card__list-name {
@@ -2274,6 +2318,13 @@ body {
   color: #31404d;
 }
 
+.workflow-overlay__input-range {
+  margin: 2px 0 0;
+  color: #8a97b0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .workflow-overlay__field textarea.workflow-overlay__expression-preview {
   resize: vertical;
   min-height: 56px;
@@ -2370,6 +2421,31 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Reads as the plain title until hovered/focused, then shows as a text field. */
+.workflow-overlay__name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.workflow-overlay__name-input:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.workflow-overlay__name-input:focus-visible {
+  border-color: rgba(239, 139, 44, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
 }
 
 .workflow-overlay__layout {

@@ -532,6 +532,13 @@ export function createDefaultNodeSettings(): WorkflowNodeSettings {
   };
 }
 
+// The name shown for a block instance: the user's custom name when set,
+// otherwise the name from the block definition.
+export function getWorkflowNodeDisplayName(nodeData: WorkflowNodeData): string {
+  const customName = typeof nodeData.customName === "string" ? nodeData.customName.trim() : "";
+  return customName || nodeData.block.displayName;
+}
+
 export function getWorkflowNodeOutputs(nodeData: WorkflowNodeData): WorkflowOutputDefinition[] {
   if (nodeData.settings.failureMode !== "separate_path") {
     return nodeData.block.outputs;

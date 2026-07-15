@@ -123,6 +123,8 @@ class GantryXYCalibrationRequest(BaseModel):
     acceleration_rpm_per_s: int = Field(default=300, gt=0)
     steps_per_rotation: int = Field(default=800, gt=0)
     max_probe_rotations: int = Field(default=120, gt=0)
+    x_calibration_y_cm: float = Field(default=3.2, ge=0)
+    limit_buffer_cm: float = Field(default=0.5, ge=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
     y_step_pin: int = Field(default=18, ge=0)

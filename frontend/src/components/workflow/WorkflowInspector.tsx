@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
 
-import { formatWorkflowParameterValue } from "../../lib/workflow";
+import { formatWorkflowParameterValue, getWorkflowNodeDisplayName } from "../../lib/workflow";
 import type { Esp32CustomBlockSaveResponse } from "../../types/esp32Builder";
 import type {
   FunctionTestResponse,
@@ -54,6 +54,7 @@ interface WorkflowInspectorProps {
   onEditCompound: () => void;
   onRunTest: () => void;
   onRunNode: (nodeId: string) => void;
+  onRenameNode: (nodeId: string, displayName: string) => void;
   onSaveCustomBlock: (displayName: string) => Promise<Esp32CustomBlockSaveResponse>;
   onUpdateParameter: (
     nodeId: string,
@@ -330,6 +331,7 @@ export function WorkflowInspector({
   onEditCompound,
   onRunTest,
   onRunNode,
+  onRenameNode,
   onSaveCustomBlock,
   onUpdateParameter,
   onUpdateSettings,
@@ -341,6 +343,7 @@ export function WorkflowInspector({
   const [customBlockName, setCustomBlockName] = useState(`${selectedNode.data.block.displayName} Preset`);
   const [customBlockSaveState, setCustomBlockSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [customBlockSaveMessage, setCustomBlockSaveMessage] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState(() => getWorkflowNodeDisplayName(selectedNode.data));
   const { block, parameters, settings } = selectedNode.data;
   const visibleInputs = block.inputs.filter(isVisibleWorkflowInput);
   const visibleAdvancedInputs = (block.advancedInputs ?? []).filter(isVisibleWorkflowInput);
@@ -402,6 +405,7 @@ export function WorkflowInspector({
     setCustomBlockName(`${selectedNode.data.block.displayName} Preset`);
     setCustomBlockSaveState("idle");
     setCustomBlockSaveMessage(null);
+    setNameDraft(getWorkflowNodeDisplayName(selectedNode.data));
   }, [selectedNode.id]);
 
   async function handleSaveCustomBlock() {
@@ -499,6 +503,11 @@ export function WorkflowInspector({
         )}
 
         <p>{input.description ?? "No additional description for this field."}</p>
+        {input.type === "number" && (input.min != null || input.max != null) ? (
+          <p className="workflow-overlay__input-range">
+            Allowed range: {input.min ?? "-∞"} – {input.max ?? "∞"}
+          </p>
+        ) : null}
       </label>
     );
   }
@@ -534,7 +543,24 @@ export function WorkflowInspector({
             <span className="workflow-overlay__eyebrow">
               {block.kind === "compound" ? "Compound Function" : block.kind === "broken" ? "Missing Block" : block.kind === "advanced" || block.kind === "robot-action" ? "Advanced Function" : "Basic Block"}
             </span>
-            <strong>{block.displayName}</strong>
+            <input
+              aria-label="Block name"
+              className="workflow-overlay__name-input"
+              onBlur={() => onRenameNode(selectedNode.id, nameDraft)}
+              onChange={(event) => setNameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                } else if (event.key === "Escape") {
+                  setNameDraft(getWorkflowNodeDisplayName(selectedNode.data));
+                  event.currentTarget.blur();
+                }
+              }}
+              placeholder={block.displayName}
+              title="Rename this block"
+              type="text"
+              value={nameDraft}
+            />
           </div>
         </div>
         <button className="workflow-overlay__close" onClick={onClose} type="button">

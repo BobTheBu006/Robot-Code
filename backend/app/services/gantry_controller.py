@@ -454,7 +454,8 @@ class GantryControllerService:
         return (
             f"CALIBRATE XY {request.x_track_length_cm:.3f} {request.y_track_length_cm:.3f} "
             f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
-            f"{request.steps_per_rotation} {request.max_probe_rotations}"
+            f"{request.steps_per_rotation} {request.max_probe_rotations} "
+            f"{request.x_calibration_y_cm:.3f} {request.limit_buffer_cm:.3f}"
         )
 
     def _build_z_pin_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:

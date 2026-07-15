@@ -20,6 +20,8 @@ export interface WorkflowInputDefinition {
   advanced?: boolean;
   hidden?: boolean;
   resolvedFrom?: "hardware_map";
+  min?: number | null;
+  max?: number | null;
   options: WorkflowInputOption[];
 }
 
@@ -143,6 +145,19 @@ export interface WorkflowListResponse {
   workflows: WorkflowFileSummary[];
 }
 
+export interface WorkflowRenameResponse {
+  filename: string;
+  path: string;
+  previous_filename: string;
+  renamed_at: string;
+}
+
+export interface WorkflowDeleteResponse {
+  filename: string;
+  path: string;
+  deleted_at: string;
+}
+
 export interface WorkflowCompoundDefinition {
   entryNodeId: string;
   nodes: WorkflowCanvasNode[];
@@ -194,6 +209,9 @@ export interface WorkflowNodeData extends Record<string, unknown> {
   parameters: Record<string, WorkflowParameterValue>;
   settings: WorkflowNodeSettings;
   isActive: boolean;
+  // User-supplied name for this block instance. Kept on the node (not the block)
+  // so it survives the block definition being re-synced from function discovery.
+  customName?: string | null;
   runCount?: number;
   benchmarkDurationMs?: number | null;
   lastDurationMs?: number | null;

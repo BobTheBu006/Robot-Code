@@ -7,9 +7,11 @@ from pathlib import Path
 from app.models.workflows import (
     SUPPORTED_WORKFLOW_SCHEMA_VERSIONS,
     WORKFLOW_SCHEMA_VERSION,
+    WorkflowDeleteResponse,
     WorkflowFileResponse,
     WorkflowFileSummary,
     WorkflowListResponse,
+    WorkflowRenameResponse,
     WorkflowSaveResponse,
 )
 
@@ -203,6 +205,36 @@ class WorkflowStorageService:
             filename=workflow_path.name,
             path=str(workflow_path),
             saved_at=saved_at,
+        )
+
+    def delete_workflow(self, filename: str) -> WorkflowDeleteResponse:
+        workflow_path = self._workflow_path(filename)
+        if not workflow_path.exists():
+            raise WorkflowNotFoundError(f"Workflow file not found: {workflow_path.name}")
+
+        workflow_path.unlink()
+        return WorkflowDeleteResponse(
+            filename=workflow_path.name,
+            path=str(workflow_path),
+            deleted_at=datetime.now(tz=timezone.utc),
+        )
+
+    def rename_workflow(self, filename: str, next_filename: str) -> WorkflowRenameResponse:
+        source_path = self._workflow_path(filename)
+        if not source_path.exists():
+            raise WorkflowNotFoundError(f"Workflow file not found: {source_path.name}")
+
+        target_path = self._workflow_path(next_filename)
+        if target_path != source_path:
+            if target_path.exists():
+                raise WorkflowStorageError(f"A workflow named '{target_path.name}' already exists.")
+            source_path.rename(target_path)
+
+        return WorkflowRenameResponse(
+            filename=target_path.name,
+            path=str(target_path),
+            previous_filename=source_path.name,
+            renamed_at=datetime.now(tz=timezone.utc),
         )
 
 
