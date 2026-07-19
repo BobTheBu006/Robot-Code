@@ -9,6 +9,7 @@ from app.models.workflows import (
     WorkflowSaveRequest,
     WorkflowSaveResponse,
 )
+from app.services.workspace_defaults import workspace_defaults_service
 from app.services.workflow_storage import (
     WorkflowNotFoundError,
     WorkflowStorageError,
@@ -47,15 +48,20 @@ def load_workflow_file(filename: str) -> WorkflowFileResponse:
 def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
     try:
         if request.filename or request.path:
-            return workflow_storage_service.save_workflow(
+            response = workflow_storage_service.save_workflow(
                 filename=request.filename or workflow_storage_service._default_filename(),
                 workflow=request.workflow,
                 directory=request.path,
             )
-
-        return workflow_storage_service.save_default_workflow(request.workflow)
+        else:
+            response = workflow_storage_service.save_default_workflow(request.workflow)
     except WorkflowStorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Values edited on any tool block become the shared defaults as soon as the
+    # workflow is saved, so a newly placed block starts from them.
+    workspace_defaults_service.adopt_toolhead_defaults_from_workflow(request.workflow)
+    return response
 
 
 @router.post("/{filename}/rename", response_model=WorkflowRenameResponse)

@@ -38,6 +38,16 @@ _RANGE_DERIVED_INPUTS: dict[str, dict[str, str]] = {
 # position on either one has to land on both.
 _TOOLHEAD_FUNCTION_IDS = ("pickup_toolhead", "drop_toolhead")
 
+# Every editable tool-change setting that should propagate to both tool blocks
+# as the new default: the rack geometry and engage distances. Per-block intent
+# stays out - which tool to grab (toolhead_index) and how fast to approach
+# (approach_speed_rpm) legitimately differ between blocks. Hardware pins are
+# excluded: the Hardware Map owns those.
+TOOLHEAD_DEFAULT_KEYS = frozenset(
+    {f"tool_{index}_{axis}_cm" for index in range(1, 7) for axis in ("x", "y")}
+    | {"clearance_cm", "dip_depth_cm", "lift_cm", "release_cm"}
+)
+
 
 def usable_max_cm(track_length_cm: float, buffer_cm: float = DEFAULT_XY_LIMIT_BUFFER_CM) -> float:
     """Highest coordinate a move may request on a track of this length."""
@@ -189,19 +199,69 @@ class WorkspaceDefaultsService:
                 positions[index] = (float(x_cm), float(y_cm))
         return positions
 
-    def apply_toolhead_positions(self, positions: dict[int, tuple[float, float]]) -> list[str]:
-        """Adopt these tool positions as the new defaults on both tool blocks.
+    def adopt_toolhead_defaults_from_workflow(self, workflow: dict) -> list[str]:
+        """Adopt tool-block settings the moment a workflow is saved.
 
-        Called after a successful tool change so a position tuned in the UI
-        sticks, instead of reverting to the value authored here. Only writes when
-        a value actually differs.
+        Editing a value on any Pick Up / Drop Toolhead block and saving the
+        workflow makes it the new default for future blocks immediately - the
+        user should not have to run the block first for a measured rack
+        position to stick."""
+        collected: dict[str, float] = {}
+
+        def walk(node: object) -> None:
+            if isinstance(node, dict):
+                block = node.get("data", {}).get("block") if isinstance(node.get("data"), dict) else None
+                if isinstance(block, dict) and block.get("id") in _TOOLHEAD_FUNCTION_IDS:
+                    parameters = node["data"].get("parameters")
+                    if isinstance(parameters, dict):
+                        for key, value in parameters.items():
+                            if key in TOOLHEAD_DEFAULT_KEYS and isinstance(value, (int, float)):
+                                collected[key] = float(value)
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(workflow)
+        if not collected:
+            return []
+        return self.apply_toolhead_defaults(collected)
+
+    def current_toolhead_defaults(self) -> dict[str, float]:
+        """The latest stored defaults for every shared tool-change setting.
+
+        Read from the Pick Up Toolhead manifest, which apply_toolhead_defaults
+        keeps in lockstep with the drop block."""
+        manifest_path = self._app_functions_dir / "pickup_toolhead" / "manifest.json"
+        if not manifest_path.exists():
+            return {}
+        manifest = self._read_json(manifest_path)
+        return {
+            definition.get("key"): float(definition.get("default"))
+            for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]
+            if definition.get("key") in TOOLHEAD_DEFAULT_KEYS
+            and isinstance(definition.get("default"), (int, float))
+        }
+
+    def apply_toolhead_defaults(self, values: dict[str, float]) -> list[str]:
+        """Adopt these tool settings as the new defaults on both tool blocks.
+
+        Called after a successful tool change so anything tuned in the UI sticks
+        instead of reverting to the value authored here, and so both blocks keep
+        describing the same physical rack. Only writes when a value differs.
+
+        Pass only the settings the caller actually supplied. Filling the gaps from
+        a model's defaults would let a caller that simply omitted a field reset a
+        measurement someone had tuned on the machine.
+
+        Hardware pins are deliberately excluded: those are owned by the Hardware
+        Map and resolved from it on every run, so writing them back here would
+        record a copy that silently fights the map once it changes.
         """
         with self._lock:
             changed: list[str] = []
-            wanted: dict[str, float] = {}
-            for index, (x_cm, y_cm) in positions.items():
-                wanted[f"tool_{index}_x_cm"] = round(float(x_cm), 3)
-                wanted[f"tool_{index}_y_cm"] = round(float(y_cm), 3)
+            wanted = {key: round(float(value), 3) for key, value in values.items()}
 
             for function_id in _TOOLHEAD_FUNCTION_IDS:
                 manifest_path = self._app_functions_dir / function_id / "manifest.json"

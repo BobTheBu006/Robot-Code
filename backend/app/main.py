@@ -1,6 +1,12 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.env_file import load_env_file
+
+# Machine-specific wiring flags (direction inversion, GPIO tuning) must be in the
+# environment before any gantry service reads them.
+load_env_file()
+
 from app.api.routes.camera import router as camera_router
 from app.api.routes.emergency_stop import router as emergency_stop_router
 from app.api.routes.esp32_builder import router as esp32_builder_router

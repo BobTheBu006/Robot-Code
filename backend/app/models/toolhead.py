@@ -13,22 +13,22 @@ class ToolheadRackGeometry(BaseModel):
     """
 
     tool_1_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_1_y_cm: float = Field(default=3.2, ge=0.0)
+    tool_1_y_cm: float = Field(default=2.7, ge=0.0)
     tool_2_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_2_y_cm: float = Field(default=13.2, ge=0.0)
+    tool_2_y_cm: float = Field(default=12.7, ge=0.0)
     tool_3_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_3_y_cm: float = Field(default=23.2, ge=0.0)
+    tool_3_y_cm: float = Field(default=22.7, ge=0.0)
     tool_4_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_4_y_cm: float = Field(default=33.2, ge=0.0)
+    tool_4_y_cm: float = Field(default=32.7, ge=0.0)
     tool_5_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_5_y_cm: float = Field(default=43.2, ge=0.0)
+    tool_5_y_cm: float = Field(default=42.7, ge=0.0)
     tool_6_x_cm: float = Field(default=0.0, ge=0.0)
-    tool_6_y_cm: float = Field(default=53.2, ge=0.0)
+    tool_6_y_cm: float = Field(default=52.7, ge=0.0)
 
     clearance_cm: float = Field(default=2.0, gt=0.0)
-    dip_depth_cm: float = Field(default=3.0, gt=0.0)
-    lift_cm: float = Field(default=0.2, ge=0.0)
-    release_cm: float = Field(default=0.2, ge=0.0)
+    dip_depth_cm: float = Field(default=1.7, gt=0.0)
+    lift_cm: float = Field(default=0.1, ge=0.0)
+    release_cm: float = Field(default=0.1, ge=0.0)
 
     def positions(self) -> dict[int, tuple[float, float]]:
         return {

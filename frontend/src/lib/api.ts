@@ -265,6 +265,13 @@ export function emergencyStop(): Promise<EmergencyStopResponse> {
   });
 }
 
+// Clears a latched emergency stop so new work is allowed to move again.
+export function rearmEmergencyStop(): Promise<{ ok: boolean; message: string }> {
+  return request<{ ok: boolean; message: string }>("/api/emergency-stop/rearm", {
+    method: "POST",
+  });
+}
+
 export function fetchRobotState(): Promise<RobotState> {
   return request<RobotState>("/api/robot/state");
 }

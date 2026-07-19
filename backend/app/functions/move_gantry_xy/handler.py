@@ -1,8 +1,15 @@
-from app.models.gantry import GantryGotoXYRequest
+from app.models.gantry import GantryGotoXYRequest, GantryXYMoveRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.raspberry_gantry import planned_move_xy_result, xy_hardware_is_on_raspberry_pi
 
 
 def execute(context: dict, inputs: dict) -> dict:
+    # When the gantry is wired to Raspberry Pi GPIO, drive it there. Falling
+    # through to the ESP32 would send this move to whatever else is on that
+    # board (e.g. the syringe motors).
+    if xy_hardware_is_on_raspberry_pi(context):
+        return planned_move_xy_result(context, GantryXYMoveRequest.model_validate(inputs))
+
     request = GantryGotoXYRequest.model_validate(inputs)
     response = gantry_controller_service.goto_xy(request)
 

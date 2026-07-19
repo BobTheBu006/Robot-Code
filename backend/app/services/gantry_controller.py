@@ -10,6 +10,8 @@ from app.models.gantry import (
     GantryCircleXYResponse,
     GantryGotoXYRequest,
     GantryGotoXYResponse,
+    GantryTestMotorRequest,
+    GantryTestMotorResponse,
     GantryXYCalibrationRequest,
     GantryXYCalibrationResponse,
     GantryXYMoveRequest,
@@ -614,6 +616,46 @@ class GantryControllerService:
                 "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
                 "steps_per_rotation": request.steps_per_rotation,
                 "max_probe_rotations": request.max_probe_rotations,
+            },
+        )
+
+    def test_motor(self, request: GantryTestMotorRequest) -> GantryTestMotorResponse:
+        port = self._selected_port(request.tool_port)
+        baud_rate = request.baud_rate or self._baud_rate()
+        test_command = (
+            f"TEST MOTOR {request.motor} {request.steps} "
+            f"{1 if request.forward else 0} {request.speed_rpm}"
+        )
+        action_deadline = self._move_deadline(request.steps, request.speed_rpm)
+        pin_reply, limit_reply, test_reply = self._send_config_and_action(
+            port=port,
+            baud_rate=baud_rate,
+            pin_command=self._build_xy_pin_command(request),
+            enable_command=self._build_xy_enable_command(request),
+            limit_command=self._build_xy_limit_command(request),
+            action_command=test_command,
+            action_prefix="OK TEST MOTOR",
+            action_deadline=action_deadline,
+        )
+
+        return GantryTestMotorResponse(
+            port=port,
+            baud_rate=baud_rate,
+            motor=request.motor,
+            steps=request.steps,
+            forward=request.forward,
+            speed_rpm=request.speed_rpm,
+            pin_command_sent=self._build_xy_pin_command(request),
+            pin_reply=pin_reply,
+            limit_command_sent=self._build_xy_limit_command(request),
+            limit_reply=limit_reply,
+            test_command_sent=test_command,
+            test_reply=test_reply,
+            configured_pins={
+                "x_step_pin": request.x_step_pin,
+                "x_dir_pin": request.x_dir_pin,
+                "y_step_pin": request.y_step_pin,
+                "y_dir_pin": request.y_dir_pin,
             },
         )
 

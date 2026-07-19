@@ -7,7 +7,14 @@ from app.services.workspace_defaults import workspace_defaults_service
 def execute(context: dict, inputs: dict) -> dict:
     request = GantryXYCalibrationRequest.model_validate(inputs)
     if xy_hardware_is_on_raspberry_pi(context):
-        return planned_calibrate_xy_result(context, request)
+        result = planned_calibrate_xy_result(context, request)
+        # The write-back below must run on this path too: the Pi-driven machine
+        # is the one actually calibrating, so its track lengths and buffer are
+        # the ones the block defaults and move ranges should follow.
+        result["workspace_defaults"] = workspace_defaults_service.apply_track_lengths(
+            request.x_track_length_cm, request.y_track_length_cm, request.limit_buffer_cm
+        )
+        return result
 
     response = gantry_controller_service.calibrate_xy(request)
 

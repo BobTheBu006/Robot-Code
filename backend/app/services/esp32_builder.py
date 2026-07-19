@@ -324,23 +324,29 @@ class Esp32BuilderService:
                 continue
 
             workspace_dir = self._resolve_workspace_dir(board_id)
+            if not workspace_dir.exists():
+                # A board without a builder workspace is an externally
+                # programmed controller (e.g. the pre-flashed syringe ESP32):
+                # its blocks talk to it over serial as-is, so there is nothing
+                # to build or flash. Excluding it from the board plans also
+                # keeps it out of the flash list.
+                message = (
+                    f"ESP32 board '{board_id}' (referenced by block '{block_label}') has no firmware "
+                    "workspace; treating it as externally programmed and leaving its firmware untouched."
+                )
+                if message not in response_warnings:
+                    response_warnings.append(message)
+                continue
+
             board_plan = board_plans.get(board_id)
             if board_plan is None:
-                metadata = self._load_board_metadata(workspace_dir) if workspace_dir.exists() else {}
+                metadata = self._load_board_metadata(workspace_dir)
                 board_plan = Esp32WorkflowFirmwareBoardPlan(
                     board_id=board_id,
                     workspace_path=str(workspace_dir),
                     firmware_entry_file=self._firmware_entry_file(metadata) if metadata else None,
                 )
                 board_plans[board_id] = board_plan
-
-            if not workspace_dir.exists():
-                message = f"Unknown ESP32 board '{board_id}' referenced by block '{block_label}'."
-                if message not in board_plan.errors:
-                    board_plan.errors.append(message)
-                if message not in response_errors:
-                    response_errors.append(message)
-                continue
 
             for requirement in item.requirements:
                 source_path, source_exists, source_error = self._resolve_firmware_requirement_source(

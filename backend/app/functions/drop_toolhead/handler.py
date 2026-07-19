@@ -7,9 +7,25 @@ from app.services.toolhead import (
     toolhead_service,
     toolhead_state_store,
 )
-from app.services.workspace_defaults import workspace_defaults_service
+from app.services.workspace_defaults import TOOLHEAD_DEFAULT_KEYS, workspace_defaults_service
 
 _GANTRY_KEYS = set(GantryGotoXYRequest.model_fields) - {"x_cm", "y_cm", "speed_rpm"}
+
+# Advanced settings that describe the rack and the tool-change motion. Hardware
+# pins are excluded: the Hardware Map owns those.
+_TOOLHEAD_DEFAULT_KEYS = TOOLHEAD_DEFAULT_KEYS
+
+
+def _supplied_toolhead_defaults(inputs: dict) -> dict:
+    """Only the settings actually passed in, so an omitted field never resets a
+    measurement tuned on the machine."""
+    return {
+        key: float(value)
+        for key, value in inputs.items()
+        if key in _TOOLHEAD_DEFAULT_KEYS and value is not None
+    }
+
+
 
 
 def _gantry_base_inputs(inputs: dict) -> dict:
@@ -17,6 +33,11 @@ def _gantry_base_inputs(inputs: dict) -> dict:
 
 
 def execute(context: dict, inputs: dict) -> dict:
+    # A drop must return the tool along the same geometry it was picked up
+    # with, so the rack measurements always come from the latest shared
+    # defaults rather than whatever this block carried when it was placed -
+    # a stale drop block must not aim at an outdated slot position.
+    inputs = {**inputs, **workspace_defaults_service.current_toolhead_defaults()}
     request = ToolheadDropRequest.model_validate(inputs)
     base_inputs = _gantry_base_inputs(inputs)
 
@@ -44,11 +65,14 @@ def execute(context: dict, inputs: dict) -> dict:
         lift_cm=request.lift_cm,
         release_cm=request.release_cm,
         clearance_cm=request.clearance_cm,
+        context=context,
     )
 
     # Persist only after the sequence succeeds, so a position that the guard
     # rejected is never adopted as the new default.
-    position_changes = workspace_defaults_service.apply_toolhead_positions(request.positions())
+    position_changes = workspace_defaults_service.apply_toolhead_defaults(
+        _supplied_toolhead_defaults(inputs)
+    )
 
     return {
         "status": "completed",

@@ -11,6 +11,14 @@ def execute(context: dict, inputs: dict) -> dict:
             "intake_speed": inputs.get("intake_speed") or None,
             "outtake_speed": inputs.get("outtake_speed") or None,
             "baud_rate": inputs.get("baud_rate"),
+            # Per-head step/dir pins resolved from the Hardware Map; without
+            # them the firmware falls back to its compiled-in pinout, which no
+            # longer matches the wiring.
+            **{
+                f"head_{head}_{signal}_pin": inputs.get(f"head_{head}_{signal}_pin")
+                for head in "abcdefg"
+                for signal in ("step", "dir")
+            },
             "A": inputs.get("A", 0),
             "B": inputs.get("B", 0),
             "C": inputs.get("C", 0),

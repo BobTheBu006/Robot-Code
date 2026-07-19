@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
-from app.models.gantry import GantryGotoXYRequest
+from app.models.gantry import GantryGotoXYRequest, GantryXYMoveRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.raspberry_gantry import planned_move_xy_result, xy_hardware_is_on_raspberry_pi
 from app.services.workspace_defaults import workspace_defaults_service
 
 # Speed used for every step after the initial approach. The approach speed is
@@ -26,12 +27,12 @@ TOOLHEAD_COUNT = 6
 # Rack as measured. These seed the block defaults; the exact position of each
 # slot is editable per toolhead and an edit is written back as the new default.
 DEFAULT_TOOLHEAD_POSITIONS: dict[int, tuple[float, float]] = {
-    1: (0.0, 3.2),
-    2: (0.0, 13.2),
-    3: (0.0, 23.2),
-    4: (0.0, 33.2),
-    5: (0.0, 43.2),
-    6: (0.0, 53.2),
+    1: (0.0, 2.7),
+    2: (0.0, 12.7),
+    3: (0.0, 22.7),
+    4: (0.0, 32.7),
+    5: (0.0, 42.7),
+    6: (0.0, 52.7),
 }
 
 _STATE_PATH = Path(__file__).resolve().parents[3] / "toolhead-state.json"
@@ -135,7 +136,23 @@ toolhead_state_store = ToolheadStateStore(_STATE_PATH)
 
 
 class ToolheadService:
-    def _goto(self, base_inputs: dict, x_cm: float, y_cm: float, speed_rpm: int) -> dict:
+    def _goto(self, base_inputs: dict, x_cm: float, y_cm: float, speed_rpm: int, context: dict | None = None) -> dict:
+        # Route through the same board decision as the move blocks: when the XY
+        # gantry lives on Raspberry Pi GPIO, tool changes must not fall back to
+        # the ESP32 serial path (there may be no /dev/ttyUSB0 at all, or worse,
+        # another board answering on it).
+        if context is not None and xy_hardware_is_on_raspberry_pi(context):
+            move_request = GantryXYMoveRequest.model_validate(
+                {**base_inputs, "x_cm": x_cm, "y_cm": y_cm, "speed_rpm": speed_rpm}
+            )
+            result = planned_move_xy_result(context, move_request)
+            return {
+                "x_cm": x_cm,
+                "y_cm": y_cm,
+                "speed_rpm": speed_rpm,
+                "move_reply": result.get("move_reply") or result.get("message"),
+            }
+
         request = GantryGotoXYRequest.model_validate(
             {**base_inputs, "x_cm": x_cm, "y_cm": y_cm, "speed_rpm": speed_rpm}
         )
@@ -163,15 +180,19 @@ class ToolheadService:
     def drop_waypoints(
         self, position: ToolheadPosition, dip_depth_cm: float, lift_cm: float, release_cm: float, clearance_cm: float
     ) -> list[tuple[float, float]]:
+        """Exact mirror of the pickup exit: approach at the engaged height the
+        tool was carried at, slide into the slot, rise past the slot Y by the
+        release offset so the holder takes the tool off the hooks, settle onto
+        the slot Y, and leave at slot height."""
         x, y = position.x_cm, position.y_cm
         engaged_y = round(y - dip_depth_cm + lift_cm, 3)
-        released_y = round(y - release_cm, 3)
+        unhook_y = round(y + release_cm, 3)
         return [
             (round(x + clearance_cm, 3), engaged_y),
             (x, engaged_y),
+            (x, unhook_y),
             (x, y),
-            (x, released_y),
-            (round(x + clearance_cm, 3), released_y),
+            (round(x + clearance_cm, 3), y),
         ]
 
     def run_sequence(
@@ -179,13 +200,14 @@ class ToolheadService:
         base_inputs: dict,
         waypoints: list[tuple[float, float]],
         approach_speed_rpm: int,
+        context: dict | None = None,
     ) -> list[dict]:
         """Run a tool-change sequence: first waypoint at the approach speed,
         every subsequent waypoint at the fixed engage speed."""
         moves: list[dict] = []
         for step, (x_cm, y_cm) in enumerate(waypoints):
             speed_rpm = approach_speed_rpm if step == 0 else ENGAGE_RPM
-            moves.append(self._goto(base_inputs, x_cm, y_cm, speed_rpm))
+            moves.append(self._goto(base_inputs, x_cm, y_cm, speed_rpm, context=context))
         return moves
 
     def drop(
@@ -197,10 +219,11 @@ class ToolheadService:
         lift_cm: float,
         release_cm: float,
         clearance_cm: float,
+        context: dict | None = None,
     ) -> list[dict]:
         waypoints = self.drop_waypoints(position, dip_depth_cm, lift_cm, release_cm, clearance_cm)
         _assert_waypoints_reachable("be dropped", position, waypoints)
-        moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm)
+        moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm, context=context)
         toolhead_state_store.set_held_index(None)
         return moves
 
@@ -212,10 +235,11 @@ class ToolheadService:
         dip_depth_cm: float,
         lift_cm: float,
         clearance_cm: float,
+        context: dict | None = None,
     ) -> list[dict]:
         waypoints = self.pickup_waypoints(position, dip_depth_cm, lift_cm, clearance_cm)
         _assert_waypoints_reachable("be picked up", position, waypoints)
-        moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm)
+        moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm, context=context)
         toolhead_state_store.set_held_index(position.index)
         return moves
 

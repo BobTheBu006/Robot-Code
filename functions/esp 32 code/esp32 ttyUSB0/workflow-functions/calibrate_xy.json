@@ -5,7 +5,7 @@
     "display_name": "Calibrate Gantry XY",
     "category": "Robot Actions",
     "description": "CoreXY calibration. Homes Y against the Y-min switch first to establish the Y origin, parks the gantry a short distance clear of that switch, then probes X min and X max and measures X steps per centimetre from the entered track length. A limit switch already pressed at the start is nudged clear rather than treated as an error.",
-    "version": "0.7.0",
+    "version": "0.10.0",
     "inputs": [
       {
         "key": "tool_port",
@@ -24,7 +24,7 @@
         "type": "number",
         "description": "Physical X travel in cm between the X-min and X-max limit switches.",
         "required": true,
-        "default": 105.7,
+        "default": 105.5,
         "placeholder": null,
         "advanced": false,
         "options": []
@@ -35,16 +35,29 @@
         "type": "number",
         "description": "Physical Y travel in cm from the Y-min switch to the far end. Y is homed against the Y-min switch, which defines Y = 0; this value sets the Y track length used to bound later moves.",
         "required": true,
-        "default": 55.3,
+        "default": 55.2,
         "placeholder": null,
         "advanced": false,
+        "options": []
+      },
+      {
+        "key": "x_start_clear_cm",
+        "label": "X Start Clearance (cm)",
+        "type": "number",
+        "description": "First move of the calibration: the gantry steps this far in +X before homing, so a mounted tool clears the tool holders before Y homes. Uses the estimated steps-per-cm; stops safely on the X-max switch if already at the far end. Set 0 to skip.",
+        "required": false,
+        "default": 2.0,
+        "placeholder": null,
+        "advanced": false,
+        "min": null,
+        "max": null,
         "options": []
       },
       {
         "key": "x_calibration_y_cm",
         "label": "X Calibration Y (cm)",
         "type": "number",
-        "description": "Y position the gantry parks at, clear of the Y-min switch, while X is calibrated. Sweeping X while the carriage still rests on the Y switch loads the frame against its stop. Y is corrected onto this exact value once X measures the true steps per cm.",
+        "description": "Y position in cm the gantry parks at, clear of the Y-min switch, while X is calibrated. Parked using the carried-over steps-per-cm estimate, then corrected onto this exact value once X measures the true steps per cm.",
         "required": false,
         "default": 3.2,
         "placeholder": null,
@@ -57,9 +70,22 @@
         "type": "number",
         "description": "Safety gap kept between the usable workspace and every limit switch. User coordinate 0 sits this far off the min switch and the usable max is the track length minus one buffer at each end, so moves to 0 or to the max stop short of the switches instead of tripping them. Changing it re-derives the ranges on the move blocks.",
         "required": false,
-        "default": 0.1,
+        "default": 0.2,
         "placeholder": null,
         "advanced": false,
+        "options": []
+      },
+      {
+        "key": "x_end_clear_cm",
+        "label": "X End Clearance (cm)",
+        "type": "number",
+        "description": "Last move of the calibration: after homing X-max the gantry retreats at least this far from the X-max switch (never less than the limit buffer), so it finishes well clear of the switch and anything mounted at the far end.",
+        "required": false,
+        "default": 2.0,
+        "placeholder": null,
+        "advanced": false,
+        "min": null,
+        "max": null,
         "options": []
       },
       {
@@ -345,7 +371,7 @@
         "routine_id": "calibrate_xy",
         "controller_role": "builder_board",
         "source": "firmware/main.ino",
-        "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYCm> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks at xCalibrationYCm clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
+        "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYRotations> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks xCalibrationYRotations motor rotations clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
         "entry_point": "calibrate_xy",
         "required_device_ids": [
           "x-axis-motor",
@@ -364,10 +390,10 @@
     "builder_base_function_id": null
   },
   "firmware_entry_file": "firmware/main.ino",
-  "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYCm> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks at xCalibrationYCm clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
+  "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYCm> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks xCalibrationYCm motor rotations clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
   "notes": "X-only gantry bring-up calibration: home to X-min, move to X-max, and measure X steps per centimeter.",
   "schema_version": 1,
   "inputs": [],
-  "version": "0.7.0",
+  "version": "0.10.0",
   "advanced_inputs": []
 }

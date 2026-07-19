@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "id": "move_gantry_xy",
-  "display_name": "Move Gantry XY",
+  "id": "test_motor",
+  "display_name": "Test Motor A/B",
   "category": "Robot Actions",
-  "description": "Move the CoreXY gantry in a straight line from its current position to an absolute (X, Y) position in cm, with trapezoidal acceleration. Requires a prior Calibrate Gantry XY run (X steps-per-cm is reused for Y). Coordinates are inset by a 5 mm buffer from each limit switch: 0 is the safe min end and the max is the track length minus the buffers. Errors and stops immediately if the target is outside the usable range or a limit switch is hit.",
-  "version": "0.2.0",
+  "description": "Diagnostic: pulse a single CoreXY motor on its own to identify which physical motor is A and which is B. Because CoreXY couples both motors, driving one alone moves the carriage diagonally rather than along an axis. Stops if any limit switch trips. This move is not position-tracked, so it drops the gantry calibration - re-run Calibrate Gantry XY afterwards.",
+  "version": "0.1.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -15,65 +15,69 @@
       "default": "/dev/ttyUSB0",
       "placeholder": "/dev/ttyUSB0",
       "advanced": false,
-      "options": []
+      "options": [],
+      "min": null,
+      "max": null
     },
     {
-      "key": "x_cm",
-      "label": "Target X (cm)",
-      "type": "number",
-      "description": "Absolute X position in cm. 0 is the safe X-min end (5 mm off the switch); the max is the X track length minus the 5 mm buffer at each end.",
+      "key": "motor",
+      "label": "Motor",
+      "type": "select",
+      "description": "Which CoreXY motor to pulse on its own.",
       "required": true,
-      "default": 0.0,
+      "default": "A",
       "placeholder": null,
       "advanced": false,
-      "min": 0.0,
-      "max": 105.1,
-      "options": []
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "Motor A (CoreXY A)",
+          "value": "A"
+        },
+        {
+          "label": "Motor B (CoreXY B)",
+          "value": "B"
+        }
+      ]
     },
     {
-      "key": "y_cm",
-      "label": "Target Y (cm)",
+      "key": "steps",
+      "label": "Steps",
       "type": "number",
-      "description": "Absolute Y position in cm. 0 is the safe Y-min end (5 mm off the switch); the max is the Y track length minus the 5 mm buffer at each end.",
+      "description": "How many step pulses to send. 2000 is about 2.5 turns at 800 steps/rotation.",
       "required": true,
-      "default": 0.0,
+      "default": 2000.0,
       "placeholder": null,
       "advanced": false,
-      "min": 0.0,
-      "max": 54.8,
+      "min": 1.0,
+      "max": null,
       "options": []
     },
     {
-      "key": "speed_rpm",
-      "label": "Move Speed (RPM)",
-      "type": "number",
-      "description": "Numeric target motor speed for the move.",
-      "required": true,
-      "default": 400.0,
-      "placeholder": null,
-      "advanced": false,
-      "options": []
-    },
-    {
-      "key": "trapezoidal_speed",
-      "label": "Trapezoidal Speed",
+      "key": "forward",
+      "label": "Forward",
       "type": "boolean",
-      "description": "Ramp acceleration and deceleration instead of jumping straight to target speed.",
+      "description": "Direction of rotation. Run it both ways to confirm the motor reverses.",
       "required": false,
       "default": true,
       "placeholder": null,
       "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
-      "key": "acceleration_rpm_per_s",
-      "label": "Acceleration (RPM/s)",
+      "key": "speed_rpm",
+      "label": "Speed (RPM)",
       "type": "number",
-      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
-      "required": false,
-      "default": 600.0,
+      "description": "Deliberately slow by default so the motor is easy to watch.",
+      "required": true,
+      "default": 60.0,
       "placeholder": null,
       "advanced": false,
+      "min": 1.0,
+      "max": null,
       "options": []
     }
   ],
@@ -172,7 +176,7 @@
       "key": "next",
       "label": "Next",
       "type": "flow",
-      "description": "Continue when the XY move completes."
+      "description": "Continue when the motor test completes."
     }
   ],
   "hardware_devices": [
@@ -298,11 +302,11 @@
   ],
   "firmware_requirements": [
     {
-      "routine_id": "move_gantry_xy",
+      "routine_id": "test_motor",
       "controller_role": "builder_board",
       "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves in a straight line using the calibrated steps-per-cm and Y track length restored from NVS, with trapezoidal ramping, and faults on workspace or limit violations.",
-      "entry_point": "moveGantryXYTo",
+      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, TEST MOTOR <A|B> <steps> <forwardFlag> <rpm>. Firmware pulses only the named motor, watching every limit switch, and drops the stored calibration because the move is not tracked.",
+      "entry_point": "test_motor",
       "required_device_ids": [
         "x-axis-motor",
         "y-axis-motor",
@@ -310,12 +314,12 @@
         "x-max-limit-switch",
         "y-min-limit-switch"
       ],
-      "description": "Firmware routine required by the Move Gantry XY block."
+      "description": "Firmware routine required by the Test Motor A/B block."
     }
   ],
   "builder_board_id": "ttyUSB0",
   "builder_source_path": null,
-  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
-  "builder_firmware_entry_file": "firmware/main.ino",
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
   "builder_base_function_id": null
 }

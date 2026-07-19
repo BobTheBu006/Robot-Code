@@ -28,3 +28,6 @@ tools/arduino-cli/
 
 # Runtime machine state: which toolhead is physically on the gantry right now.
 toolhead-state.json
+
+# Runtime machine state: Pi gantry calibration (mirrors ESP32 NVS).
+gantry-state.json

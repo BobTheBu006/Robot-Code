@@ -1,25 +1,61 @@
+import json
 import math
 import os
 import time
 from dataclasses import dataclass
-from threading import Lock
+from pathlib import Path
+from threading import Event, Lock
 from typing import Any
+
+# Bumped whenever the meaning of the saved calibration changes, so a record
+# written under older semantics is discarded instead of misread. Matches the
+# ESP32 firmware's GANTRY_STATE_VERSION scheme.
+GANTRY_STATE_VERSION = 2
+
+# Slow re-touch speed for the three-pass homing, matching XY_SLOW_HOMING_RPM in
+# the ESP32 firmware so both execution paths home identically.
+XY_SLOW_HOMING_RPM = 10.0
 
 from app.models.gantry import GANTRY_WORKSPACE_X_CM, GANTRY_WORKSPACE_Y_CM, GantryXYCalibrationRequest, GantryXYMoveRequest
 from app.services.gpio_backend import load_gpio_backend
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
-XY_DEVICE_IDS = {
+# A Y-max switch is optional: the gantry homes against Y-min, so a machine with
+# only a Y-min switch is a valid setup and must not be treated as "not on the Pi".
+REQUIRED_XY_DEVICE_IDS = {
     "x-axis-motor",
     "y-axis-motor",
     "x-min-limit-switch",
     "x-max-limit-switch",
     "y-min-limit-switch",
+}
+OPTIONAL_XY_DEVICE_IDS = {
     "y-max-limit-switch",
 }
+XY_DEVICE_IDS = REQUIRED_XY_DEVICE_IDS | OPTIONAL_XY_DEVICE_IDS
 
 DEFAULT_STEPS_PER_CM = 100.0
-DEFAULT_STEP_PULSE_SECONDS = 0.0005
+# STEP pulse width. Drivers only need ~1-2us; the width also floors the step
+# interval (interval >= 2x pulse), which caps the step rate at 5000/s - a
+# ceiling this Python loop can still time accurately. Stall protection does
+# not come from this cap but from the trapezoidal ramp in _move_corexy_steps:
+# commanding a stepper from standstill straight at full speed stalls it, and
+# stalls hit the two CoreXY motors unevenly, which bends commanded straight
+# lines into diagonals - observed on this machine before the ramp existed.
+DEFAULT_STEP_PULSE_SECONDS = float(os.getenv("ROBOT_GPIO_STEP_PULSE_SECONDS", "0.0001"))
+# Ramp floor, matching the firmware's rpmForTrapezoidIteration lower clamp:
+# every ramped move starts and ends at this speed, which is well inside the
+# motors' pull-in range, so a move can never begin above what a stationary
+# rotor can follow.
+MIN_RAMP_RPM = 10.0
+# Settle time between writing the DIR pins and the first STEP edge, mirroring
+# the firmware's delayMicroseconds(20) (drivers latch direction on the step
+# edge and need the level stable first).
+DIR_SETTLE_SECONDS = 0.0002
+# time.sleep()/Event.wait() only resolve to ~50-100us and overshoot badly below
+# that, so short waits spin on perf_counter instead. Waits longer than this
+# sleep first (to yield the CPU) and spin only for the tail.
+STEP_SPIN_THRESHOLD_SECONDS = 0.002
 DEFAULT_BACKOFF_CM = 1.0
 
 
@@ -32,7 +68,14 @@ class _GPIOPinPlan:
     x_min_limit_pin: int
     x_max_limit_pin: int
     y_min_limit_pin: int
-    y_max_limit_pin: int
+    # None when the machine has no Y-max switch; that end is then unguarded.
+    y_max_limit_pin: int | None = None
+
+    def limit_pins(self) -> list[int]:
+        pins = [self.x_min_limit_pin, self.x_max_limit_pin, self.y_min_limit_pin]
+        if self.y_max_limit_pin is not None:
+            pins.append(self.y_max_limit_pin)
+        return pins
 
 
 @dataclass
@@ -52,19 +95,55 @@ def _hardware_map_devices(context: dict) -> list[dict]:
     return devices if isinstance(devices, list) else []
 
 
+class RaspberryGantryConfigError(RuntimeError):
+    """The XY hardware is partly mapped to the Raspberry Pi, but not usably so."""
+
+
+def _device_is_on_raspberry_pi(device: dict | None) -> bool:
+    return bool(
+        device
+        and device.get("board_id") == RASPBERRY_BOARD_ID
+        and device.get("enabled") is not False
+    )
+
+
 def xy_hardware_is_on_raspberry_pi(context: dict) -> bool:
+    """True when the XY gantry should be driven from Raspberry Pi GPIO.
+
+    Raises instead of returning False when the XY hardware is *partly* on the Pi.
+    Falling back to the ESP32 serial path in that case would send gantry motion
+    commands to whatever else is wired to that board (e.g. the syringe motors),
+    so a half-finished mapping has to fail loudly rather than move the wrong axis.
+    """
     devices_by_id = {
         device.get("id"): device
         for device in _hardware_map_devices(context)
         if isinstance(device, dict)
     }
 
-    for device_id in XY_DEVICE_IDS:
-        device = devices_by_id.get(device_id)
-        if not device or device.get("board_id") != RASPBERRY_BOARD_ID or device.get("enabled") is False:
-            return False
+    missing = sorted(
+        device_id
+        for device_id in REQUIRED_XY_DEVICE_IDS
+        if not _device_is_on_raspberry_pi(devices_by_id.get(device_id))
+    )
+    if not missing:
+        return True
 
-    return True
+    on_pi = sorted(
+        device_id
+        for device_id in XY_DEVICE_IDS
+        if _device_is_on_raspberry_pi(devices_by_id.get(device_id))
+    )
+    if on_pi:
+        raise RaspberryGantryConfigError(
+            "The XY gantry is only partly mapped to the Raspberry Pi, so it cannot be driven safely. "
+            f"On the Raspberry Pi: {', '.join(on_pi)}. "
+            f"Still missing (must be on the '{RASPBERRY_BOARD_ID}' board and enabled): {', '.join(missing)}. "
+            "Fix the Hardware Map before running gantry motion - the previous behaviour fell back to the "
+            "ESP32 controller and moved whichever motors were wired to it."
+        )
+
+    return False
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -72,6 +151,10 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if raw_value is None:
         return default
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+class GantryStoppedError(RuntimeError):
+    """Motion was aborted by an emergency stop."""
 
 
 class RaspberryGantryGPIOService:
@@ -82,16 +165,147 @@ class RaspberryGantryGPIOService:
         self._x_track_length_cm = GANTRY_WORKSPACE_X_CM
         self._y_track_length_cm = GANTRY_WORKSPACE_Y_CM
         self._calibrated = False
+        # Physical position in steps, origin at the min-switch slow touch of the
+        # last calibration. This mirrors the ESP32 firmware's currentX/YSteps: the
+        # steps are the source of truth and user cm are derived from them.
+        self._x_steps = 0
+        self._y_steps = 0
+        self._y_known = False
+        # Steps-per-cm measured by the last X calibration (track length / counted
+        # steps), like the firmware's xStepsPerCm. None until first measured; the
+        # ROBOT_GPIO_XY_STEPS_PER_CM estimate is only a pre-calibration fallback.
+        self._measured_steps_per_cm: float | None = None
+        # Steps-per-rotation the machine was calibrated with; later moves use it
+        # to turn RPM into a step rate, like the firmware's stepsPerRevolution.
+        self._steps_per_rotation: int | None = None
+        self._limit_buffer_cm = 0.5
+        # Signed pulses issued to each motor by the last _move_corexy_steps call,
+        # including runs stopped early by a limit; probes measure travel from it.
+        self._last_a_steps = 0
+        self._last_b_steps = 0
+        # Set by emergency_stop() from the request thread; the stepping loop
+        # checks it every step so motion aborts mid-move rather than running to
+        # completion. Never cleared by motion itself - only by rearm().
+        self._stop_requested = Event()
+        self._load_state()
+
+    def _state_path(self) -> Path:
+        return Path(__file__).resolve().parents[3] / "gantry-state.json"
+
+    def _save_state(self) -> None:
+        """Persist calibration the way the firmware persists to NVS.
+
+        Steps-per-cm and the buffer survive an invalidated calibration on
+        purpose: they describe the belts and the workspace mapping, not where
+        the carriage happens to be.
+        """
+        payload = {
+            "version": GANTRY_STATE_VERSION,
+            "calibrated": self._calibrated,
+            "steps_per_cm": self._measured_steps_per_cm,
+            "steps_per_rotation": self._steps_per_rotation,
+            "limit_buffer_cm": self._limit_buffer_cm,
+            "x_track_length_cm": self._x_track_length_cm,
+            "y_track_length_cm": self._y_track_length_cm,
+            "x_steps": self._x_steps,
+            "y_steps": self._y_steps,
+            "y_known": self._y_known,
+        }
+        try:
+            temp_path = self._state_path().with_suffix(".json.tmp")
+            with temp_path.open("w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2)
+                handle.write("\n")
+            temp_path.replace(self._state_path())
+        except OSError:
+            # Persistence is a convenience; never fail motion over it.
+            pass
+
+    def _load_state(self) -> None:
+        path = self._state_path()
+        if not path.exists():
+            return
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return
+        # A record written under a different meaning of the fields is discarded
+        # rather than misread, mirroring the firmware's versioned NVS state.
+        if payload.get("version") != GANTRY_STATE_VERSION:
+            return
+        steps_per_cm = payload.get("steps_per_cm")
+        if isinstance(steps_per_cm, (int, float)) and steps_per_cm > 0:
+            self._measured_steps_per_cm = float(steps_per_cm)
+        steps_per_rotation = payload.get("steps_per_rotation")
+        if isinstance(steps_per_rotation, int) and steps_per_rotation > 0:
+            self._steps_per_rotation = steps_per_rotation
+        buffer_cm = payload.get("limit_buffer_cm")
+        if isinstance(buffer_cm, (int, float)) and buffer_cm >= 0:
+            self._limit_buffer_cm = float(buffer_cm)
+        if payload.get("calibrated"):
+            self._calibrated = True
+            self._x_track_length_cm = float(payload.get("x_track_length_cm", GANTRY_WORKSPACE_X_CM))
+            self._y_track_length_cm = float(payload.get("y_track_length_cm", GANTRY_WORKSPACE_Y_CM))
+            self._x_steps = int(payload.get("x_steps", 0))
+            self._y_steps = int(payload.get("y_steps", 0))
+            self._y_known = bool(payload.get("y_known", False))
+
+    def _effective_steps_per_cm(self) -> float:
+        return self._measured_steps_per_cm if self._measured_steps_per_cm else self._steps_per_cm()
+
+    def _invalidate_calibration(self) -> None:
+        """Forget the stored calibration so moves refuse rather than run against
+        a position that is no longer true. Steps-per-cm is kept."""
+        self._calibrated = False
+        self._y_known = False
+        self._save_state()
+
+    def emergency_stop(self) -> dict[str, object]:
+        """Abort any in-progress GPIO motion. Safe to call when nothing is moving."""
+        self._stop_requested.set()
+        return {
+            "ok": True,
+            "tool": "raspberry-pi-gantry",
+            "tool_port": None,
+            "message": "Raspberry Pi GPIO gantry motion stop requested.",
+        }
+
+    def rearm(self) -> None:
+        """Clear a latched stop so the next run can move again."""
+        self._stop_requested.clear()
+
+    def stop_is_requested(self) -> bool:
+        return self._stop_requested.is_set()
+
+    def _raise_if_stopped(self) -> None:
+        if self._stop_requested.is_set():
+            raise GantryStoppedError("Gantry motion stopped by emergency stop.")
+
+    def _wait_until(self, deadline: float) -> None:
+        """Wait until perf_counter reaches deadline, aborting on emergency stop.
+
+        Sleeps for the bulk of long waits so the CPU is not pinned, then spins
+        for the remainder: step intervals are tens to hundreds of microseconds,
+        which time.sleep() cannot resolve without large overshoot.
+        """
+        remaining = deadline - time.perf_counter()
+        if remaining > STEP_SPIN_THRESHOLD_SECONDS:
+            if self._stop_requested.wait(remaining - STEP_SPIN_THRESHOLD_SECONDS):
+                raise GantryStoppedError("Gantry motion stopped by emergency stop.")
+
+        while time.perf_counter() < deadline:
+            if self._stop_requested.is_set():
+                raise GantryStoppedError("Gantry motion stopped by emergency stop.")
 
     def calibrate_xy(self, context: dict, request: GantryXYCalibrationRequest) -> dict:
-        pins = self._pins_from_request(request)
+        # A latched emergency stop blocks new motion until the next run rearms it.
+        self._raise_if_stopped()
+        pins = self._pins_from_request(request, context)
         execution = self._execution_mode()
 
         if execution.simulated:
-            self._x_cm = 0.0
-            self._y_cm = 0.0
-            self._x_track_length_cm = request.x_track_length_cm
-            self._calibrated = True
+            self._adopt_calibration(request, self._effective_steps_per_cm())
             return self._calibration_result(context, request, pins, execution)
 
         gpio, _ = self._gpio_module()
@@ -102,31 +316,216 @@ class RaspberryGantryGPIOService:
                 self._setup_gpio(gpio, pins)
             except Exception as exc:
                 execution = self._gpio_unavailable_execution(str(exc))
-                self._x_cm = 0.0
-                self._y_cm = 0.0
-                self._x_track_length_cm = request.x_track_length_cm
-                self._calibrated = True
+                self._adopt_calibration(request, self._effective_steps_per_cm())
                 return self._calibration_result(context, request, pins, execution)
             try:
+                # Everything below moves the carriage, so a run that fails part
+                # way through leaves the stored position wrong. Drop the old
+                # calibration first; moves refuse until a run completes.
+                self._invalidate_calibration()
+
                 fast_rpm = request.speed_rpm
-                slow_rpm = max(1.0, request.speed_rpm / 3.0)
-
                 max_probe_steps = request.steps_per_rotation * request.max_probe_rotations
+                trapezoidal = request.trapezoidal_speed
+                acceleration = request.acceleration_rpm_per_s
 
-                self._probe_axis(gpio, pins, "x", -1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
-                self._x_cm = 0.0
-                self._probe_axis(gpio, pins, "x", 1, max_probe_steps, request.steps_per_rotation, fast_rpm, slow_rpm)
-                self._x_cm = request.x_track_length_cm
-                self._x_track_length_cm = request.x_track_length_cm
+                # ---- Step clear of the tool holders before anything else: the
+                # carriage may be parked among them, and the Y homing that
+                # follows would drag a mounted tool through the holder rack.
+                # The distance converts through the carried-over steps-per-cm
+                # estimate; precision does not matter for a clearance hop. The
+                # move stops silently on X-max, which the nudge below frees. ----
+                clear_steps = round(request.x_start_clear_cm * self._effective_steps_per_cm())
+                if clear_steps > 0:
+                    self._move_corexy_steps(
+                        gpio, pins, clear_steps, clear_steps, fast_rpm,
+                        stop_limit_pin=pins.x_max_limit_pin,
+                        steps_per_rotation=request.steps_per_rotation,
+                        trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                    )
 
-                self._calibrated = True
+                self._nudge_away_from_pressed_limits(
+                    gpio, pins, fast_rpm, request.steps_per_rotation, trapezoidal, acceleration
+                )
+
+                # ---- Y first: home against the Y-min switch so the Y position
+                # is known, then park clear of the switch so the X sweep does not
+                # drag the frame along its Y stop. The park cm converts with the
+                # steps-per-cm carried over from the last calibration (or the
+                # pre-calibration estimate) and is corrected onto the exact cm
+                # once X has measured the true value, like the firmware. ----
+                self._probe_axis(
+                    gpio, pins, "y", -1, max_probe_steps, request.steps_per_rotation, fast_rpm,
+                    trapezoidal, acceleration,
+                )
+                self._y_steps = 0
+                park_steps = max(1, round(request.x_calibration_y_cm * self._effective_steps_per_cm()))
+                self._move_corexy_steps(
+                    gpio, pins, park_steps, -park_steps, fast_rpm,
+                    steps_per_rotation=request.steps_per_rotation,
+                    trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                )
+                self._y_steps = park_steps
+
+                # ---- X: the min slow touch defines X = 0, then the max home
+                # measures the physical track in steps -- that measurement is
+                # what makes cm real on this machine. ----
+                self._probe_axis(
+                    gpio, pins, "x", -1, max_probe_steps, request.steps_per_rotation, fast_rpm,
+                    trapezoidal, acceleration,
+                )
+                self._x_steps = 0
+                measured_x_steps = self._probe_axis(
+                    gpio, pins, "x", 1, max_probe_steps, request.steps_per_rotation, fast_rpm,
+                    trapezoidal, acceleration,
+                )
+                if measured_x_steps <= 0:
+                    raise RuntimeError(
+                        "X max homing measured zero travel from X min; check the X limit switches."
+                    )
+                self._x_steps = measured_x_steps
+                steps_per_cm = measured_x_steps / request.x_track_length_cm
+
+                # The park above used an estimated steps-per-cm; only now is the
+                # real value measured. Correct Y onto the exact requested cm so
+                # the recorded Y position is true rather than approximate,
+                # mirroring the firmware's post-measurement Y correction.
+                desired_y_steps = round(request.x_calibration_y_cm * steps_per_cm)
+                y_correction = desired_y_steps - self._y_steps
+                if y_correction != 0:
+                    self._move_corexy_steps(
+                        gpio, pins, y_correction, -y_correction, fast_rpm,
+                        stop_limit_pin=pins.y_min_limit_pin if y_correction < 0 else None,
+                        steps_per_rotation=request.steps_per_rotation,
+                        trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                    )
+                    self._y_steps = desired_y_steps
+
+                # Walk back off the X-max switch so calibration never finishes
+                # with a limit pressed: at least one buffer (the usable max),
+                # extended to the requested end clearance so the gantry parks
+                # well clear of the switch and the tool holders at the far end.
+                backoff_steps = round(max(request.limit_buffer_cm, request.x_end_clear_cm) * steps_per_cm)
+                if backoff_steps > 0:
+                    self._move_corexy_steps(
+                        gpio, pins, -backoff_steps, -backoff_steps, fast_rpm,
+                        steps_per_rotation=request.steps_per_rotation,
+                        trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                    )
+                    self._x_steps = measured_x_steps - backoff_steps
+
+                self._adopt_calibration(request, steps_per_cm)
             finally:
                 self._cleanup_gpio(gpio, pins)
 
         return self._calibration_result(context, request, pins, execution)
 
+    def _adopt_calibration(self, request: GantryXYCalibrationRequest, steps_per_cm: float) -> None:
+        """Record a completed (or simulated) calibration and persist it.
+
+        User coordinates sit one buffer inside the physical track, exactly like
+        the firmware: user 0 is one buffer off the min switch, so the physical
+        position maps to user cm as physical/steps_per_cm - buffer.
+        """
+        self._measured_steps_per_cm = steps_per_cm
+        self._steps_per_rotation = request.steps_per_rotation
+        self._limit_buffer_cm = request.limit_buffer_cm
+        self._x_track_length_cm = request.x_track_length_cm
+        self._y_track_length_cm = request.y_track_length_cm
+        if not self._x_steps and not self._y_steps:
+            # Simulated / GPIO-unavailable path: adopt the post-calibration rest
+            # position (walked back to the usable X max, parked at the Y park).
+            self._x_steps = round(
+                (request.x_track_length_cm - max(request.limit_buffer_cm, request.x_end_clear_cm)) * steps_per_cm
+            )
+            self._y_steps = round(request.x_calibration_y_cm * steps_per_cm)
+        self._x_cm = max(0.0, self._x_steps / steps_per_cm - self._limit_buffer_cm)
+        self._y_cm = max(0.0, self._y_steps / steps_per_cm - self._limit_buffer_cm)
+        self._y_known = True
+        self._calibrated = True
+        self._save_state()
+
+    def test_motor(self, context: dict, request) -> dict:
+        """Pulse one CoreXY motor on its own so the operator can identify it.
+
+        CoreXY couples both belts, so driving a single motor moves the carriage
+        diagonally rather than along an axis -- that diagonal, and its direction,
+        is what distinguishes A from B by eye. Every switch is watched because a
+        diagonal can reach any of them.
+        """
+        pins = self._pins_from_request(request, context)
+        execution = self._execution_mode()
+        signed_steps = int(request.steps) * (1 if request.forward else -1)
+        a_steps = signed_steps if request.motor == "A" else 0
+        b_steps = signed_steps if request.motor == "B" else 0
+
+        stopped_on_limit = False
+        if not execution.simulated:
+            gpio, _ = self._gpio_module()
+            if gpio is None:
+                raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during motor test.")
+            with self._lock:
+                try:
+                    self._setup_gpio(gpio, pins)
+                except Exception as exc:
+                    execution = self._gpio_unavailable_execution(str(exc))
+                else:
+                    try:
+                        stopped_on_limit = self._move_corexy_steps(
+                            gpio,
+                            pins,
+                            a_steps,
+                            b_steps,
+                            request.speed_rpm,
+                            stop_limit_pins=pins.limit_pins(),
+                            steps_per_rotation=request.steps_per_rotation,
+                        )
+                    finally:
+                        self._cleanup_gpio(gpio, pins)
+
+        # The carriage moved without cartesian tracking, so the stored position is
+        # no longer true. Drop it rather than leave later moves computing from it.
+        self._invalidate_calibration()
+
+        message = (
+            f"Pulsed CoreXY motor {request.motor} {request.steps} steps "
+            f"{'forward' if request.forward else 'backward'} at {request.speed_rpm} RPM through "
+            "Raspberry Pi GPIO. On a CoreXY only one motor turning moves the carriage diagonally. "
+            "The gantry calibration was dropped because this move is not position-tracked."
+        )
+        if stopped_on_limit:
+            message = (
+                f"Motor {request.motor} test stopped early: a limit switch tripped. "
+                "The gantry calibration was dropped."
+            )
+        if execution.simulated:
+            message = execution.message
+
+        return {
+            "accepted": not stopped_on_limit,
+            "status": execution.status,
+            "message": message,
+            "tool_port": None,
+            "motor": request.motor,
+            "steps": request.steps,
+            "forward": request.forward,
+            "speed_rpm": request.speed_rpm,
+            "stopped_on_limit": stopped_on_limit,
+            "a_steps": a_steps,
+            "b_steps": b_steps,
+            "configured_pins": {
+                "a_step_pin": pins.a_step_pin,
+                "a_dir_pin": pins.a_dir_pin,
+                "b_step_pin": pins.b_step_pin,
+                "b_dir_pin": pins.b_dir_pin,
+            },
+            "mode": context.get("mode"),
+        }
+
     def move_xy(self, context: dict, request: GantryXYMoveRequest) -> dict:
-        pins = self._pins_from_request(request)
+        # A latched emergency stop blocks new motion until the next run rearms it.
+        self._raise_if_stopped()
+        pins = self._pins_from_request(request, context)
         execution = self._execution_mode()
         self._assert_target_within_calibrated_workspace(request)
 
@@ -134,6 +533,12 @@ class RaspberryGantryGPIOService:
             self._x_cm = request.x_cm
             self._y_cm = request.y_cm
             return self._move_result(context, request, pins, execution, applied=True)
+
+        # A real move computes its path from the stored position, so it is only
+        # meaningful after a calibration has established one. The firmware
+        # refuses identically (ERR X NOT CALIBRATED).
+        if not self._calibrated:
+            raise RuntimeError("Gantry is not calibrated. Run Calibrate Gantry XY before moving.")
 
         gpio, _ = self._gpio_module()
         if gpio is None:
@@ -148,11 +553,44 @@ class RaspberryGantryGPIOService:
                 return self._move_result(context, request, pins, execution, applied=True)
             try:
                 self._assert_limits_clear(gpio, pins, request)
-                dx_cm = request.x_cm - self._x_cm
-                dy_cm = request.y_cm - self._y_cm
-                self._move_cm(gpio, pins, dx_cm, dy_cm, request.speed_rpm, request)
+
+                # User coordinates map through the calibrated buffer exactly as
+                # in the firmware: user 0 sits one buffer off the min switch.
+                steps_per_cm = self._effective_steps_per_cm()
+                target_x_steps = round((request.x_cm + self._limit_buffer_cm) * steps_per_cm)
+                target_y_steps = round((request.y_cm + self._limit_buffer_cm) * steps_per_cm)
+                delta_x = target_x_steps - self._x_steps
+                delta_y = target_y_steps - self._y_steps
+
+                # CoreXY: motor A = X + Y, motor B = X - Y (in steps).
+                try:
+                    self._move_corexy_steps(
+                        gpio,
+                        pins,
+                        delta_x + delta_y,
+                        delta_x - delta_y,
+                        request.speed_rpm,
+                        request=request,
+                        steps_per_rotation=self._steps_per_rotation,
+                        trapezoidal=request.trapezoidal_speed,
+                        acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+                    )
+                except BaseException:
+                    # The move was aborted part way (emergency stop, limit trip)
+                    # but every pulse issued so far was counted, so the position
+                    # is still exactly known. Adopt the partial travel instead of
+                    # discarding it - an E-Stop must not cost the calibration.
+                    self._x_steps += (self._last_a_steps + self._last_b_steps) // 2
+                    self._y_steps += (self._last_a_steps - self._last_b_steps) // 2
+                    self._x_cm = max(0.0, self._x_steps / steps_per_cm - self._limit_buffer_cm)
+                    self._y_cm = max(0.0, self._y_steps / steps_per_cm - self._limit_buffer_cm)
+                    self._save_state()
+                    raise
+                self._x_steps = target_x_steps
+                self._y_steps = target_y_steps
                 self._x_cm = request.x_cm
                 self._y_cm = request.y_cm
+                self._save_state()
             finally:
                 self._cleanup_gpio(gpio, pins)
 
@@ -161,10 +599,15 @@ class RaspberryGantryGPIOService:
     def _assert_target_within_calibrated_workspace(self, request: GantryXYMoveRequest) -> None:
         if not self._calibrated:
             return
-        if not 0.0 <= request.x_cm <= self._x_track_length_cm:
-            raise RuntimeError(f"x_cm must be between 0 and calibrated X length {self._x_track_length_cm} cm.")
-        if not 0.0 <= request.y_cm <= self._y_track_length_cm:
-            raise RuntimeError(f"y_cm must be between 0 and calibrated Y length {self._y_track_length_cm} cm.")
+        # The usable range is inset from each switch by the calibrated buffer, so
+        # the highest reachable coordinate is the track length minus two buffers,
+        # exactly as the firmware enforces.
+        usable_x_max = self._x_track_length_cm - 2.0 * self._limit_buffer_cm
+        usable_y_max = self._y_track_length_cm - 2.0 * self._limit_buffer_cm
+        if not 0.0 <= request.x_cm <= usable_x_max:
+            raise RuntimeError(f"x_cm must be between 0 and the usable X maximum of {usable_x_max:g} cm.")
+        if not 0.0 <= request.y_cm <= usable_y_max:
+            raise RuntimeError(f"y_cm must be between 0 and the usable Y maximum of {usable_y_max:g} cm.")
 
     def _execution_mode(self) -> _GPIOExecution:
         gpio, unavailable_reason = self._gpio_module()
@@ -203,7 +646,23 @@ class RaspberryGantryGPIOService:
             return None, "ROBOT_GPIO_SIMULATE is enabled."
         return load_gpio_backend()
 
-    def _pins_from_request(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest) -> _GPIOPinPlan:
+    def _pins_from_request(
+        self,
+        request: GantryXYMoveRequest | GantryXYCalibrationRequest,
+        context: dict | None = None,
+    ) -> _GPIOPinPlan:
+        # Only guard the Y-max end when that switch actually exists in the
+        # Hardware Map; otherwise its pin is unwired and would read as noise.
+        y_max_limit_pin = getattr(request, "y_max_limit_pin", None)
+        if context is not None:
+            devices_by_id = {
+                device.get("id"): device
+                for device in _hardware_map_devices(context)
+                if isinstance(device, dict)
+            }
+            if not _device_is_on_raspberry_pi(devices_by_id.get("y-max-limit-switch")):
+                y_max_limit_pin = None
+
         return _GPIOPinPlan(
             a_step_pin=request.x_step_pin,
             a_dir_pin=request.x_dir_pin,
@@ -212,7 +671,7 @@ class RaspberryGantryGPIOService:
             x_min_limit_pin=request.x_min_limit_pin,
             x_max_limit_pin=request.x_max_limit_pin,
             y_min_limit_pin=request.y_min_limit_pin,
-            y_max_limit_pin=request.y_max_limit_pin,
+            y_max_limit_pin=y_max_limit_pin,
         )
 
     def _setup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:
@@ -222,12 +681,7 @@ class RaspberryGantryGPIOService:
             gpio.setup(pin, gpio.OUT, initial=gpio.LOW)
 
         pull = gpio.PUD_UP if _bool_env("ROBOT_GPIO_LIMIT_ACTIVE_LOW", True) else gpio.PUD_DOWN
-        for pin in [
-            pins.x_min_limit_pin,
-            pins.x_max_limit_pin,
-            pins.y_min_limit_pin,
-            pins.y_max_limit_pin,
-        ]:
+        for pin in pins.limit_pins():
             gpio.setup(pin, gpio.IN, pull_up_down=pull)
 
     def _cleanup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:
@@ -237,10 +691,7 @@ class RaspberryGantryGPIOService:
                 pins.a_dir_pin,
                 pins.b_step_pin,
                 pins.b_dir_pin,
-                pins.x_min_limit_pin,
-                pins.x_max_limit_pin,
-                pins.y_min_limit_pin,
-                pins.y_max_limit_pin,
+                *pins.limit_pins(),
             ]
         )
 
@@ -251,6 +702,44 @@ class RaspberryGantryGPIOService:
         configured_steps_per_rotation = steps_per_rotation or int(os.getenv("ROBOT_GPIO_STEPS_PER_ROTATION", "200"))
         rpm = max(float(speed_rpm), 0.1)
         return max(60.0 / (rpm * configured_steps_per_rotation), DEFAULT_STEP_PULSE_SECONDS * 2.0)
+
+    def _ramp_steps(
+        self,
+        total_steps: int,
+        target_rpm: float,
+        acceleration_rpm_per_s: float,
+        steps_per_rotation: int,
+    ) -> int:
+        """Steps needed to reach the target speed at constant acceleration
+        (v^2 / 2a), clamped to half the move so short moves peak at the midpoint.
+        Mirrors rampIterationsForMotion in the ESP32 firmware."""
+        if total_steps <= 2 or target_rpm <= 0 or acceleration_rpm_per_s <= 0:
+            return 0
+        accel_steps_per_s2 = acceleration_rpm_per_s * steps_per_rotation / 60.0
+        target_steps_per_s = target_rpm * steps_per_rotation / 60.0
+        ramp = int(target_steps_per_s * target_steps_per_s / (2.0 * accel_steps_per_s2))
+        return min(max(ramp, 1), total_steps // 2)
+
+    def _trapezoid_rpm(
+        self,
+        iteration: int,
+        total_steps: int,
+        target_rpm: float,
+        ramp_steps: int,
+        acceleration_rpm_per_s: float,
+        steps_per_rotation: int,
+    ) -> float:
+        """Speed for one iteration of a trapezoidal move: accelerate over the
+        first ramp_steps, cruise, decelerate over the last ramp_steps. Mirrors
+        rpmForTrapezoidIteration in the ESP32 firmware, including its 10 RPM
+        floor. For a limit probe the move stops on contact long before the
+        deceleration phase, so it effectively just accelerates."""
+        remaining = total_steps - iteration - 1
+        ramp_position = min(iteration + 1, remaining + 1, ramp_steps)
+        accel_steps_per_s2 = acceleration_rpm_per_s * steps_per_rotation / 60.0
+        steps_per_s = math.sqrt(2.0 * accel_steps_per_s2 * ramp_position)
+        rpm = steps_per_s * 60.0 / steps_per_rotation
+        return max(MIN_RAMP_RPM, min(float(target_rpm), rpm))
 
     def _limit_active(self, gpio: Any, pin: int) -> bool:
         active_low = _bool_env("ROBOT_GPIO_LIMIT_ACTIVE_LOW", True)
@@ -297,8 +786,16 @@ class RaspberryGantryGPIOService:
         speed_rpm: float,
         request: GantryXYMoveRequest | None = None,
         stop_limit_pin: int | None = None,
+        stop_limit_pins: list[int] | None = None,
         steps_per_rotation: int | None = None,
+        trapezoidal: bool = True,
+        acceleration_rpm_per_s: float = 300.0,
     ) -> bool:
+        # Reset the issued-pulse counters before anything can fail, so a caller
+        # recovering from an aborted move never adopts counts from an earlier one.
+        self._last_a_steps = 0
+        self._last_b_steps = 0
+
         a_total = abs(a_steps)
         b_total = abs(b_steps)
         total = max(a_total, b_total)
@@ -307,40 +804,87 @@ class RaspberryGantryGPIOService:
 
         self._set_direction(gpio, pins.a_dir_pin, a_steps >= 0, "ROBOT_GPIO_A_DIR_INVERT")
         self._set_direction(gpio, pins.b_dir_pin, b_steps >= 0, "ROBOT_GPIO_B_DIR_INVERT")
+        self._wait_until(time.perf_counter() + DIR_SETTLE_SECONDS)
 
-        interval = self._step_interval_seconds(speed_rpm, steps_per_rotation)
-        pulse = min(DEFAULT_STEP_PULSE_SECONDS, interval / 2.0)
+        resolved_steps_per_rotation = steps_per_rotation or int(os.getenv("ROBOT_GPIO_STEPS_PER_ROTATION", "200"))
+        base_interval = self._step_interval_seconds(speed_rpm, resolved_steps_per_rotation)
+        min_interval = DEFAULT_STEP_PULSE_SECONDS * 2.0
+        # Starting a stepper from standstill at full speed stalls it, and a
+        # stall on one CoreXY motor bends the commanded straight line into a
+        # diagonal. Ramp exactly like the firmware instead of jumping to speed.
+        ramp_steps = (
+            self._ramp_steps(total, speed_rpm, acceleration_rpm_per_s, resolved_steps_per_rotation)
+            if trapezoidal
+            else 0
+        )
 
         a_error = 0
         b_error = 0
-        for _ in range(total):
-            if stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin):
-                return True
+        a_sign = 1 if a_steps >= 0 else -1
+        b_sign = 1 if b_steps >= 0 else -1
+        try:
+            for iteration in range(total):
+                # Checked every step so an emergency stop aborts within one step
+                # period instead of after the whole move.
+                self._raise_if_stopped()
 
-            if request is not None:
-                self._assert_limits_clear(gpio, pins, request)
+                if stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin):
+                    return True
 
-            pulse_a = False
-            pulse_b = False
-            a_error += a_total
-            b_error += b_total
-            if a_error >= total:
-                pulse_a = True
-                a_error -= total
-            if b_error >= total:
-                pulse_b = True
-                b_error -= total
+                # Driving one motor alone travels diagonally, so it can reach any
+                # switch rather than only the one guarding a single axis.
+                if stop_limit_pins and any(
+                    self._limit_active(gpio, candidate) for candidate in stop_limit_pins
+                ):
+                    return True
 
-            if pulse_a:
-                gpio.output(pins.a_step_pin, gpio.HIGH)
-            if pulse_b:
-                gpio.output(pins.b_step_pin, gpio.HIGH)
-            time.sleep(pulse)
-            if pulse_a:
-                gpio.output(pins.a_step_pin, gpio.LOW)
-            if pulse_b:
-                gpio.output(pins.b_step_pin, gpio.LOW)
-            time.sleep(max(0.0, interval - pulse))
+                if request is not None:
+                    self._assert_limits_clear(gpio, pins, request)
+
+                pulse_a = False
+                pulse_b = False
+                a_error += a_total
+                b_error += b_total
+                if a_error >= total:
+                    pulse_a = True
+                    a_error -= total
+                if b_error >= total:
+                    pulse_b = True
+                    b_error -= total
+
+                if ramp_steps:
+                    active_rpm = self._trapezoid_rpm(
+                        iteration, total, speed_rpm, ramp_steps,
+                        acceleration_rpm_per_s, resolved_steps_per_rotation,
+                    )
+                    interval = max(60.0 / (active_rpm * resolved_steps_per_rotation), min_interval)
+                else:
+                    interval = base_interval
+                pulse = min(DEFAULT_STEP_PULSE_SECONDS, interval / 2.0)
+
+                # Time the step from a single start point so the pulse and the
+                # gap add up to the requested interval instead of drifting.
+                # Count a pulse the moment its rising edge is written: drivers
+                # step on that edge, so if an emergency stop lands during the
+                # pulse the count still matches what the motor actually did.
+                step_started = time.perf_counter()
+                if pulse_a:
+                    gpio.output(pins.a_step_pin, gpio.HIGH)
+                    self._last_a_steps += a_sign
+                if pulse_b:
+                    gpio.output(pins.b_step_pin, gpio.HIGH)
+                    self._last_b_steps += b_sign
+                self._wait_until(step_started + pulse)
+                if pulse_a:
+                    gpio.output(pins.a_step_pin, gpio.LOW)
+                if pulse_b:
+                    gpio.output(pins.b_step_pin, gpio.LOW)
+                self._wait_until(step_started + interval)
+        except GantryStoppedError:
+            # Leave the drivers in a safe idle state on the way out.
+            gpio.output(pins.a_step_pin, gpio.LOW)
+            gpio.output(pins.b_step_pin, gpio.LOW)
+            raise
 
         return stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin)
 
@@ -353,9 +897,23 @@ class RaspberryGantryGPIOService:
         max_probe_steps: int,
         steps_per_rotation: int,
         fast_rpm: float,
-        slow_rpm: float,
-    ) -> None:
+        trapezoidal: bool = True,
+        acceleration_rpm_per_s: float = 300.0,
+    ) -> int:
+        """Three-pass homing matching homeXAgainstSwitch in the ESP32 firmware:
+        fast touch, back off one full rotation, then a slow re-touch at
+        XY_SLOW_HOMING_RPM capped at two rotations. Leaves the carriage resting
+        on the switch and returns the net travel along the probed axis in steps,
+        so the caller can measure steps-per-cm between two homes.
+        """
         limit_pin = self._axis_limit_pin(pins, axis, direction)
+
+        def axis_delta() -> int:
+            if axis == "x":
+                return (self._last_a_steps + self._last_b_steps) // 2
+            return (self._last_a_steps - self._last_b_steps) // 2
+
+        net_axis_steps = 0
         cartesian_steps = direction * max(1, int(max_probe_steps))
         a_steps = cartesian_steps
         b_steps = cartesian_steps if axis == "x" else -cartesian_steps
@@ -368,38 +926,99 @@ class RaspberryGantryGPIOService:
             fast_rpm,
             stop_limit_pin=limit_pin,
             steps_per_rotation=steps_per_rotation,
+            trapezoidal=trapezoidal,
+            acceleration_rpm_per_s=acceleration_rpm_per_s,
         )
+        net_axis_steps += axis_delta()
         if not hit_fast:
             raise RuntimeError(f"{axis.upper()} {'max' if direction > 0 else 'min'} limit switch was not hit during fast calibration probe.")
 
-        backoff_steps = -direction * max(1, steps_per_rotation // 4)
+        backoff_steps = -direction * max(1, steps_per_rotation)
         self._move_corexy_steps(
             gpio,
             pins,
             backoff_steps,
             backoff_steps if axis == "x" else -backoff_steps,
-            slow_rpm,
+            fast_rpm,
             steps_per_rotation=steps_per_rotation,
+            trapezoidal=trapezoidal,
+            acceleration_rpm_per_s=acceleration_rpm_per_s,
         )
+        net_axis_steps += axis_delta()
 
-        slow_probe_steps = direction * max(1, steps_per_rotation // 2)
+        slow_probe_steps = direction * max(1, steps_per_rotation * 2)
         hit_slow = self._move_corexy_steps(
             gpio,
             pins,
             slow_probe_steps,
             slow_probe_steps if axis == "x" else -slow_probe_steps,
-            slow_rpm,
+            XY_SLOW_HOMING_RPM,
             stop_limit_pin=limit_pin,
             steps_per_rotation=steps_per_rotation,
+            trapezoidal=trapezoidal,
+            acceleration_rpm_per_s=acceleration_rpm_per_s,
         )
+        net_axis_steps += axis_delta()
         if not hit_slow:
             raise RuntimeError(f"{axis.upper()} {'max' if direction > 0 else 'min'} limit switch was not hit during slow calibration probe.")
+
+        return net_axis_steps
+
+    def _nudge_away_from_pressed_limits(
+        self,
+        gpio: Any,
+        pins: _GPIOPinPlan,
+        rpm: float,
+        steps_per_rotation: int,
+        trapezoidal: bool = True,
+        acceleration_rpm_per_s: float = 300.0,
+    ) -> None:
+        """Free any limit switch that is already pressed before calibrating.
+
+        Backs off one motor rotation at a time, re-reading the switch between
+        each, so the carriage travels no further than it takes to free the
+        switch. A switch that stays pressed after four rotations is stuck or
+        miswired, and calibrating from it would measure garbage.
+        """
+        candidates = [
+            ("X_MIN", pins.x_min_limit_pin, 1, 1),
+            ("X_MAX", pins.x_max_limit_pin, -1, -1),
+            ("Y_MIN", pins.y_min_limit_pin, 1, -1),
+            ("Y_MAX", pins.y_max_limit_pin, -1, 1),
+        ]
+        for name, pin, a_sign, b_sign in candidates:
+            if pin is None or not self._limit_active(gpio, pin):
+                continue
+            rotations = 0
+            while rotations < 4 and self._limit_active(gpio, pin):
+                self._move_corexy_steps(
+                    gpio,
+                    pins,
+                    a_sign * steps_per_rotation,
+                    b_sign * steps_per_rotation,
+                    rpm,
+                    steps_per_rotation=steps_per_rotation,
+                    trapezoidal=trapezoidal,
+                    acceleration_rpm_per_s=acceleration_rpm_per_s,
+                )
+                rotations += 1
+            if self._limit_active(gpio, pin):
+                raise RuntimeError(
+                    f"{name} limit switch is still pressed after nudging {rotations} rotations away "
+                    "from it; the switch is stuck or miswired. Check the switch and its wiring."
+                )
 
     def _axis_limit_pin(self, pins: _GPIOPinPlan, axis: str, direction: int) -> int:
         if axis == "x":
             return pins.x_max_limit_pin if direction > 0 else pins.x_min_limit_pin
         if axis == "y":
-            return pins.y_max_limit_pin if direction > 0 else pins.y_min_limit_pin
+            if direction > 0:
+                if pins.y_max_limit_pin is None:
+                    raise RuntimeError(
+                        "Cannot probe toward Y max: this machine has no Y-max limit switch mapped."
+                    )
+                return pins.y_max_limit_pin
+            return pins.y_min_limit_pin
         raise ValueError(f"Unsupported calibration axis: {axis}")
 
     def _assert_limits_clear(self, gpio: Any, pins: _GPIOPinPlan, request: GantryXYMoveRequest) -> None:
@@ -410,7 +1029,7 @@ class RaspberryGantryGPIOService:
             active_limits.append("x_max")
         if self._limit_active(gpio, pins.y_min_limit_pin):
             active_limits.append("y_min")
-        if self._limit_active(gpio, pins.y_max_limit_pin):
+        if pins.y_max_limit_pin is not None and self._limit_active(gpio, pins.y_max_limit_pin):
             active_limits.append("y_max")
 
         if active_limits:
@@ -537,3 +1156,15 @@ def planned_calibrate_xy_result(context: dict, request: GantryXYCalibrationReque
 
 def planned_move_xy_result(context: dict, request: GantryXYMoveRequest) -> dict:
     return raspberry_gantry_gpio_service.move_xy(context, request)
+
+
+def planned_test_motor_result(context: dict, request) -> dict:
+    return raspberry_gantry_gpio_service.test_motor(context, request)
+
+
+def emergency_stop_raspberry_gantry() -> dict[str, object]:
+    return raspberry_gantry_gpio_service.emergency_stop()
+
+
+def rearm_raspberry_gantry() -> None:
+    raspberry_gantry_gpio_service.rearm()

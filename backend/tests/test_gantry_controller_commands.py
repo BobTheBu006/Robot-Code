@@ -76,7 +76,7 @@ class GantryControllerCommandTests(unittest.TestCase):
             x_calibration_y_cm=5.0,
         )
 
-        # The park Y is appended last so firmware built before it still parses
+        # The park Y cm arg is appended last so firmware built before it still parses
         # the command and falls back to its own default.
         self.assertEqual(
             service._build_calibrate_xy_command(request),

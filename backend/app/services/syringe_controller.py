@@ -10,6 +10,8 @@ from app.models.syringe import (
     SyringeCalibrationEntry,
     SyringeDispenseRequest,
     SyringeDispenseResponse,
+    SyringePrimeRequest,
+    SyringePrimeResponse,
     SyringeHead,
     SyringeStatusResponse,
 )
@@ -679,6 +681,142 @@ class SyringeControllerService:
             calculated_steps=steps,
             command_sent=command,
             reply=reply,
+        )
+
+    def _move_command_deadline(self, max_steps: int, rpm: int) -> float:
+        # Full-step firmware: steps/s = rpm * 200 / 60. Generous 2x margin plus
+        # serial slack so a slow prime stroke is never cut off mid-move.
+        steps_per_second = max(1.0, rpm * 200.0 / 60.0)
+        return (max_steps / steps_per_second) * 2.0 + 5.0
+
+    def _send_move(
+        self,
+        serial_port,
+        steps_by_head: dict[SyringeHead, int],
+        direction: int,
+        rpm: int,
+        active_session: _ActiveSyringeSession | None,
+        commands_sent: list[str],
+        replies: list[str],
+    ) -> None:
+        """One-directional MOVE: positive direction pushes the plungers
+        (dispense direction, toward the bottom hard stop), negative draws."""
+        ordered = [direction * steps_by_head[head] for head in HEADS]
+        command = "MOVE " + " ".join(str(value) for value in ordered) + f" {rpm}"
+        reply, completed = self._send_command(
+            serial_port,
+            command,
+            terminal_prefixes=("OK MOVE", "ERR "),
+            deadline_seconds=self._move_command_deadline(max(steps_by_head.values()), rpm),
+            active_session=active_session,
+        )
+        commands_sent.append(command)
+        if reply:
+            replies.append(reply)
+        if not completed:
+            raise SyringeControllerError("Timed out while waiting for the ESP32 to finish a MOVE.")
+        if not self._reply_contains_prefix(reply, ("OK MOVE",)):
+            raise SyringeControllerError(f"ESP32 rejected the MOVE command: {reply}")
+
+    def prime(self, request: SyringePrimeRequest) -> SyringePrimeResponse:
+        """Home all plungers against the bottom hard stop, then run draw/push
+        prime cycles.
+
+        There is no plunger position feedback: homing deliberately over-drives
+        every plunger in the dispense (push) direction so each one bottoms out
+        on the mechanical stop, which becomes the known zero. The steppers
+        skip steps at the stop by design. Each prime cycle then draws
+        prime_volume up and pushes it back out, ending at the stop again.
+        """
+        calibration_path = self._calibration_path(request.calibration_file)
+        calibration = self._load_calibration(request.calibration_file)
+
+        home_steps = {
+            head: max(1, round(calibration[head].a * request.home_overtravel_ul + calibration[head].b))
+            for head in HEADS
+        }
+        prime_steps = {
+            head: max(1, round(calibration[head].a * request.prime_volume_ul + calibration[head].b))
+            for head in HEADS
+        }
+        final_draw_steps = {
+            head: (
+                max(1, round(calibration[head].a * request.final_draw_ul + calibration[head].b))
+                if request.final_draw_ul > 0
+                else 0
+            )
+            for head in HEADS
+        }
+
+        configured_pins = self._requested_head_pins(request)
+        port = self._selected_port(request.port)
+        baud_rate = request.baud_rate or self._baud_rate()
+        serial = self._load_serial_module()
+        commands_sent: list[str] = []
+        replies: list[str] = []
+
+        try:
+            with self._port_lock(port):
+                with serial.Serial(port, baud_rate, timeout=self._serial_timeout()) as serial_port:
+                    active_session = self._register_active_session(port, serial_port)
+                    try:
+                        boot_delay = self._boot_delay()
+                        if boot_delay > 0:
+                            time.sleep(boot_delay)
+
+                        pin_result = self._apply_head_pin_profile(serial_port, configured_pins)
+
+                        # Home: push everything to the bottom hard stop.
+                        self._send_move(
+                            serial_port, home_steps, +1, request.speed,
+                            active_session, commands_sent, replies,
+                        )
+
+                        # Prime cycles: draw up, push back out.
+                        for _ in range(request.prime_cycles):
+                            self._send_move(
+                                serial_port, prime_steps, -1, request.speed,
+                                active_session, commands_sent, replies,
+                            )
+                            self._send_move(
+                                serial_port, prime_steps, +1, request.speed,
+                                active_session, commands_sent, replies,
+                            )
+
+                        # Final draw: leave the plungers pulled up and ready to
+                        # dispense rather than seated on the stop.
+                        if request.final_draw_ul > 0:
+                            self._send_move(
+                                serial_port, final_draw_steps, -1, request.speed,
+                                active_session, commands_sent, replies,
+                            )
+                    finally:
+                        self._unregister_active_session(port, active_session)
+        except SyringeControllerError:
+            raise
+        except Exception as exc:
+            raise SyringeControllerError(
+                f"Failed to communicate with ESP32 on {port}: {exc}"
+            ) from exc
+
+        return SyringePrimeResponse(
+            port=port,
+            baud_rate=baud_rate,
+            calibration_file=str(calibration_path),
+            speed=request.speed,
+            prime_volume_ul=request.prime_volume_ul,
+            prime_cycles=request.prime_cycles,
+            home_overtravel_ul=request.home_overtravel_ul,
+            final_draw_ul=request.final_draw_ul,
+            final_draw_steps=final_draw_steps,
+            home_steps=home_steps,
+            prime_steps=prime_steps,
+            pin_config_commands_sent=list(pin_result["pin_config_commands_sent"]),
+            pin_config_replies=list(pin_result["pin_config_replies"]),
+            pin_config_applied=bool(pin_result["pin_config_applied"]),
+            configured_pins=dict(pin_result["configured_pins"]),
+            commands_sent=commands_sent,
+            replies=replies,
         )
 
 

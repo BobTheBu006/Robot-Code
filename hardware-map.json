@@ -2,21 +2,10 @@
   "version": 1,
   "boards": [
     {
-      "id": "ttyUSB0",
-      "label": "Calibrate Gantry XY Controller",
-      "usb_port": "/dev/ttyUSB0",
-      "enabled": true,
-      "notes": "Auto-created because Calibrate Gantry XY declares hardware devices.",
-      "dynamic": false,
-      "expected_serial_number": null,
-      "expected_hardware_id": null,
-      "expected_device_label": null
-    },
-    {
       "id": "controller-x83xnc",
       "label": "7 syringe pump controller",
       "usb_port": "/dev/ttyUSB0",
-      "enabled": false,
+      "enabled": true,
       "notes": null,
       "dynamic": false,
       "expected_serial_number": null,
@@ -27,7 +16,7 @@
   "devices": [
     {
       "id": "x-axis-motor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "name": "CoreXY A Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -39,14 +28,14 @@
         {
           "id": "x-dir",
           "signal": "direction",
-          "gpio": "14",
+          "gpio": "24",
           "function_input_key": "x_dir_pin",
           "notes": null
         },
         {
           "id": "x-step",
           "signal": "step",
-          "gpio": "27",
+          "gpio": "23",
           "function_input_key": "x_step_pin",
           "notes": null
         },
@@ -83,7 +72,7 @@
     },
     {
       "id": "y-axis-motor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "name": "CoreXY B Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -95,7 +84,7 @@
         {
           "id": "y-dir",
           "signal": "direction",
-          "gpio": "16",
+          "gpio": "27",
           "function_input_key": "y_dir_pin",
           "notes": null
         },
@@ -139,7 +128,7 @@
     },
     {
       "id": "x-min-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "name": "X Min Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -151,7 +140,7 @@
         {
           "id": "x-min-limit",
           "signal": "signal",
-          "gpio": "12",
+          "gpio": "26",
           "function_input_key": "x_min_limit_pin",
           "notes": null
         }
@@ -160,7 +149,7 @@
     },
     {
       "id": "x-max-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "name": "X Max Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -181,7 +170,7 @@
     },
     {
       "id": "y-min-limit-switch",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "name": "Y Min Limit Switch",
       "kind": "sensor",
       "enabled": true,
@@ -193,204 +182,8 @@
         {
           "id": "y-min-limit",
           "signal": "signal",
-          "gpio": "26",
+          "gpio": "16",
           "function_input_key": "y_min_limit_pin",
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "left-z-motor",
-      "board_id": "ttyUSB0",
-      "name": "Left Z Axis Motor",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-left-dir",
-          "signal": "direction",
-          "gpio": "33",
-          "function_input_key": "z_left_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "z-left-step",
-          "signal": "step",
-          "gpio": "32",
-          "function_input_key": "z_left_step_pin",
-          "notes": null
-        },
-        {
-          "id": "z-left-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-left-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-left-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-left-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": "Single Z axis motor. Stable legacy ID kept for compatibility."
-    },
-    {
-      "id": "right-z-motor",
-      "board_id": "ttyUSB0",
-      "name": "Right Z Axis Motor",
-      "kind": "stepper_motor",
-      "enabled": false,
-      "sensor_kind": null,
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-right-dir",
-          "signal": "direction",
-          "gpio": "5",
-          "function_input_key": "z_right_dir_pin",
-          "notes": null
-        },
-        {
-          "id": "z-right-step",
-          "signal": "step",
-          "gpio": "4",
-          "function_input_key": "z_right_step_pin",
-          "notes": null
-        },
-        {
-          "id": "z-right-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-right-ms1",
-          "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-right-ms2",
-          "signal": "micro_step_2",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        },
-        {
-          "id": "z-right-ms3",
-          "signal": "micro_step_3",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "z-left-min-limit-switch",
-      "board_id": "ttyUSB0",
-      "name": "Left Z Min Limit Switch",
-      "kind": "sensor",
-      "enabled": true,
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-left-min-limit",
-          "signal": "signal",
-          "gpio": "36",
-          "function_input_key": "z_left_min_limit_pin",
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "z-left-max-limit-switch",
-      "board_id": "ttyUSB0",
-      "name": "Left Z Max Limit Switch",
-      "kind": "sensor",
-      "enabled": true,
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-left-max-limit",
-          "signal": "signal",
-          "gpio": "39",
-          "function_input_key": "z_left_max_limit_pin",
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "z-right-min-limit-switch",
-      "board_id": "ttyUSB0",
-      "name": "Right Z Min Limit Switch",
-      "kind": "sensor",
-      "enabled": true,
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-right-min-limit",
-          "signal": "signal",
-          "gpio": "32",
-          "function_input_key": "z_right_min_limit_pin",
-          "notes": null
-        }
-      ],
-      "notes": null
-    },
-    {
-      "id": "z-right-max-limit-switch",
-      "board_id": "ttyUSB0",
-      "name": "Right Z Max Limit Switch",
-      "kind": "sensor",
-      "enabled": true,
-      "sensor_kind": "position_limit_switch",
-      "rotation_min_deg": null,
-      "rotation_max_deg": null,
-      "calibration_ml_per_200_steps": null,
-      "pins": [
-        {
-          "id": "z-right-max-limit",
-          "signal": "signal",
-          "gpio": "33",
-          "function_input_key": "z_right_max_limit_pin",
           "notes": null
         }
       ],
@@ -401,7 +194,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head A",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -410,14 +203,14 @@
         {
           "id": "head-a-dir",
           "signal": "direction",
-          "gpio": "32",
+          "gpio": "13",
           "function_input_key": "head_a_dir_pin",
           "notes": null
         },
         {
           "id": "head-a-step",
           "signal": "step",
-          "gpio": "33",
+          "gpio": "14",
           "function_input_key": "head_a_step_pin",
           "notes": null
         },
@@ -457,7 +250,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head B",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -466,14 +259,14 @@
         {
           "id": "head-b-dir",
           "signal": "direction",
-          "gpio": "4",
+          "gpio": "27",
           "function_input_key": "head_b_dir_pin",
           "notes": null
         },
         {
           "id": "head-b-step",
           "signal": "step",
-          "gpio": "25",
+          "gpio": "26",
           "function_input_key": "head_b_step_pin",
           "notes": null
         },
@@ -513,7 +306,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head C",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -522,14 +315,14 @@
         {
           "id": "head-c-dir",
           "signal": "direction",
-          "gpio": "5",
+          "gpio": "25",
           "function_input_key": "head_c_dir_pin",
           "notes": null
         },
         {
           "id": "head-c-step",
           "signal": "step",
-          "gpio": "26",
+          "gpio": "33",
           "function_input_key": "head_c_step_pin",
           "notes": null
         },
@@ -569,7 +362,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head D",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -578,14 +371,14 @@
         {
           "id": "head-d-dir",
           "signal": "direction",
-          "gpio": "18",
+          "gpio": "17",
           "function_input_key": "head_d_dir_pin",
           "notes": null
         },
         {
           "id": "head-d-step",
           "signal": "step",
-          "gpio": "27",
+          "gpio": "16",
           "function_input_key": "head_d_step_pin",
           "notes": null
         },
@@ -625,7 +418,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head E",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -634,14 +427,14 @@
         {
           "id": "head-e-dir",
           "signal": "direction",
-          "gpio": "19",
+          "gpio": "5",
           "function_input_key": "head_e_dir_pin",
           "notes": null
         },
         {
           "id": "head-e-step",
           "signal": "step",
-          "gpio": "14",
+          "gpio": "18",
           "function_input_key": "head_e_step_pin",
           "notes": null
         },
@@ -681,7 +474,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head F",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -690,14 +483,14 @@
         {
           "id": "head-f-dir",
           "signal": "direction",
-          "gpio": "21",
+          "gpio": "19",
           "function_input_key": "head_f_dir_pin",
           "notes": null
         },
         {
           "id": "head-f-step",
           "signal": "step",
-          "gpio": "12",
+          "gpio": "21",
           "function_input_key": "head_f_step_pin",
           "notes": null
         },
@@ -737,7 +530,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head G",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -753,7 +546,7 @@
         {
           "id": "head-g-step",
           "signal": "step",
-          "gpio": "13",
+          "gpio": "23",
           "function_input_key": "head_g_step_pin",
           "notes": null
         },
@@ -810,24 +603,7 @@
       "notes": null
     }
   ],
-  "groups": [
-    {
-      "id": "group-1fhsjs",
-      "name": "7 syringe group",
-      "member_ids": [
-        "controller-x83xnc",
-        "syringe-head-a",
-        "syringe-head-b",
-        "syringe-head-c",
-        "syringe-head-d",
-        "syringe-head-e",
-        "syringe-head-f",
-        "syringe-head-g"
-      ],
-      "enabled": false,
-      "notes": null
-    }
-  ],
+  "groups": [],
   "function_assignments": [
     {
       "function_id": "calibrate_xy",
@@ -918,14 +694,104 @@
       "function_id": "move_gantry_circle",
       "device_id": "y-min-limit-switch",
       "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "pickup_toolhead",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "drop_toolhead",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "move_gantry_circle",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
+    },
+    {
+      "function_id": "pickup_toolhead",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "drop_toolhead",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "move_gantry_circle",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "pickup_toolhead",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "drop_toolhead",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_circle",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "drop_toolhead",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "move_gantry_circle",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-max-limit-switch"
+    },
+    {
+      "function_id": "drop_toolhead",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "pickup_toolhead",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "pickup_toolhead",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
     }
   ],
   "node_positions": [
-    {
-      "node_id": "group-1fhsjs",
-      "x": 152.0,
-      "y": 1024.0
-    },
     {
       "node_id": "raspberry-pi",
       "x": 40.0,
@@ -933,69 +799,74 @@
     },
     {
       "node_id": "y-max-limit-switch",
-      "x": 680.0,
-      "y": 80.0
-    },
-    {
-      "node_id": "ttyUSB0",
-      "x": 350.0,
-      "y": 80.0
+      "x": 1947.84,
+      "y": 143.66
     },
     {
       "node_id": "x-axis-motor",
-      "x": 680.0,
-      "y": 80.0
+      "x": 1947.84,
+      "y": 143.66
     },
     {
       "node_id": "y-axis-motor",
-      "x": 680.0,
-      "y": 190.0
+      "x": 1947.84,
+      "y": 253.66
     },
     {
       "node_id": "x-min-limit-switch",
-      "x": 680.0,
-      "y": 300.0
+      "x": 1947.84,
+      "y": 363.66
     },
     {
       "node_id": "x-max-limit-switch",
-      "x": 680.0,
-      "y": 410.0
+      "x": 1947.84,
+      "y": 473.66
     },
     {
       "node_id": "y-min-limit-switch",
-      "x": 680.0,
-      "y": 520.0
+      "x": 1947.84,
+      "y": 583.66
     },
     {
-      "node_id": "left-z-motor",
-      "x": 680.0,
-      "y": 740.0
+      "node_id": "controller-x83xnc",
+      "x": 397.41,
+      "y": 1008.7
     },
     {
-      "node_id": "right-z-motor",
-      "x": 680.0,
-      "y": 850.0
+      "node_id": "syringe-head-a",
+      "x": 727.41,
+      "y": 1008.7
     },
     {
-      "node_id": "z-left-min-limit-switch",
-      "x": 680.0,
-      "y": 960.0
+      "node_id": "syringe-head-b",
+      "x": 727.41,
+      "y": 1118.7
     },
     {
-      "node_id": "z-left-max-limit-switch",
-      "x": 680.0,
-      "y": 1070.0
+      "node_id": "syringe-head-c",
+      "x": 727.41,
+      "y": 1228.7
     },
     {
-      "node_id": "z-right-min-limit-switch",
-      "x": 680.0,
-      "y": 1180.0
+      "node_id": "syringe-head-d",
+      "x": 727.41,
+      "y": 1338.7
     },
     {
-      "node_id": "z-right-max-limit-switch",
-      "x": 680.0,
-      "y": 1290.0
+      "node_id": "syringe-head-e",
+      "x": 727.41,
+      "y": 1448.7
+    },
+    {
+      "node_id": "syringe-head-f",
+      "x": 727.41,
+      "y": 1558.7
+    },
+    {
+      "node_id": "syringe-head-g",
+      "x": 727.41,
+      "y": 1668.7
     }
   ],
-  "updated_at": "2026-07-15T15:52:25.434372Z"
+  "updated_at": "2026-07-19T17:13:20.451701Z"
 }

@@ -30,6 +30,7 @@ import {
   fetchSavedWorkflow,
   flashEsp32BoardFirmware,
   planWorkflowFirmware,
+  rearmEmergencyStop,
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
@@ -2146,6 +2147,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(nodes, edges);
       setHasUnsavedChanges(false);
       saveResetTimeoutRef.current = window.setTimeout(() => setSaveState("idle"), 1600);
+      // Saving adopts tool-block values as the new shared defaults on the
+      // backend, so refresh the catalog: a block added after a save must start
+      // from those new defaults, not the ones fetched at page load.
+      void loadFunctions();
     } catch (error) {
       setSaveState("idle");
       setFunctionsError(error instanceof Error ? error.message : "Could not save workflow file.");
@@ -2620,6 +2625,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   }
 
   async function handleRunTestForNode(nodeId: string) {
+    startNewActivity();
+
     try {
       await runNodeTestRecursively(nodeId);
     } catch (error) {
@@ -2638,6 +2645,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // Runs a node that lives outside the main canvas (e.g. inside the compound
   // editor). It executes standalone, without resolving upstream inputs.
   async function handleRunDetachedNode(node: WorkflowFlowNode) {
+    startNewActivity();
+
     try {
       await executeNode(node.id, null, node);
     } catch {
@@ -2909,7 +2918,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       throw new Error(summarizeWorkflowFirmwarePlanFailure(plan.errors, plan.warnings));
     }
 
-    return Array.from(new Set([...fallbackBoardIds, ...plan.boards.map((board) => board.board_id)]));
+    // Only boards the builder actually manages get flashed. A board the plan
+    // left out (externally programmed controller, e.g. the pre-flashed syringe
+    // ESP32) keeps its firmware and is driven over serial as-is.
+    const managedBoardIds = new Set(plan.boards.map((board) => board.board_id));
+    return Array.from(new Set([
+      ...fallbackBoardIds.filter((boardId) => managedBoardIds.has(boardId)),
+      ...managedBoardIds,
+    ]));
   }
 
   async function flashEsp32BoardsForRun(boardIds: string[]) {
@@ -3024,13 +3040,35 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       return;
     }
 
+    // Resume is new work: clear the latched stop or every move would refuse.
+    await rearmEmergencyStop().catch(() => undefined);
     setFunctionsError(null);
     await runWorkflowFromOrder(workflowRunState.orderedNodeIds, workflowResultsRef.current, { flashBeforeRun: false });
   }
 
-  async function handleRunAll() {
-    // Pressing Run all re-arms the E-Stop (clears any latched "RESUME" state).
+  // Starting any new work re-arms the E-Stop and abandons the run that was
+  // stopped, so RESUME can never pick up a task the user has moved on from.
+  // Clearing orderedNodeIds is what makes the abandonment real: resume replays
+  // that list, so without this, testing a block after an E-Stop would leave the
+  // old run resumable and silently continue it later.
+  function startNewActivity() {
     window.dispatchEvent(new CustomEvent("robot-emergency-reset"));
+    // Also clear the latch on the backend, which blocks Raspberry Pi GPIO
+    // motion until it is explicitly rearmed.
+    void rearmEmergencyStop().catch(() => {
+      // A failed rearm surfaces on the next move attempt; never block the run here.
+    });
+    workflowResultsRef.current = new Map();
+    setWorkflowRunState((currentState) => ({
+      ...currentState,
+      orderedNodeIds: [],
+      completedNodeIds: [],
+      currentNodeId: null,
+    }));
+  }
+
+  async function handleRunAll() {
+    startNewActivity();
 
     const startNodeIds = nodes
       .filter((node) => node.data.block.id === "start")

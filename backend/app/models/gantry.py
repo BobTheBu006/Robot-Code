@@ -124,6 +124,8 @@ class GantryXYCalibrationRequest(BaseModel):
     steps_per_rotation: int = Field(default=800, gt=0)
     max_probe_rotations: int = Field(default=120, gt=0)
     x_calibration_y_cm: float = Field(default=3.2, ge=0)
+    x_start_clear_cm: float = Field(default=2.0, ge=0)
+    x_end_clear_cm: float = Field(default=2.0, ge=0)
     limit_buffer_cm: float = Field(default=0.5, ge=0)
     x_step_pin: int = Field(default=16, ge=0)
     x_dir_pin: int = Field(default=17, ge=0)
@@ -514,3 +516,43 @@ class ToolChangeRequest(BaseModel):
             "y_cm": getattr(self, f"slot_{self.slot}_y_cm"),
             "z_cm": getattr(self, f"slot_{self.slot}_z_cm"),
         }
+
+
+class GantryTestMotorRequest(BaseModel):
+    """Pulses one CoreXY motor on its own to identify which is which."""
+
+    tool_port: str | None = None
+    motor: Literal["A", "B"] = "A"
+    steps: int = Field(default=2000, gt=0)
+    forward: bool = Field(default=True)
+    speed_rpm: int = Field(default=60, gt=0)
+    steps_per_rotation: int = Field(default=800, gt=0)
+    x_step_pin: int = Field(default=16, ge=0)
+    x_dir_pin: int = Field(default=17, ge=0)
+    y_step_pin: int = Field(default=18, ge=0)
+    y_dir_pin: int = Field(default=19, ge=0)
+    x_enable_pin: int = Field(default=-1, ge=-1)
+    y_enable_pin: int = Field(default=-1, ge=-1)
+    enable_active_low: bool = Field(default=True)
+    limit_switch_mode: GantryLimitMode = "4"
+    x_min_limit_pin: int = Field(default=21, ge=0)
+    x_max_limit_pin: int = Field(default=22, ge=0)
+    y_min_limit_pin: int = Field(default=23, ge=0)
+    y_max_limit_pin: int = Field(default=25, ge=0)
+    baud_rate: int | None = Field(default=None, gt=0)
+
+
+class GantryTestMotorResponse(BaseModel):
+    port: str
+    baud_rate: int
+    motor: str
+    steps: int
+    forward: bool
+    speed_rpm: int
+    pin_command_sent: str | None = None
+    pin_reply: str | None = None
+    limit_command_sent: str | None = None
+    limit_reply: str | None = None
+    test_command_sent: str | None = None
+    test_reply: str | None = None
+    configured_pins: dict[str, int] = Field(default_factory=dict)
