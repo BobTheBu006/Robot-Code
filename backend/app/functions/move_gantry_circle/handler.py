@@ -1,19 +1,42 @@
 from app.models.gantry import GantryCircleXYRequest
 from app.services.gantry_controller import gantry_controller_service
-from app.services.raspberry_gantry import xy_hardware_is_on_raspberry_pi
+from app.services.raspberry_gantry import planned_circle_xy_result, xy_hardware_is_on_raspberry_pi
 
 
 def execute(context: dict, inputs: dict) -> dict:
-    # There is no Raspberry Pi GPIO implementation of the circle move yet, and
-    # the ESP32 fallback would drive whatever else is wired to that board, so
-    # refuse rather than move the wrong motors.
-    if xy_hardware_is_on_raspberry_pi(context):
-        raise RuntimeError(
-            "Move Gantry Circle is only implemented for an ESP32-driven gantry, but the XY hardware "
-            "is mapped to the Raspberry Pi in the Hardware Map. Use Move Gantry XY instead."
-        )
-
     request = GantryCircleXYRequest.model_validate(inputs)
+
+    if xy_hardware_is_on_raspberry_pi(context):
+        result = planned_circle_xy_result(context, request)
+        return {
+            "status": "completed",
+            "message": (
+                f"Gantry traced {request.repeat_count} circle"
+                f"{'' if request.repeat_count == 1 else 's'} around X = {request.center_x_cm:.3f} cm, "
+                f"Y = {request.center_y_cm:.3f} cm with radius {request.radius_cm:.3f} cm."
+            ),
+            "tool_port": result["port"],
+            "center": result["center"],
+            "radius_cm": result["radius_cm"],
+            "repeat_count": result["repeat_count"],
+            "speed_profile": result["speed_profile"],
+            "speed_rpm": result["speed_rpm"],
+            "trapezoidal_speed": result["trapezoidal_speed"],
+            "acceleration_rpm_per_s": result["acceleration_rpm_per_s"],
+            "pin_command_sent": result["pin_command_sent"],
+            "pin_reply": result["pin_reply"],
+            "pins_applied": result["pins_applied"],
+            "limit_command_sent": result["limit_command_sent"],
+            "limit_reply": result["limit_reply"],
+            "limits_applied": result["limits_applied"],
+            "move_command_sent": result["move_command_sent"],
+            "move_reply": result["move_reply"],
+            "move_applied": result["move_applied"],
+            "configured_pins": result["configured_pins"],
+            "configured_limits": result["configured_limits"],
+            "mode": context.get("mode"),
+        }
+
     response = gantry_controller_service.circle_xy(request)
 
     return {

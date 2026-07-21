@@ -16,7 +16,13 @@ GANTRY_STATE_VERSION = 2
 # the ESP32 firmware so both execution paths home identically.
 XY_SLOW_HOMING_RPM = 10.0
 
-from app.models.gantry import GANTRY_WORKSPACE_X_CM, GANTRY_WORKSPACE_Y_CM, GantryXYCalibrationRequest, GantryXYMoveRequest
+from app.models.gantry import (
+    GANTRY_WORKSPACE_X_CM,
+    GANTRY_WORKSPACE_Y_CM,
+    GantryCircleXYRequest,
+    GantryXYCalibrationRequest,
+    GantryXYMoveRequest,
+)
 from app.services.gpio_backend import load_gpio_backend
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
@@ -76,6 +82,12 @@ class _GPIOPinPlan:
         if self.y_max_limit_pin is not None:
             pins.append(self.y_max_limit_pin)
         return pins
+
+    def named_limit_pins(self) -> list[tuple[str, int]]:
+        named = [("x_min", self.x_min_limit_pin), ("x_max", self.x_max_limit_pin), ("y_min", self.y_min_limit_pin)]
+        if self.y_max_limit_pin is not None:
+            named.append(("y_max", self.y_max_limit_pin))
+        return named
 
 
 @dataclass
@@ -460,6 +472,7 @@ class RaspberryGantryGPIOService:
         b_steps = signed_steps if request.motor == "B" else 0
 
         stopped_on_limit = False
+        tripped_limit_names: list[str] = []
         if not execution.simulated:
             gpio, _ = self._gpio_module()
             if gpio is None:
@@ -480,6 +493,12 @@ class RaspberryGantryGPIOService:
                             stop_limit_pins=pins.limit_pins(),
                             steps_per_rotation=request.steps_per_rotation,
                         )
+                        if stopped_on_limit:
+                            # Read which switch(es) tripped before cleanup frees
+                            # the pins below.
+                            tripped_limit_names = [
+                                name for name, pin in pins.named_limit_pins() if self._limit_active(gpio, pin)
+                            ]
                     finally:
                         self._cleanup_gpio(gpio, pins)
 
@@ -494,8 +513,9 @@ class RaspberryGantryGPIOService:
             "The gantry calibration was dropped because this move is not position-tracked."
         )
         if stopped_on_limit:
+            tripped_label = ", ".join(tripped_limit_names) if tripped_limit_names else "unknown"
             message = (
-                f"Motor {request.motor} test stopped early: a limit switch tripped. "
+                f"Motor {request.motor} test stopped early: limit switch tripped ({tripped_label}). "
                 "The gantry calibration was dropped."
             )
         if execution.simulated:
@@ -595,6 +615,194 @@ class RaspberryGantryGPIOService:
                 self._cleanup_gpio(gpio, pins)
 
         return self._move_result(context, request, pins, execution, applied=True)
+
+    def circle_xy(self, context: dict, request: GantryCircleXYRequest) -> dict:
+        """Trace a circle by walking short straight chords around it, matching
+        the ESP32 firmware's circleGantryXY algorithm exactly: ~0.5mm chords
+        approximate the arc, and one acceleration/deceleration profile is
+        shaped across the whole circumference rather than per chord."""
+        self._raise_if_stopped()
+        pins = self._pins_from_request(request, context)
+        execution = self._execution_mode()
+
+        if execution.simulated:
+            self._x_cm = request.center_x_cm + request.radius_cm
+            self._y_cm = request.center_y_cm
+            return self._circle_result(context, request, pins, execution)
+
+        if not self._calibrated:
+            raise RuntimeError("Gantry is not calibrated. Run Calibrate Gantry XY before moving.")
+
+        # The full circle must fit inside the usable (buffer-inset) workspace,
+        # exactly as the firmware enforces.
+        usable_x_max = self._x_track_length_cm - 2.0 * self._limit_buffer_cm
+        usable_y_max = self._y_track_length_cm - 2.0 * self._limit_buffer_cm
+        if (
+            request.center_x_cm - request.radius_cm < 0.0
+            or request.center_x_cm + request.radius_cm > usable_x_max
+            or request.center_y_cm - request.radius_cm < 0.0
+            or request.center_y_cm + request.radius_cm > usable_y_max
+        ):
+            raise RuntimeError(
+                f"Circle center ({request.center_x_cm:g}, {request.center_y_cm:g}) cm with radius "
+                f"{request.radius_cm:g} cm does not fit inside the usable workspace "
+                f"(0-{usable_x_max:g} x 0-{usable_y_max:g} cm)."
+            )
+
+        gpio, _ = self._gpio_module()
+        if gpio is None:
+            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during move.")
+        with self._lock:
+            try:
+                self._setup_gpio(gpio, pins)
+            except Exception as exc:
+                execution = self._gpio_unavailable_execution(str(exc))
+                self._x_cm = request.center_x_cm + request.radius_cm
+                self._y_cm = request.center_y_cm
+                return self._circle_result(context, request, pins, execution)
+            try:
+                self._assert_limits_clear(gpio, pins, None)
+                steps_per_cm = self._effective_steps_per_cm()
+                self._run_circle_sweep(gpio, pins, request, steps_per_cm)
+                self._save_state()
+            finally:
+                self._cleanup_gpio(gpio, pins)
+
+        return self._circle_result(context, request, pins, execution)
+
+    def _run_circle_sweep(
+        self,
+        gpio: Any,
+        pins: _GPIOPinPlan,
+        request: GantryCircleXYRequest,
+        steps_per_cm: float,
+    ) -> None:
+        """Trace the circle repeat_count times back to back with a single
+        acceleration/deceleration profile spanning every lap, so repeats flow
+        into one another at cruise speed instead of decelerating toward a
+        near-stall and re-accelerating at every lap boundary."""
+        # Approach: straight move to the circle start point (angle 0, right of
+        # center), with its own ramp - same as a normal move.
+        start_x_steps = round((request.center_x_cm + request.radius_cm + self._limit_buffer_cm) * steps_per_cm)
+        start_y_steps = round((request.center_y_cm + self._limit_buffer_cm) * steps_per_cm)
+        self._run_circle_chord(
+            gpio, pins, start_x_steps, start_y_steps, request.speed_rpm,
+            trapezoidal=request.trapezoidal_speed, acceleration_rpm_per_s=request.acceleration_rpm_per_s,
+        )
+
+        circumference_cm = 2.0 * math.pi * request.radius_cm
+        segments = max(24, math.ceil(circumference_cm / 0.05))
+        steps_per_rotation = self._steps_per_rotation or 200
+        # Motor iterations per chord are |dx| + |dy| steps, which integrates to
+        # (4 / pi) x circumference over a lap; multiplied by repeat_count so the
+        # ramp treats the whole multi-lap sweep as one continuous move, ramping
+        # up once at the start and down once at the very end.
+        total_profile_iterations = round(circumference_cm * steps_per_cm * 4.0 / math.pi) * request.repeat_count
+        ramp_steps = self._ramp_steps(
+            total_profile_iterations, request.speed_rpm, request.acceleration_rpm_per_s, steps_per_rotation
+        )
+        profile_done = 0
+
+        for _ in range(request.repeat_count):
+            for segment in range(1, segments + 1):
+                angle = (2.0 * math.pi * segment) / segments
+                target_x_steps = round(
+                    (request.center_x_cm + self._limit_buffer_cm + request.radius_cm * math.cos(angle)) * steps_per_cm
+                )
+                target_y_steps = round(
+                    (request.center_y_cm + self._limit_buffer_cm + request.radius_cm * math.sin(angle)) * steps_per_cm
+                )
+                delta_x = target_x_steps - self._x_steps
+                delta_y = target_y_steps - self._y_steps
+                if delta_x == 0 and delta_y == 0:
+                    continue
+
+                chord_iterations = abs(delta_x) + abs(delta_y)
+                if request.trapezoidal_speed:
+                    segment_rpm = self._trapezoid_rpm(
+                        profile_done + chord_iterations // 2, total_profile_iterations, request.speed_rpm,
+                        ramp_steps, request.acceleration_rpm_per_s, steps_per_rotation,
+                    )
+                else:
+                    segment_rpm = request.speed_rpm
+
+                self._run_circle_chord(gpio, pins, target_x_steps, target_y_steps, segment_rpm, trapezoidal=False)
+                profile_done += chord_iterations
+
+    def _run_circle_chord(
+        self,
+        gpio: Any,
+        pins: _GPIOPinPlan,
+        target_x_steps: int,
+        target_y_steps: int,
+        speed_rpm: float,
+        trapezoidal: bool,
+        acceleration_rpm_per_s: float = 300.0,
+    ) -> None:
+        delta_x = target_x_steps - self._x_steps
+        delta_y = target_y_steps - self._y_steps
+        # Every limit switch is watched, like the firmware's checkLimit=true:
+        # a chord can approach any switch, not just the one guarding one axis.
+        stopped = self._move_corexy_steps(
+            gpio, pins, delta_x + delta_y, delta_x - delta_y, speed_rpm,
+            stop_limit_pins=pins.limit_pins(),
+            steps_per_rotation=self._steps_per_rotation,
+            trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration_rpm_per_s,
+        )
+        self._x_steps += (self._last_a_steps + self._last_b_steps) // 2
+        self._y_steps += (self._last_a_steps - self._last_b_steps) // 2
+        steps_per_cm = self._effective_steps_per_cm()
+        self._x_cm = max(0.0, self._x_steps / steps_per_cm - self._limit_buffer_cm)
+        self._y_cm = max(0.0, self._y_steps / steps_per_cm - self._limit_buffer_cm)
+        if stopped:
+            self._save_state()
+            tripped = [name for name, pin in pins.named_limit_pins() if self._limit_active(gpio, pin)]
+            tripped_label = ", ".join(tripped) if tripped else "unknown"
+            raise RuntimeError(f"Limit switch tripped during circle move; aborting: {tripped_label}")
+
+    def _circle_result(
+        self,
+        context: dict,
+        request: GantryCircleXYRequest,
+        pins: _GPIOPinPlan,
+        execution: _GPIOExecution,
+    ) -> dict:
+        return {
+            "port": None,
+            "baud_rate": 0,
+            "speed_profile": request.speed_profile,
+            "speed_rpm": request.speed_rpm,
+            "trapezoidal_speed": request.trapezoidal_speed,
+            "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
+            "center": {"x_cm": request.center_x_cm, "y_cm": request.center_y_cm},
+            "radius_cm": request.radius_cm,
+            "repeat_count": request.repeat_count,
+            "pin_command_sent": "GPIO CoreXY circle",
+            "pin_reply": execution.message,
+            "pins_applied": True,
+            "limit_command_sent": "GPIO CoreXY circle",
+            "limit_reply": execution.message,
+            "limits_applied": True,
+            "move_command_sent": "GPIO CoreXY circle",
+            "move_reply": execution.message,
+            "move_applied": True,
+            "configured_pins": {
+                "x_step_pin": pins.a_step_pin,
+                "x_dir_pin": pins.a_dir_pin,
+                "y_step_pin": pins.b_step_pin,
+                "y_dir_pin": pins.b_dir_pin,
+            },
+            "configured_limits": {
+                "limit_switch_mode": request.limit_switch_mode,
+                "x_min_limit_pin": pins.x_min_limit_pin,
+                "x_max_limit_pin": pins.x_max_limit_pin,
+                "y_min_limit_pin": pins.y_min_limit_pin,
+                "y_max_limit_pin": pins.y_max_limit_pin,
+            },
+            "mode": context.get("mode"),
+            "controller": RASPBERRY_BOARD_ID,
+            "simulated": execution.simulated,
+        }
 
     def _assert_target_within_calibrated_workspace(self, request: GantryXYMoveRequest) -> None:
         if not self._calibrated:
@@ -1021,7 +1229,9 @@ class RaspberryGantryGPIOService:
             return pins.y_min_limit_pin
         raise ValueError(f"Unsupported calibration axis: {axis}")
 
-    def _assert_limits_clear(self, gpio: Any, pins: _GPIOPinPlan, request: GantryXYMoveRequest) -> None:
+    def _assert_limits_clear(
+        self, gpio: Any, pins: _GPIOPinPlan, request: GantryXYMoveRequest | None
+    ) -> None:
         active_limits = []
         if self._limit_active(gpio, pins.x_min_limit_pin):
             active_limits.append("x_min")
@@ -1038,7 +1248,7 @@ class RaspberryGantryGPIOService:
                 + ", ".join(active_limits)
             )
 
-        if math.isnan(request.x_cm) or math.isnan(request.y_cm):
+        if request is not None and (math.isnan(request.x_cm) or math.isnan(request.y_cm)):
             raise RuntimeError("Invalid gantry move target.")
 
     def _calibration_result(
@@ -1156,6 +1366,10 @@ def planned_calibrate_xy_result(context: dict, request: GantryXYCalibrationReque
 
 def planned_move_xy_result(context: dict, request: GantryXYMoveRequest) -> dict:
     return raspberry_gantry_gpio_service.move_xy(context, request)
+
+
+def planned_circle_xy_result(context: dict, request: GantryCircleXYRequest) -> dict:
+    return raspberry_gantry_gpio_service.circle_xy(context, request)
 
 
 def planned_test_motor_result(context: dict, request) -> dict:
