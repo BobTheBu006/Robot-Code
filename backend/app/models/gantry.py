@@ -403,6 +403,7 @@ class GantryZCalibrationRequest(BaseModel):
     tool_port: str | None = None
     z_left_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
     z_right_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
+    limit_buffer_cm: float = Field(default=0.5, ge=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
     speed_rpm: int = Field(default=100, gt=0)
     trapezoidal_speed: bool = Field(default=True)

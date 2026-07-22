@@ -1519,6 +1519,46 @@ bool handleMoveZCommand(const String &cmd) {
   return true;
 }
 
+// Pure open-loop dual-stepper pulse: no limit switches are read on this board
+// for this move (the host tracks position and limit state itself, e.g. when
+// the limit switches live on a different controller than the motors). Still
+// obeys an async STOP, checked every step inside runDualAxisMove regardless
+// of the useLimitChecks flag.
+bool handleStepZCommand(const String &cmd) {
+  long leftSteps = 0;
+  long rightSteps = 0;
+  int rpm = 100;
+  int trapezoidFlag = 1;
+  int accelerationRpmPerSecond = 300;
+  int parsed = sscanf(
+    cmd.c_str(), "STEP Z %ld %ld %d %d %d",
+    &leftSteps, &rightSteps, &rpm, &trapezoidFlag, &accelerationRpmPerSecond
+  );
+  if (parsed < 3) {
+    return false;
+  }
+
+  bool leftBlocked = false;
+  bool rightBlocked = false;
+  bool stopRequested = false;
+  bool completed = runDualAxisMove(
+    zLeftAxis, zRightAxis, leftSteps, rightSteps, rpm,
+    parsed >= 4 ? trapezoidFlag != 0 : true,
+    parsed >= 5 ? accelerationRpmPerSecond : 300,
+    zLimitSwitchMode,
+    /*useLimitChecks*/ false, /*stopOnAnyNewLimit*/ false,
+    leftBlocked, rightBlocked, stopRequested
+  );
+
+  if (stopRequested) {
+    Serial.println("ERR STOP STEP Z");
+    return true;
+  }
+  (void)completed;
+  Serial.println("OK STEP Z");
+  return true;
+}
+
 bool handleCalibrateZCommand(const String &cmd) {
   float leftTrackLengthCm = 0.0f;
   float rightTrackLengthCm = 0.0f;
@@ -1578,6 +1618,8 @@ void loop() {
   else if (handleSetZPinsCommand(cmd)) {
   }
   else if (handleSetZLimitsCommand(cmd)) {
+  }
+  else if (handleStepZCommand(cmd)) {
   }
   else if (handleMoveZCommand(cmd)) {
   }

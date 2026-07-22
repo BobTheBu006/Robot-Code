@@ -50,7 +50,45 @@ class HardwareMapService:
                 f"hardware-map.json failed validation: {exc.errors()[0]['msg']}"
             ) from exc
 
+    def _sync_device_enabled_with_groups(self, hardware_map: HardwareMap) -> HardwareMap:
+        """A device's stored enabled flag always mirrors the board and any
+        hardware groups it belongs to - turning a board or group off shows
+        every device under it as off, and turning it back on shows them all
+        as on again, like a breaker cutting power to everything downstream.
+        No per-device override survives independent of its board/group: if a
+        specific device needs to stay off, that has to be set again after the
+        board or group is re-enabled.
+        """
+        board_enabled = {board.id: board.enabled for board in hardware_map.boards}
+
+        # Resolve every group to the concrete set of device ids it covers,
+        # since a group's member_ids can list board ids to cover every device
+        # on that board without naming each one.
+        group_disabled_device_ids: set[str] = set()
+        for group in hardware_map.groups:
+            if group.enabled:
+                continue
+            for device in hardware_map.devices:
+                if device.id in group.member_ids or (device.board_id and device.board_id in group.member_ids):
+                    group_disabled_device_ids.add(device.id)
+
+        updated_devices = []
+        changed = False
+        for device in hardware_map.devices:
+            target_enabled = board_enabled.get(device.board_id, device.enabled)
+            if device.id in group_disabled_device_ids:
+                target_enabled = False
+            if target_enabled != device.enabled:
+                device = device.model_copy(update={"enabled": target_enabled})
+                changed = True
+            updated_devices.append(device)
+
+        if not changed:
+            return hardware_map
+        return hardware_map.model_copy(update={"devices": updated_devices})
+
     def save_map(self, hardware_map: HardwareMap) -> HardwareMapSaveResponse:
+        hardware_map = self._sync_device_enabled_with_groups(hardware_map)
         self._hardware_map_path.parent.mkdir(parents=True, exist_ok=True)
         saved_at = datetime.now(tz=timezone.utc)
         payload = hardware_map.model_copy(update={"version": 1, "updated_at": saved_at})

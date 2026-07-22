@@ -4,7 +4,7 @@
   "display_name": "Calibrate Z Axis",
   "category": "Robot Actions",
   "description": "Homes both Z motors independently: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. The actual measured travel becomes the calibrated range for later Move Z Axis calls.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -41,6 +41,19 @@
       "description": "Expected physical travel of the right Z axis between its min and max limit switches.",
       "required": true,
       "default": 60.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "limit_buffer_cm",
+      "label": "Limit Buffer (cm)",
+      "type": "number",
+      "description": "Safety gap kept between the usable range and each max limit switch. Calibration parks this far off the max switch when it finishes, so it never leaves a switch pressed, and later moves are capped at track length minus this buffer.",
+      "required": false,
+      "default": 0.5,
       "placeholder": null,
       "advanced": false,
       "min": null,

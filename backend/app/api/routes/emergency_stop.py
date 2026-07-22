@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.services.esp32_builder import esp32_builder_service
 from app.services.gantry_controller import gantry_controller_service
+from app.services.hybrid_z_axis import hybrid_z_axis_service
 from app.services.raspberry_gantry import emergency_stop_raspberry_gantry, rearm_raspberry_gantry
 from app.services.syringe_controller import syringe_controller_service
 from app.services.toolhead import toolhead_state_store
@@ -16,6 +17,7 @@ def emergency_stop() -> dict[str, object]:
         # only sets a flag and returns immediately, whereas the serial stops
         # below can block on a busy port.
         emergency_stop_raspberry_gantry(),
+        hybrid_z_axis_service.emergency_stop(),
         # Abort an in-progress board flash so the controller stops getting
         # reprogrammed, then stop any active motion.
         esp32_builder_service.emergency_stop(),
@@ -44,4 +46,5 @@ def rearm() -> dict[str, object]:
     explicitly starts new work (Run all, running a block, or Resume).
     """
     rearm_raspberry_gantry()
+    hybrid_z_axis_service.rearm()
     return {"ok": True, "message": "Emergency stop cleared."}

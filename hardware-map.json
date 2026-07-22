@@ -739,7 +739,7 @@
         {
           "id": "z-left-min-limit",
           "signal": "signal",
-          "gpio": "20",
+          "gpio": "19",
           "function_input_key": "z_left_min_limit_pin",
           "notes": null
         }
@@ -996,6 +996,66 @@
       "function_id": "pickup_toolhead",
       "device_id": "x-max-limit-switch",
       "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-left-motor",
+      "hardware_device_id": "z-left-motor"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-left-motor",
+      "hardware_device_id": "z-left-motor"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-right-motor",
+      "hardware_device_id": "z-right-motor"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-right-motor",
+      "hardware_device_id": "z-right-motor"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-left-min-limit-switch",
+      "hardware_device_id": "z-left-min-limit-switch"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-left-min-limit-switch",
+      "hardware_device_id": "z-left-min-limit-switch"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-left-max-limit-switch",
+      "hardware_device_id": "z-left-max-limit-switch"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-left-max-limit-switch",
+      "hardware_device_id": "z-left-max-limit-switch"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-right-min-limit-switch",
+      "hardware_device_id": "z-right-min-limit-switch"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-right-min-limit-switch",
+      "hardware_device_id": "z-right-min-limit-switch"
+    },
+    {
+      "function_id": "calibrate_z",
+      "device_id": "z-right-max-limit-switch",
+      "hardware_device_id": "z-right-max-limit-switch"
+    },
+    {
+      "function_id": "move_z",
+      "device_id": "z-right-max-limit-switch",
+      "hardware_device_id": "z-right-max-limit-switch"
     }
   ],
   "node_positions": [
@@ -1036,23 +1096,23 @@
     },
     {
       "node_id": "z-left-min-limit-switch",
-      "x": 1016.0,
-      "y": -1234.0
+      "x": 1596.0,
+      "y": -332.0
     },
     {
       "node_id": "z-left-max-limit-switch",
-      "x": 1016.0,
-      "y": -1124.0
+      "x": 1596.0,
+      "y": -222.0
     },
     {
       "node_id": "z-right-min-limit-switch",
-      "x": 1016.0,
-      "y": -1014.0
+      "x": 1596.0,
+      "y": -112.0
     },
     {
       "node_id": "z-right-max-limit-switch",
-      "x": 1014.9,
-      "y": -907.4
+      "x": 1594.9,
+      "y": -5.4
     },
     {
       "node_id": "controller-x83xnc",
@@ -1110,5 +1170,5 @@
       "y": 239.0
     }
   ],
-  "updated_at": "2026-07-22T15:40:52.940032Z"
+  "updated_at": "2026-07-22T16:48:09.363377Z"
 }
