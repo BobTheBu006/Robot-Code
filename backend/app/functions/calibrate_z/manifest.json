@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "id": "calibrate_z",
+  "display_name": "Calibrate Z Axis",
+  "category": "Robot Actions",
+  "description": "Homes both Z motors independently: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. The actual measured travel becomes the calibrated range for later Move Z Axis calls.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "Selected ESP32",
+      "type": "file/path",
+      "description": "Connected ESP32 board running the dual Z-axis controller firmware.",
+      "required": true,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0",
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [],
+      "hidden": true,
+      "resolvedFrom": "hardware_map"
+    },
+    {
+      "key": "z_left_track_length_cm",
+      "label": "Z Left Track Length (cm)",
+      "type": "number",
+      "description": "Expected physical travel of the left Z axis between its min and max limit switches.",
+      "required": true,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_right_track_length_cm",
+      "label": "Z Right Track Length (cm)",
+      "type": "number",
+      "description": "Expected physical travel of the right Z axis between its min and max limit switches.",
+      "required": true,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "speed_rpm",
+      "label": "Calibration Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed used while homing both Z axes.",
+      "required": true,
+      "default": 100.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "trapezoidal_speed",
+      "label": "Trapezoidal Speed",
+      "type": "boolean",
+      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "acceleration_rpm_per_s",
+      "label": "Acceleration (RPM/s)",
+      "type": "number",
+      "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+      "required": false,
+      "default": 300.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "z_left_step_pin",
+      "label": "Z Left Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z left step pin.",
+      "required": false,
+      "default": 32.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_left_dir_pin",
+      "label": "Z Left Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z left dir pin.",
+      "required": false,
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_right_step_pin",
+      "label": "Z Right Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z right step pin.",
+      "required": false,
+      "default": 4.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_right_dir_pin",
+      "label": "Z Right Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z right dir pin.",
+      "required": false,
+      "default": 5.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_left_min_limit_pin",
+      "label": "Z Left Min Limit Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z left min limit pin.",
+      "required": false,
+      "default": 12.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_left_max_limit_pin",
+      "label": "Z Left Max Limit Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z left max limit pin.",
+      "required": false,
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_right_min_limit_pin",
+      "label": "Z Right Min Limit Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z right min limit pin.",
+      "required": false,
+      "default": 14.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_right_max_limit_pin",
+      "label": "Z Right Max Limit Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for z right max limit pin.",
+      "required": false,
+      "default": 15.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue when Z calibration completes."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "z-left-motor",
+      "name": "Z Left Motor",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "z_left_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "z_left_step_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-z-left-motor",
+      "notes": null
+    },
+    {
+      "id": "z-right-motor",
+      "name": "Z Right Motor",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "z_right_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "z_right_step_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-z-right-motor",
+      "notes": null
+    },
+    {
+      "id": "z-left-min-limit-switch",
+      "name": "Z Left Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_left_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-left-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-left-max-limit-switch",
+      "name": "Z Left Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_left_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-left-max-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-right-min-limit-switch",
+      "name": "Z Right Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-min-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_right_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-right-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "z-right-max-limit-switch",
+      "name": "Z Right Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-max-limit",
+          "signal": "signal",
+          "gpio": null,
+          "function_input_key": "z_right_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-z-right-max-limit-switch",
+      "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "calibrate_z",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z <leftCm> <rightCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware homes each Z side to its min switch (sets 0), then to its max switch, and records the measured travel as the calibrated track length.",
+      "entry_point": "calibrate_z",
+      "required_device_ids": [
+        "z-left-motor",
+        "z-right-motor",
+        "z-left-min-limit-switch",
+        "z-left-max-limit-switch",
+        "z-right-min-limit-switch",
+        "z-right-max-limit-switch"
+      ],
+      "description": "Firmware routine required by the Calibrate Z Axis block."
+    }
+  ],
+  "builder_board_id": "controller-ykkl80",
+  "builder_source_path": null,
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
+  "builder_base_function_id": null
+}

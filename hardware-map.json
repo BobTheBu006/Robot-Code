@@ -5,6 +5,17 @@
       "id": "controller-x83xnc",
       "label": "7 syringe pump controller",
       "usb_port": "/dev/ttyUSB0",
+      "enabled": false,
+      "notes": null,
+      "dynamic": false,
+      "expected_serial_number": null,
+      "expected_hardware_id": null,
+      "expected_device_label": null
+    },
+    {
+      "id": "controller-ykkl80",
+      "label": "Double Z axis and pumps",
+      "usb_port": "/dev/ttyUSB0",
       "enabled": true,
       "notes": null,
       "dynamic": false,
@@ -91,7 +102,7 @@
         {
           "id": "y-step",
           "signal": "step",
-          "gpio": "17",
+          "gpio": "22",
           "function_input_key": "y_step_pin",
           "notes": null
         },
@@ -161,7 +172,7 @@
         {
           "id": "x-max-limit",
           "signal": "signal",
-          "gpio": "13",
+          "gpio": "20",
           "function_input_key": "x_max_limit_pin",
           "notes": null
         }
@@ -182,7 +193,7 @@
         {
           "id": "y-min-limit",
           "signal": "signal",
-          "gpio": "16",
+          "gpio": "21",
           "function_input_key": "y_min_limit_pin",
           "notes": null
         }
@@ -601,6 +612,202 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "z-left-motor",
+      "board_id": "controller-ykkl80",
+      "name": "Z Left Motor",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-dir",
+          "signal": "direction",
+          "gpio": "33",
+          "function_input_key": "z_left_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-left-step",
+          "signal": "step",
+          "gpio": "32",
+          "function_input_key": "z_left_step_pin",
+          "notes": null
+        },
+        {
+          "id": "pin-3-x0wow5",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-4-mxvucv",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-5-7u80fj",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-6-9vvs62",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-right-motor",
+      "board_id": "controller-ykkl80",
+      "name": "Z Right Motor",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-dir",
+          "signal": "direction",
+          "gpio": "32",
+          "function_input_key": "z_right_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "z-right-step",
+          "signal": "step",
+          "gpio": "18",
+          "function_input_key": "z_right_step_pin",
+          "notes": null
+        },
+        {
+          "id": "pin-3-rcwdsn",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-4-6tvb4v",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-5-ns7et7",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-6-659ts2",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-left-min-limit-switch",
+      "board_id": "raspberry-pi",
+      "name": "Z Left Min Limit Switch",
+      "kind": "sensor",
+      "enabled": true,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-min-limit",
+          "signal": "signal",
+          "gpio": "20",
+          "function_input_key": "z_left_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-left-max-limit-switch",
+      "board_id": "raspberry-pi",
+      "name": "Z Left Max Limit Switch",
+      "kind": "sensor",
+      "enabled": true,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-left-max-limit",
+          "signal": "signal",
+          "gpio": "6",
+          "function_input_key": "z_left_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-right-min-limit-switch",
+      "board_id": "raspberry-pi",
+      "name": "Z Right Min Limit Switch",
+      "kind": "sensor",
+      "enabled": true,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-min-limit",
+          "signal": "signal",
+          "gpio": "16",
+          "function_input_key": "z_right_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "z-right-max-limit-switch",
+      "board_id": "raspberry-pi",
+      "name": "Z Right Max Limit Switch",
+      "kind": "sensor",
+      "enabled": true,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "z-right-max-limit",
+          "signal": "signal",
+          "gpio": "12",
+          "function_input_key": "z_right_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
     }
   ],
   "groups": [],
@@ -799,38 +1006,58 @@
     },
     {
       "node_id": "y-max-limit-switch",
-      "x": 1947.84,
-      "y": 143.66
+      "x": 1013.84,
+      "y": -558.34
     },
     {
       "node_id": "x-axis-motor",
-      "x": 1947.84,
-      "y": 143.66
+      "x": 1013.84,
+      "y": -558.34
     },
     {
       "node_id": "y-axis-motor",
-      "x": 1947.84,
-      "y": 253.66
+      "x": 1013.84,
+      "y": -448.34
     },
     {
       "node_id": "x-min-limit-switch",
-      "x": 1947.84,
-      "y": 363.66
+      "x": 1013.84,
+      "y": -338.34
     },
     {
       "node_id": "x-max-limit-switch",
-      "x": 1947.84,
-      "y": 473.66
+      "x": 1013.84,
+      "y": -228.34
     },
     {
       "node_id": "y-min-limit-switch",
-      "x": 1947.84,
-      "y": 583.66
+      "x": 1013.84,
+      "y": -118.34
+    },
+    {
+      "node_id": "z-left-min-limit-switch",
+      "x": 1016.0,
+      "y": -1234.0
+    },
+    {
+      "node_id": "z-left-max-limit-switch",
+      "x": 1016.0,
+      "y": -1124.0
+    },
+    {
+      "node_id": "z-right-min-limit-switch",
+      "x": 1016.0,
+      "y": -1014.0
+    },
+    {
+      "node_id": "z-right-max-limit-switch",
+      "x": 1014.9,
+      "y": -907.4
     },
     {
       "node_id": "controller-x83xnc",
-      "x": 397.41,
-      "y": 1008.7
+      "x": 27.41,
+      "y": 1192.7
     },
     {
       "node_id": "syringe-head-a",
@@ -866,7 +1093,22 @@
       "node_id": "syringe-head-g",
       "x": 727.41,
       "y": 1668.7
+    },
+    {
+      "node_id": "controller-ykkl80",
+      "x": 714.0,
+      "y": 164.0
+    },
+    {
+      "node_id": "z-left-motor",
+      "x": 1176.0,
+      "y": 121.0
+    },
+    {
+      "node_id": "z-right-motor",
+      "x": 1180.0,
+      "y": 239.0
     }
   ],
-  "updated_at": "2026-07-19T17:13:20.451701Z"
+  "updated_at": "2026-07-22T15:40:52.940032Z"
 }
