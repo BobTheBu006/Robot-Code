@@ -978,11 +978,6 @@
       "hardware_device_id": "x-max-limit-switch"
     },
     {
-      "function_id": "test_motor",
-      "device_id": "y-min-limit-switch",
-      "hardware_device_id": "y-max-limit-switch"
-    },
-    {
       "function_id": "drop_toolhead",
       "device_id": "y-min-limit-switch",
       "hardware_device_id": "y-min-limit-switch"
@@ -1056,6 +1051,36 @@
       "function_id": "move_z",
       "device_id": "z-right-max-limit-switch",
       "hardware_device_id": "z-right-max-limit-switch"
+    },
+    {
+      "function_id": "test_motor",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "test_gantry_repeatability",
+      "device_id": "y-min-limit-switch",
+      "hardware_device_id": "y-min-limit-switch"
+    },
+    {
+      "function_id": "test_gantry_repeatability",
+      "device_id": "x-max-limit-switch",
+      "hardware_device_id": "x-max-limit-switch"
+    },
+    {
+      "function_id": "test_gantry_repeatability",
+      "device_id": "x-min-limit-switch",
+      "hardware_device_id": "x-min-limit-switch"
+    },
+    {
+      "function_id": "test_gantry_repeatability",
+      "device_id": "y-axis-motor",
+      "hardware_device_id": "y-axis-motor"
+    },
+    {
+      "function_id": "test_gantry_repeatability",
+      "device_id": "x-axis-motor",
+      "hardware_device_id": "x-axis-motor"
     }
   ],
   "node_positions": [
@@ -1170,5 +1195,5 @@
       "y": 727.0
     }
   ],
-  "updated_at": "2026-07-27T14:47:58.963827Z"
+  "updated_at": "2026-07-27T17:47:41.614460Z"
 }

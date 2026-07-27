@@ -564,15 +564,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 56,
-        "benchmarkDurationMs": 29600,
-        "lastDurationMs": 66
+        "runCount": 57,
+        "benchmarkDurationMs": 30839,
+        "lastDurationMs": 100221
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
     },
     {
@@ -2737,7 +2737,7 @@
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
           "repeat_count": 5,
-          "speed_1_rpm": 100,
+          "speed_1_rpm": 200,
           "speed_2_rpm": 0,
           "speed_3_rpm": 0,
           "speed_4_rpm": 0,
@@ -2756,15 +2756,15 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 1,
-        "benchmarkDurationMs": 137241,
-        "lastDurationMs": 137241
+        "runCount": 2,
+        "benchmarkDurationMs": 165738,
+        "lastDurationMs": 194236
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     }
   ],

@@ -544,6 +544,16 @@ function functionHardwareGroupLabel(discoveredFunction: DiscoveredFunctionDefini
   return discoveredFunction.manifest.category || "Other";
 }
 
+// Every limit switch in this app is named "<axis>-<min|max>-limit-switch"
+// (or "z-<left|right>-<min|max>-limit-switch"). Stripping the fixed suffix
+// leaves the device's role - e.g. "y-min", "z-left-max" - so two switches
+// only look interchangeable when they guard the same physical end of the
+// same axis, never a different end or a different axis.
+function limitSwitchRole(deviceId: string): string | null {
+  const match = deviceId.match(/^(.*)-limit-switch$/);
+  return match ? match[1] : null;
+}
+
 function compatibleHardwareDevices(
   hardwareMap: HardwareMap,
   deviceReference: WorkflowHardwareDeviceReference,
@@ -554,7 +564,22 @@ function compatibleHardwareDevices(
     }
 
     if (normalizeDeviceKind(device.kind) === "sensor") {
-      return normalizeSensorKind(device.sensor_kind) === normalizeSensorKind(deviceReference.sensor_kind);
+      if (normalizeSensorKind(device.sensor_kind) !== normalizeSensorKind(deviceReference.sensor_kind)) {
+        return false;
+      }
+
+      if (normalizeSensorKind(device.sensor_kind) === normalizeSensorKind("position_limit_switch")) {
+        const referenceRole = limitSwitchRole(deviceReference.id);
+        const deviceRole = limitSwitchRole(device.id);
+        // Only devices that actually follow the naming convention can be
+        // role-matched; anything else falls back to the old kind-only
+        // compatibility rather than silently excluding every candidate.
+        if (referenceRole && deviceRole) {
+          return referenceRole === deviceRole;
+        }
+      }
+
+      return true;
     }
 
     return true;
