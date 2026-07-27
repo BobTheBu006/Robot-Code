@@ -16,7 +16,7 @@
       "id": "controller-ykkl80",
       "label": "Double Z axis and pumps",
       "usb_port": "/dev/ttyUSB0",
-      "enabled": true,
+      "enabled": false,
       "notes": null,
       "dynamic": false,
       "expected_serial_number": null,
@@ -205,7 +205,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head A",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -261,7 +261,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head B",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -317,7 +317,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head C",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -373,7 +373,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head D",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -429,7 +429,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head E",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -485,7 +485,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head F",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -541,7 +541,7 @@
       "board_id": "controller-x83xnc",
       "name": "Syringe Head G",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -618,7 +618,7 @@
       "board_id": "controller-ykkl80",
       "name": "Z Left Motor",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -674,7 +674,7 @@
       "board_id": "controller-ykkl80",
       "name": "Z Right Motor",
       "kind": "stepper_motor",
-      "enabled": true,
+      "enabled": false,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -1156,19 +1156,19 @@
     },
     {
       "node_id": "controller-ykkl80",
-      "x": 714.0,
-      "y": 164.0
+      "x": 722.0,
+      "y": 432.0
     },
     {
       "node_id": "z-left-motor",
-      "x": 1176.0,
-      "y": 121.0
+      "x": 1178.0,
+      "y": 513.0
     },
     {
       "node_id": "z-right-motor",
-      "x": 1180.0,
-      "y": 239.0
+      "x": 1230.0,
+      "y": 727.0
     }
   ],
-  "updated_at": "2026-07-22T16:48:09.363377Z"
+  "updated_at": "2026-07-27T14:47:58.963827Z"
 }

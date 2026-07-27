@@ -1,90 +1,100 @@
 {
   "schema_version": 1,
-  "id": "move_gantry_circle",
-  "display_name": "Move Gantry Circle",
+  "id": "test_gantry_repeatability",
+  "display_name": "Test Gantry Repeatability",
   "category": "Robot Actions",
-  "description": "Trace a full circle with the CoreXY gantry around a given center (X, Y) position with a given radius, using trapezoidal acceleration over the whole lap. Moves to the circle start point first. Requires a prior Calibrate Gantry XY run. Errors and stops immediately if the circle does not fit the workspace or a limit switch is hit.",
-  "version": "0.1.0",
+  "description": "Diagnostic for step-skipping. Using the last calibration, repeatedly tours X-min/Y-min -> X-mid/Y-max -> X-max/Y-min -> X-mid/Y-max at each test speed. X-min, X-max, and Y-min are real limit switches, so every arrival there is a genuine probe comparing the calibrated distance that should have been needed against how many steps it actually took to trip the switch. X-mid and Y-max have no limit switch (this machine only homes Y against Y-min) and are ordinary calibrated moves. Small, consistent deviation on every switch arrival means the motors are tracking commanded steps faithfully; growing or erratic deviation - especially at higher speeds - means steps are being skipped. Read-only: does not change the calibration.",
+  "version": "0.2.0",
   "inputs": [
     {
       "key": "tool_port",
       "label": "Selected ESP32",
       "type": "file/path",
-      "description": "Connected ESP32 board that drives the CoreXY gantry.",
+      "description": "Connected ESP32 board that should run the X calibration routine.",
       "required": true,
       "default": "/dev/ttyUSB0",
       "placeholder": "/dev/ttyUSB0",
       "advanced": false,
-      "options": []
-    },
-    {
-      "key": "center_x_cm",
-      "label": "Center X (cm)",
-      "type": "number",
-      "description": "Absolute X position of the circle center in cm. 0 is the safe X-min end (5 mm off the switch); the max is the X track length minus the 5 mm buffer at each end. The whole circle must also fit inside this range.",
-      "required": true,
-      "default": 10.0,
-      "placeholder": null,
-      "advanced": false,
-      "min": 0.0,
-      "max": 105.3,
-      "options": []
-    },
-    {
-      "key": "center_y_cm",
-      "label": "Center Y (cm)",
-      "type": "number",
-      "description": "Absolute Y position of the circle center in cm. 0 is the safe Y-min end (5 mm off the switch); the max is the Y track length minus the 5 mm buffer at each end. The whole circle must also fit inside this range.",
-      "required": true,
-      "default": 10.0,
-      "placeholder": null,
-      "advanced": false,
-      "min": 0.0,
-      "max": 54.1,
-      "options": []
-    },
-    {
-      "key": "radius_cm",
-      "label": "Radius (cm)",
-      "type": "number",
-      "description": "Circle radius in cm. The whole circle must fit inside the calibrated workspace.",
-      "required": true,
-      "default": 2.0,
-      "placeholder": null,
-      "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
       "key": "repeat_count",
-      "label": "Repeat Count",
+      "label": "Repeats per Limit",
       "type": "number",
-      "description": "Number of full circles to trace before continuing.",
-      "required": false,
-      "default": 1.0,
+      "description": "How many full tours of the four waypoints to run at each test speed.",
+      "required": true,
+      "default": 5.0,
       "placeholder": null,
       "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
-      "key": "speed_rpm",
-      "label": "Move Speed (RPM)",
+      "key": "speed_1_rpm",
+      "label": "Test Speed 1 (RPM)",
       "type": "number",
-      "description": "Numeric target motor speed for the circle move.",
+      "description": "First motor speed to test.",
       "required": true,
-      "default": 400.0,
+      "default": 100.0,
       "placeholder": null,
       "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "speed_2_rpm",
+      "label": "Test Speed 2 (RPM)",
+      "type": "number",
+      "description": "Second motor speed to test. Set 0 to skip.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "speed_3_rpm",
+      "label": "Test Speed 3 (RPM)",
+      "type": "number",
+      "description": "Third motor speed to test. Set 0 to skip.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "speed_4_rpm",
+      "label": "Test Speed 4 (RPM)",
+      "type": "number",
+      "description": "Fourth motor speed to test. Set 0 to skip.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
       "key": "trapezoidal_speed",
       "label": "Trapezoidal Speed",
       "type": "boolean",
-      "description": "Ramp acceleration and deceleration over the whole circle instead of jumping straight to target speed.",
+      "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
       "required": false,
       "default": true,
       "placeholder": null,
       "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -93,9 +103,11 @@
       "type": "number",
       "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
       "required": false,
-      "default": 600.0,
+      "default": 300.0,
       "placeholder": null,
       "advanced": false,
+      "min": null,
+      "max": null,
       "options": []
     }
   ],
@@ -109,6 +121,8 @@
       "default": 16.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -120,6 +134,8 @@
       "default": 17.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -131,6 +147,8 @@
       "default": 18.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -142,6 +160,8 @@
       "default": 19.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -153,6 +173,8 @@
       "default": 21.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
@@ -164,28 +186,21 @@
       "default": 22.0,
       "placeholder": null,
       "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     },
     {
       "key": "y_min_limit_pin",
       "label": "Y Min Limit Pin",
       "type": "number",
-      "description": "GPIO pin for the Y minimum limit switch.",
+      "description": "GPIO pin for the Y minimum/home limit switch at Y = 0. Probed first to establish the Y origin before X calibration runs.",
       "required": false,
       "default": 23.0,
       "placeholder": null,
       "advanced": true,
-      "options": []
-    },
-    {
-      "key": "y_max_limit_pin",
-      "label": "Y Max Limit Pin",
-      "type": "number",
-      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead. Optional: -1 means no Y-max limit switch is wired.",
-      "required": false,
-      "default": -1.0,
-      "placeholder": null,
-      "advanced": true,
+      "min": null,
+      "max": null,
       "options": []
     }
   ],
@@ -194,7 +209,7 @@
       "key": "next",
       "label": "Next",
       "type": "flow",
-      "description": "Continue when the circle move completes."
+      "description": "Continue when the repeatability test completes."
     }
   ],
   "hardware_devices": [
@@ -220,6 +235,13 @@
           "signal": "step",
           "gpio": null,
           "function_input_key": "x_step_pin",
+          "notes": null
+        },
+        {
+          "id": "x-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
           "notes": null
         }
       ],
@@ -248,6 +270,13 @@
           "signal": "step",
           "gpio": null,
           "function_input_key": "y_step_pin",
+          "notes": null
+        },
+        {
+          "id": "y-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
           "notes": null
         }
       ],
@@ -318,26 +347,10 @@
       "notes": null
     }
   ],
-  "firmware_requirements": [
-    {
-      "routine_id": "move_gantry_circle",
-      "controller_role": "builder_board",
-      "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The backend sends CIRCLEXY once per requested repeat. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across each lap, and faults on workspace or limit violations.",
-      "entry_point": "circleGantryXY",
-      "required_device_ids": [
-        "x-axis-motor",
-        "y-axis-motor",
-        "x-min-limit-switch",
-        "x-max-limit-switch",
-        "y-min-limit-switch"
-      ],
-      "description": "Firmware routine required by the Move Gantry Circle block."
-    }
-  ],
-  "builder_board_id": "ttyUSB0",
+  "firmware_requirements": [],
+  "builder_board_id": null,
   "builder_source_path": null,
-  "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
-  "builder_firmware_entry_file": "firmware/main.ino",
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
   "builder_base_function_id": null
 }

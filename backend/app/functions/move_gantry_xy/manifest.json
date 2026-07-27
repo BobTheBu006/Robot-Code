@@ -27,7 +27,7 @@
       "placeholder": null,
       "advanced": false,
       "min": 0.0,
-      "max": 105.1,
+      "max": 105.3,
       "options": []
     },
     {
@@ -40,7 +40,7 @@
       "placeholder": null,
       "advanced": false,
       "min": 0.0,
-      "max": 54.8,
+      "max": 54.1,
       "options": []
     },
     {
@@ -159,9 +159,9 @@
       "key": "y_max_limit_pin",
       "label": "Y Max Limit Pin",
       "type": "number",
-      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead.",
+      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead. Optional: -1 means no Y-max limit switch is wired.",
       "required": false,
-      "default": 22.0,
+      "default": -1.0,
       "placeholder": null,
       "advanced": true,
       "options": []

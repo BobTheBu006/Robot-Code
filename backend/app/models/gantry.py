@@ -52,7 +52,7 @@ class GantryXYMoveRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     z_left_min_limit_pin: int = Field(default=12, ge=0)
     z_left_max_limit_pin: int = Field(default=13, ge=0)
     z_right_min_limit_pin: int = Field(default=12, ge=0)
@@ -71,6 +71,12 @@ class GantryXYMoveRequest(BaseModel):
         }
         if self.limit_switch_mode == "4":
             assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
+        # A Y-max switch is optional: this machine only homes Y against
+        # Y-min, so -1 (no such pin) must not be forced into the distinct-pin
+        # check just because limit_switch_mode is "4" - the sentinel would
+        # never conflict with a real pin on its own, but a stale positive
+        # default could, so only a genuinely assigned pin (>= 0) is checked.
+        if self.y_max_limit_pin >= 0:
             assigned_pins["y_max_limit_pin"] = self.y_max_limit_pin
         if self.x_enable_pin >= 0:
             assigned_pins["x_enable_pin"] = self.x_enable_pin
@@ -138,7 +144,7 @@ class GantryXYCalibrationRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -205,7 +211,7 @@ class GantryGotoXYRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -220,6 +226,7 @@ class GantryGotoXYRequest(BaseModel):
         }
         if self.limit_switch_mode == "4":
             assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
+        if self.y_max_limit_pin >= 0:
             assigned_pins["y_max_limit_pin"] = self.y_max_limit_pin
         if self.x_enable_pin >= 0:
             assigned_pins["x_enable_pin"] = self.x_enable_pin
@@ -277,7 +284,7 @@ class GantryCircleXYRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -292,6 +299,7 @@ class GantryCircleXYRequest(BaseModel):
         }
         if self.limit_switch_mode == "4":
             assigned_pins["x_max_limit_pin"] = self.x_max_limit_pin
+        if self.y_max_limit_pin >= 0:
             assigned_pins["y_max_limit_pin"] = self.y_max_limit_pin
         if self.x_enable_pin >= 0:
             assigned_pins["x_enable_pin"] = self.x_enable_pin
@@ -447,6 +455,76 @@ class GantryZCalibrationResponse(BaseModel):
     configured_limits: dict[str, int | str]
 
 
+class GantryRepeatabilityTestRequest(BaseModel):
+    """Repeatedly tours X-min/Y-min -> X-mid/Y-max -> X-max/Y-min -> X-mid/Y-max
+    and back, measuring how many steps it actually took to trip each limit
+    switch on arrival against the calibrated distance that should have been
+    needed. Consistent, small deviation means the motors are tracking
+    commanded steps faithfully; growing or erratic deviation means steps are
+    being skipped at that speed."""
+
+    tool_port: str | None = None
+    repeat_count: int = Field(default=5, ge=1)
+    speed_1_rpm: int = Field(default=100, gt=0)
+    speed_2_rpm: int = Field(default=0, ge=0)
+    speed_3_rpm: int = Field(default=0, ge=0)
+    speed_4_rpm: int = Field(default=0, ge=0)
+    trapezoidal_speed: bool = Field(default=True)
+    acceleration_rpm_per_s: int = Field(default=300, gt=0)
+    x_step_pin: int = Field(default=16, ge=0)
+    x_dir_pin: int = Field(default=17, ge=0)
+    y_step_pin: int = Field(default=18, ge=0)
+    y_dir_pin: int = Field(default=19, ge=0)
+    x_min_limit_pin: int = Field(default=21, ge=0)
+    x_max_limit_pin: int = Field(default=22, ge=0)
+    y_min_limit_pin: int = Field(default=23, ge=0)
+    baud_rate: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_pin_assignments(self) -> "GantryRepeatabilityTestRequest":
+        assigned_pins = {
+            "x_step_pin": self.x_step_pin,
+            "x_dir_pin": self.x_dir_pin,
+            "y_step_pin": self.y_step_pin,
+            "y_dir_pin": self.y_dir_pin,
+            "x_min_limit_pin": self.x_min_limit_pin,
+            "x_max_limit_pin": self.x_max_limit_pin,
+            "y_min_limit_pin": self.y_min_limit_pin,
+        }
+        _validate_distinct_pins(
+            assigned_pins,
+            "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
+        )
+        return self
+
+    def speeds_rpm(self) -> list[int]:
+        return [speed for speed in (self.speed_1_rpm, self.speed_2_rpm, self.speed_3_rpm, self.speed_4_rpm) if speed > 0]
+
+
+class GantryRepeatabilityTrial(BaseModel):
+    speed_rpm: int
+    trial: int
+    expected_steps: int
+    actual_steps: int
+    deviation_steps: int
+
+
+class GantryRepeatabilityLimitResult(BaseModel):
+    limit: str
+    trials: list[GantryRepeatabilityTrial] = Field(default_factory=list)
+    max_abs_deviation_steps: int = 0
+    mean_abs_deviation_steps: float = 0.0
+
+
+class GantryRepeatabilityTestResponse(BaseModel):
+    repeat_count: int
+    speeds_rpm: list[int]
+    steps_per_cm: float
+    results: list[GantryRepeatabilityLimitResult]
+    max_abs_deviation_steps: int
+    mode: str | None = None
+
+
 class ToolChangeRequest(BaseModel):
     tool_port: str | None = None
     action: ToolChangeAction = "get_tool"
@@ -484,7 +562,7 @@ class ToolChangeRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     z_left_min_limit_pin: int = Field(default=12, ge=0)
     z_left_max_limit_pin: int = Field(default=13, ge=0)
     z_right_min_limit_pin: int = Field(default=14, ge=0)
@@ -539,7 +617,7 @@ class GantryTestMotorRequest(BaseModel):
     x_min_limit_pin: int = Field(default=21, ge=0)
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
-    y_max_limit_pin: int = Field(default=25, ge=0)
+    y_max_limit_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
 

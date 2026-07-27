@@ -467,12 +467,22 @@ function isHardwareDeviceEnabled(hardwareMap: HardwareMap, device: HardwareDevic
   return true;
 }
 
-function getDisabledHardwareReason(block: WorkflowBlockDefinition, hardwareMap: HardwareMap | null): string | null {
+function getDisabledHardwareReason(
+  block: WorkflowBlockDefinition,
+  hardwareMap: HardwareMap | null,
+  availableBlocks: WorkflowBlockDefinition[] = [],
+): string | null {
   if (!hardwareMap) {
     return null;
   }
 
-  const dependencyDeviceIds = getHardwareDependencyDeviceIds(block);
+  // A placed or detached node can carry a stale embedded copy of the block
+  // definition (captured whenever it was added or last refreshed). This
+  // check gates whether a run is even allowed to start, so it must not rely
+  // on that possibly-stale copy for a blocking decision - prefer the
+  // currently-fetched catalog definition when one exists for this block id.
+  const freshBlock = availableBlocks.find((candidate) => candidate.id === block.id) ?? block;
+  const dependencyDeviceIds = getHardwareDependencyDeviceIds(freshBlock);
   for (const deviceId of dependencyDeviceIds) {
     const device = hardwareMap.devices.find((candidate) => candidate.id === deviceId);
     if (!device) {
@@ -978,6 +988,21 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [contextMenu, setContextMenu] = useState<WorkflowContextMenuState>(null);
   const [compoundCounter, setCompoundCounter] = useState(1);
   const [compoundBlocks, setCompoundBlocks] = useState<WorkflowBlockDefinition[]>([]);
+  // Declared here (rather than near its other derived-block siblings further
+  // down) because renderedNodes and other render-time code below reference
+  // availableBlocks synchronously in the same render pass - a const declared
+  // later in the same scope is not initialized yet at that point (temporal
+  // dead zone), which crashed the whole component with a ReferenceError.
+  const robotActionBlocks = useMemo(
+    () => discoveredFunctions.map((discoveredFunction) =>
+      mapDiscoveredFunctionToBlock(discoveredFunction, esp32Boards, hardwareMap),
+    ),
+    [discoveredFunctions, esp32Boards, hardwareMap],
+  );
+  const availableBlocks = useMemo(
+    () => [...builtInBlocks, ...robotActionBlocks, ...compoundBlocks],
+    [builtInBlocks, robotActionBlocks, compoundBlocks],
+  );
   const [editingCompoundNodeId, setEditingCompoundNodeId] = useState<string | null>(null);
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
@@ -1053,7 +1078,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   }
 
   const renderedNodes = nodes.map((node) => {
-    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap, availableBlocks);
     return {
       ...node,
       data: {
@@ -1265,16 +1290,6 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  const robotActionBlocks = useMemo(
-    () => discoveredFunctions.map((discoveredFunction) =>
-      mapDiscoveredFunctionToBlock(discoveredFunction, esp32Boards, hardwareMap),
-    ),
-    [discoveredFunctions, esp32Boards, hardwareMap],
-  );
-  const availableBlocks = useMemo(
-    () => [...builtInBlocks, ...robotActionBlocks, ...compoundBlocks],
-    [builtInBlocks, robotActionBlocks, compoundBlocks],
-  );
   const openedNode = nodes.find((node) => node.id === openedNodeId) ?? null;
   const editingCompoundNode = nodes.find((node) => node.id === editingCompoundNodeId) ?? null;
   const openedNodeTestState = openedNodeId
@@ -2294,7 +2309,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     blockResults: Record<string, Record<string, unknown> | null | undefined> = {},
     signal?: AbortSignal,
   ): Promise<FunctionTestResponse> {
-    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap, availableBlocks);
     if (disabledReason) {
       return {
         function_id: node.data.block.id,
@@ -2438,7 +2453,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       throw new Error(`Could not find node '${nodeId}' for execution.`);
     }
 
-    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap);
+    const disabledReason = getDisabledHardwareReason(node.data.block, hardwareMap, availableBlocks);
     if (disabledReason) {
       const disabledResult: FunctionTestResponse = {
         function_id: node.data.block.id,
@@ -2517,6 +2532,16 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
           error: result.error ?? null,
         },
       }));
+
+      if (result.ok) {
+        // A run can change server-side block defaults (e.g. calibration
+        // re-deriving the usable move range) or the manifest itself may have
+        // been fixed since this session loaded. Refresh the catalog so every
+        // already-placed block picks it up automatically - see the
+        // availableBlocks reconciliation effect, which re-syncs node.data.block
+        // and re-merges parameters whenever this list changes.
+        void loadFunctions();
+      }
 
       return result;
     } catch (error) {
@@ -2723,7 +2748,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     block: WorkflowBlockDefinition,
     boardIds: Set<string>,
   ) {
-    if (getDisabledHardwareReason(block, hardwareMap)) {
+    if (getDisabledHardwareReason(block, hardwareMap, availableBlocks)) {
       return;
     }
 
@@ -2854,7 +2879,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     blockId: string,
     itemsByKey: Map<string, Esp32WorkflowFirmwarePlanRequestItem>,
   ) {
-    if (getDisabledHardwareReason(block, hardwareMap)) {
+    if (getDisabledHardwareReason(block, hardwareMap, availableBlocks)) {
       return;
     }
 

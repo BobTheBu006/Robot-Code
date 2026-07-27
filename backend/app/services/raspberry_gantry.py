@@ -20,6 +20,9 @@ from app.models.gantry import (
     GANTRY_WORKSPACE_X_CM,
     GANTRY_WORKSPACE_Y_CM,
     GantryCircleXYRequest,
+    GantryRepeatabilityLimitResult,
+    GantryRepeatabilityTestRequest,
+    GantryRepeatabilityTrial,
     GantryXYCalibrationRequest,
     GantryXYMoveRequest,
 )
@@ -804,6 +807,203 @@ class RaspberryGantryGPIOService:
             "simulated": execution.simulated,
         }
 
+    def test_repeatability(self, context: dict, request: GantryRepeatabilityTestRequest) -> dict:
+        """Measure step-skipping by touring X-min/Y-min -> X-mid/Y-max ->
+        X-max/Y-min -> X-mid/Y-max repeatedly at each test speed.
+
+        X-min, X-max, and Y-min are real limit switches: every arrival there
+        is a genuine probe, comparing the calibrated distance that should
+        have been needed ("expected") against how many pulses it actually
+        took to trip the switch ("actual") - a real physical ground truth,
+        never an assumed position. X-mid and Y-max have no switch (this
+        machine only homes Y against Y-min), so those legs are ordinary
+        calibrated moves with nothing to compare against. A healthy motor
+        reproduces close to the same step count on every switch arrival; a
+        motor skipping steps shows growing or erratic deviation, especially
+        at higher speeds. Read-only - position is tracked as it moves, but
+        calibration itself is never touched.
+        """
+        self._raise_if_stopped()
+        if not self._calibrated:
+            raise RuntimeError("Gantry is not calibrated. Run Calibrate Gantry XY before testing repeatability.")
+
+        pins = self._pins_from_request(request, context)
+        execution = self._execution_mode()
+        speeds = request.speeds_rpm()
+        if not speeds:
+            raise RuntimeError("At least one test speed (speed_1_rpm) must be greater than 0.")
+
+        limit_results_by_name = {
+            name: GantryRepeatabilityLimitResult(limit=name) for name in ("x_min", "x_max", "y_min")
+        }
+
+        if execution.simulated:
+            for name, result in limit_results_by_name.items():
+                visits_per_cycle = 2 if name == "y_min" else 1
+                for speed in speeds:
+                    for cycle in range(request.repeat_count):
+                        for visit in range(visits_per_cycle):
+                            result.trials.append(GantryRepeatabilityTrial(
+                                speed_rpm=speed, trial=cycle * visits_per_cycle + visit + 1,
+                                expected_steps=0, actual_steps=0, deviation_steps=0,
+                            ))
+            return self._repeatability_result(context, request, execution, list(limit_results_by_name.values()))
+
+        gpio, _ = self._gpio_module()
+        if gpio is None:
+            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during repeatability test.")
+        with self._lock:
+            try:
+                self._setup_gpio(gpio, pins)
+            except Exception as exc:
+                execution = self._gpio_unavailable_execution(str(exc))
+                return self._repeatability_result(context, request, execution, list(limit_results_by_name.values()))
+            try:
+                steps_per_cm = self._effective_steps_per_cm()
+                steps_per_rotation = self._steps_per_rotation or 800
+                x_max_steps = round(self._x_track_length_cm * steps_per_cm)
+                x_mid_cm = max(0.0, (self._x_track_length_cm - 2.0 * self._limit_buffer_cm) / 2.0)
+                x_mid_steps = round((x_mid_cm + self._limit_buffer_cm) * steps_per_cm)
+                y_max_cm = max(0.0, self._y_track_length_cm - 2.0 * self._limit_buffer_cm)
+                y_max_steps = round((y_max_cm + self._limit_buffer_cm) * steps_per_cm)
+
+                # (x target steps, x limit pin or None, x limit name or None,
+                #  y target steps, y limit pin or None, y limit name or None)
+                waypoints = [
+                    (0, pins.x_min_limit_pin, "x_min", 0, pins.y_min_limit_pin, "y_min"),
+                    (x_mid_steps, None, None, y_max_steps, None, None),
+                    (x_max_steps, pins.x_max_limit_pin, "x_max", 0, pins.y_min_limit_pin, "y_min"),
+                    (x_mid_steps, None, None, y_max_steps, None, None),
+                ]
+
+                for speed in speeds:
+                    for _ in range(request.repeat_count):
+                        for x_target, x_pin, x_name, y_target, y_pin, y_name in waypoints:
+                            self._raise_if_stopped()
+                            x_probe = self._move_axis_to(
+                                gpio, pins, "x", x_target, speed, request.trapezoidal_speed,
+                                request.acceleration_rpm_per_s, steps_per_rotation, x_pin,
+                            )
+                            if x_probe is not None:
+                                self._record_repeatability_trial(limit_results_by_name, x_name, speed, x_probe)
+
+                            y_probe = self._move_axis_to(
+                                gpio, pins, "y", y_target, speed, request.trapezoidal_speed,
+                                request.acceleration_rpm_per_s, steps_per_rotation, y_pin,
+                            )
+                            if y_probe is not None:
+                                self._record_repeatability_trial(limit_results_by_name, y_name, speed, y_probe)
+                self._save_state()
+            finally:
+                self._cleanup_gpio(gpio, pins)
+
+        return self._repeatability_result(context, request, execution, list(limit_results_by_name.values()))
+
+    def _move_axis_to(
+        self,
+        gpio: Any,
+        pins: _GPIOPinPlan,
+        axis: str,
+        target_steps: int,
+        rpm: float,
+        trapezoidal: bool,
+        acceleration_rpm_per_s: float,
+        steps_per_rotation: int,
+        probe_pin: int | None,
+    ) -> tuple[int, int, bool] | None:
+        """Move one axis from the tracked position to target_steps.
+
+        With probe_pin, stops on that limit and returns (actual_steps,
+        expected_steps, tripped) - actual_steps is measured directly from
+        the pulses issued, never assumed. Without probe_pin, makes an
+        ordinary calibrated move (no limit checking) and returns None.
+        Position bookkeeping happens here so callers never touch it.
+        """
+        current = self._x_steps if axis == "x" else self._y_steps
+        delta = target_steps - current
+        expected = abs(delta)
+        direction = 1 if delta >= 0 else -1
+
+        def axis_delta() -> int:
+            if axis == "x":
+                return (self._last_a_steps + self._last_b_steps) // 2
+            return (self._last_a_steps - self._last_b_steps) // 2
+
+        def pulse(steps: int, stop_pin: int | None) -> bool:
+            a, b = (steps, steps) if axis == "x" else (steps, -steps)
+            return self._move_corexy_steps(
+                gpio, pins, a, b, rpm, stop_limit_pin=stop_pin,
+                steps_per_rotation=steps_per_rotation, trapezoidal=trapezoidal,
+                acceleration_rpm_per_s=acceleration_rpm_per_s,
+            )
+
+        if probe_pin is None:
+            pulse(delta, None)
+            actual = abs(axis_delta())
+            self._apply_axis_delta(axis, direction * actual)
+            return None
+
+        if expected == 0:
+            tripped = self._limit_active(gpio, probe_pin)
+            return (0, 0, tripped)
+
+        margin_steps = max(2 * steps_per_rotation, expected)
+        travel_budget = direction * (expected + margin_steps)
+        tripped = pulse(travel_budget, probe_pin)
+        actual = abs(axis_delta())
+        self._apply_axis_delta(axis, direction * actual)
+        return (actual, expected, tripped)
+
+    def _apply_axis_delta(self, axis: str, signed_steps: int) -> None:
+        if axis == "x":
+            self._x_steps += signed_steps
+        else:
+            self._y_steps += signed_steps
+
+    def _record_repeatability_trial(
+        self,
+        limit_results_by_name: dict[str, GantryRepeatabilityLimitResult],
+        limit_name: str,
+        speed: int,
+        probe: tuple[int, int, bool],
+    ) -> None:
+        actual, expected, tripped = probe
+        if not tripped:
+            raise RuntimeError(
+                f"{limit_name} limit switch was not hit within the safety margin during the repeatability test "
+                f"at {speed} RPM - deviation exceeds what the test allows for."
+            )
+        result = limit_results_by_name[limit_name]
+        deviation = actual - expected
+        result.trials.append(GantryRepeatabilityTrial(
+            speed_rpm=speed, trial=len(result.trials) + 1,
+            expected_steps=expected, actual_steps=actual, deviation_steps=deviation,
+        ))
+        result.max_abs_deviation_steps = max((abs(t.deviation_steps) for t in result.trials), default=0)
+        result.mean_abs_deviation_steps = (
+            sum(abs(t.deviation_steps) for t in result.trials) / len(result.trials)
+        )
+
+    def _repeatability_result(
+        self,
+        context: dict,
+        request: GantryRepeatabilityTestRequest,
+        execution: _GPIOExecution,
+        limit_results: list[GantryRepeatabilityLimitResult],
+    ) -> dict:
+        overall_max = max((r.max_abs_deviation_steps for r in limit_results), default=0)
+        return {
+            "status": execution.status,
+            "message": execution.message,
+            "repeat_count": request.repeat_count,
+            "speeds_rpm": request.speeds_rpm(),
+            "steps_per_cm": self._effective_steps_per_cm(),
+            "results": [result.model_dump() for result in limit_results],
+            "max_abs_deviation_steps": overall_max,
+            "mode": context.get("mode"),
+            "simulated": execution.simulated,
+        }
+
     def _assert_target_within_calibrated_workspace(self, request: GantryXYMoveRequest) -> None:
         if not self._calibrated:
             return
@@ -856,7 +1056,7 @@ class RaspberryGantryGPIOService:
 
     def _pins_from_request(
         self,
-        request: GantryXYMoveRequest | GantryXYCalibrationRequest,
+        request: GantryXYMoveRequest | GantryXYCalibrationRequest | GantryRepeatabilityTestRequest,
         context: dict | None = None,
     ) -> _GPIOPinPlan:
         # Only guard the Y-max end when that switch actually exists in the
@@ -1374,6 +1574,10 @@ def planned_circle_xy_result(context: dict, request: GantryCircleXYRequest) -> d
 
 def planned_test_motor_result(context: dict, request) -> dict:
     return raspberry_gantry_gpio_service.test_motor(context, request)
+
+
+def planned_test_repeatability_result(context: dict, request: GantryRepeatabilityTestRequest) -> dict:
+    return raspberry_gantry_gpio_service.test_repeatability(context, request)
 
 
 def emergency_stop_raspberry_gantry() -> dict[str, object]:
