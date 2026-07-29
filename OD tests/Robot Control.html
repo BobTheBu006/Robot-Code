@@ -1,0 +1,3719 @@
+<!DOCTYPE html>
+<!-- saved from url=(0022)http://localhost:5173/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <script type="module">import { injectIntoGlobalHook } from "/@react-refresh";
+injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;</script>
+
+    <script type="module" src="./Robot Control_files/client"></script>
+
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control</title>
+  <style type="text/css" data-vite-dev-id="/home/robot/robot control/Robot-Code/frontend/node_modules/@xyflow/react/dist/style.css">/* this gets exported as style.css and can be used for the default theming */
+/* these are the necessary styles for React/Svelte Flow, they get used by base.css and style.css */
+.react-flow {
+  direction: ltr;
+
+  --xy-edge-stroke-default: #b1b1b7;
+  --xy-edge-stroke-width-default: 1;
+  --xy-edge-stroke-selected-default: #555;
+
+  --xy-connectionline-stroke-default: #b1b1b7;
+  --xy-connectionline-stroke-width-default: 1;
+
+  --xy-attribution-background-color-default: rgba(255, 255, 255, 0.5);
+
+  --xy-minimap-background-color-default: #fff;
+  --xy-minimap-mask-background-color-default: rgba(240, 240, 240, 0.6);
+  --xy-minimap-mask-stroke-color-default: transparent;
+  --xy-minimap-mask-stroke-width-default: 1;
+  --xy-minimap-node-background-color-default: #e2e2e2;
+  --xy-minimap-node-stroke-color-default: transparent;
+  --xy-minimap-node-stroke-width-default: 2;
+
+  --xy-background-color-default: transparent;
+  --xy-background-pattern-dots-color-default: #91919a;
+  --xy-background-pattern-lines-color-default: #eee;
+  --xy-background-pattern-cross-color-default: #e2e2e2;
+  background-color: var(--xy-background-color, var(--xy-background-color-default));
+  --xy-node-color-default: inherit;
+  --xy-node-border-default: 1px solid #1a192b;
+  --xy-node-background-color-default: #fff;
+  --xy-node-group-background-color-default: rgba(240, 240, 240, 0.25);
+  --xy-node-boxshadow-hover-default: 0 1px 4px 1px rgba(0, 0, 0, 0.08);
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px #1a192b;
+  --xy-node-border-radius-default: 3px;
+
+  --xy-handle-background-color-default: #1a192b;
+  --xy-handle-border-color-default: #fff;
+
+  --xy-selection-background-color-default: rgba(0, 89, 220, 0.08);
+  --xy-selection-border-default: 1px dotted rgba(0, 89, 220, 0.8);
+
+  --xy-controls-button-background-color-default: #fefefe;
+  --xy-controls-button-background-color-hover-default: #f4f4f4;
+  --xy-controls-button-color-default: inherit;
+  --xy-controls-button-color-hover-default: inherit;
+  --xy-controls-button-border-color-default: #eee;
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+
+  --xy-edge-label-background-color-default: #ffffff;
+  --xy-edge-label-color-default: inherit;
+  --xy-resize-background-color-default: #3367d9;
+}
+.react-flow.dark {
+  --xy-edge-stroke-default: #3e3e3e;
+  --xy-edge-stroke-width-default: 1;
+  --xy-edge-stroke-selected-default: #727272;
+
+  --xy-connectionline-stroke-default: #b1b1b7;
+  --xy-connectionline-stroke-width-default: 1;
+
+  --xy-attribution-background-color-default: rgba(150, 150, 150, 0.25);
+
+  --xy-minimap-background-color-default: #141414;
+  --xy-minimap-mask-background-color-default: rgba(60, 60, 60, 0.6);
+  --xy-minimap-mask-stroke-color-default: transparent;
+  --xy-minimap-mask-stroke-width-default: 1;
+  --xy-minimap-node-background-color-default: #2b2b2b;
+  --xy-minimap-node-stroke-color-default: transparent;
+  --xy-minimap-node-stroke-width-default: 2;
+
+  --xy-background-color-default: #141414;
+  --xy-background-pattern-dots-color-default: #777;
+  --xy-background-pattern-lines-color-default: #777;
+  --xy-background-pattern-cross-color-default: #777;
+  --xy-node-color-default: #f8f8f8;
+  --xy-node-border-default: 1px solid #3c3c3c;
+  --xy-node-background-color-default: #1e1e1e;
+  --xy-node-group-background-color-default: rgba(240, 240, 240, 0.25);
+  --xy-node-boxshadow-hover-default: 0 1px 4px 1px rgba(255, 255, 255, 0.08);
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px #999;
+
+  --xy-handle-background-color-default: #bebebe;
+  --xy-handle-border-color-default: #1e1e1e;
+
+  --xy-selection-background-color-default: rgba(200, 200, 220, 0.08);
+  --xy-selection-border-default: 1px dotted rgba(200, 200, 220, 0.8);
+
+  --xy-controls-button-background-color-default: #2b2b2b;
+  --xy-controls-button-background-color-hover-default: #3e3e3e;
+  --xy-controls-button-color-default: #f8f8f8;
+  --xy-controls-button-color-hover-default: #fff;
+  --xy-controls-button-border-color-default: #5b5b5b;
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+
+  --xy-edge-label-background-color-default: #141414;
+  --xy-edge-label-color-default: #f8f8f8;
+}
+.react-flow__background {
+  background-color: var(--xy-background-color-props, var(--xy-background-color, var(--xy-background-color-default)));
+  pointer-events: none;
+  z-index: -1;
+}
+.react-flow__container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.react-flow__pane {
+  z-index: 1;
+}
+.react-flow__pane.draggable {
+    cursor: grab;
+  }
+.react-flow__pane.dragging {
+    cursor: grabbing;
+  }
+.react-flow__pane.selection {
+    cursor: pointer;
+  }
+.react-flow__viewport {
+  transform-origin: 0 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.react-flow__renderer {
+  z-index: 4;
+}
+.react-flow__selection {
+  z-index: 6;
+}
+.react-flow__nodesselection-rect:focus,
+.react-flow__nodesselection-rect:focus-visible {
+  outline: none;
+}
+.react-flow__edge-path {
+  stroke: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+  stroke-width: var(--xy-edge-stroke-width, var(--xy-edge-stroke-width-default));
+  fill: none;
+}
+.react-flow__connection-path {
+  stroke: var(--xy-connectionline-stroke, var(--xy-connectionline-stroke-default));
+  stroke-width: var(--xy-connectionline-stroke-width, var(--xy-connectionline-stroke-width-default));
+  fill: none;
+}
+.react-flow .react-flow__edges {
+  position: absolute;
+}
+.react-flow .react-flow__edges svg {
+    overflow: visible;
+    position: absolute;
+    pointer-events: none;
+  }
+.react-flow__edge {
+  pointer-events: visibleStroke;
+}
+.react-flow__edge.selectable {
+    cursor: pointer;
+  }
+.react-flow__edge.animated path {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
+.react-flow__edge.animated path.react-flow__edge-interaction {
+    stroke-dasharray: none;
+    animation: none;
+  }
+.react-flow__edge.inactive {
+    pointer-events: none;
+  }
+.react-flow__edge.selected,
+  .react-flow__edge:focus,
+  .react-flow__edge:focus-visible {
+    outline: none;
+  }
+.react-flow__edge.selected .react-flow__edge-path,
+  .react-flow__edge.selectable:focus .react-flow__edge-path,
+  .react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+    stroke: var(--xy-edge-stroke-selected, var(--xy-edge-stroke-selected-default));
+  }
+.react-flow__edge-textwrapper {
+    pointer-events: all;
+  }
+.react-flow__edge .react-flow__edge-text {
+    pointer-events: none;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+/* Arrowhead marker styles - use CSS custom properties as default */
+.react-flow__arrowhead polyline {
+  stroke: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+}
+.react-flow__arrowhead polyline.arrowclosed {
+  fill: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+}
+.react-flow__connection {
+  pointer-events: none;
+}
+.react-flow__connection .animated {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
+svg.react-flow__connectionline {
+  z-index: 1001;
+  overflow: visible;
+  position: absolute;
+}
+.react-flow__nodes {
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+.react-flow__node {
+  position: absolute;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  pointer-events: all;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  cursor: default;
+}
+.react-flow__node.selectable {
+    cursor: pointer;
+  }
+.react-flow__node.draggable {
+    cursor: grab;
+    pointer-events: all;
+  }
+.react-flow__node.draggable.dragging {
+      cursor: grabbing;
+    }
+.react-flow__nodesselection {
+  z-index: 3;
+  transform-origin: left top;
+  pointer-events: none;
+}
+.react-flow__nodesselection-rect {
+    position: absolute;
+    pointer-events: all;
+    cursor: grab;
+  }
+.react-flow__handle {
+  position: absolute;
+  pointer-events: none;
+  min-width: 5px;
+  min-height: 5px;
+  width: 6px;
+  height: 6px;
+  background-color: var(--xy-handle-background-color, var(--xy-handle-background-color-default));
+  border: 1px solid var(--xy-handle-border-color, var(--xy-handle-border-color-default));
+  border-radius: 100%;
+}
+.react-flow__handle.connectingfrom {
+    pointer-events: all;
+  }
+.react-flow__handle.connectionindicator {
+    pointer-events: all;
+    cursor: crosshair;
+  }
+.react-flow__handle-bottom {
+    top: auto;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 50%);
+  }
+.react-flow__handle-top {
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+.react-flow__handle-left {
+    top: 50%;
+    left: 0;
+    transform: translate(-50%, -50%);
+  }
+.react-flow__handle-right {
+    top: 50%;
+    right: 0;
+    transform: translate(50%, -50%);
+  }
+.react-flow__edgeupdater {
+  cursor: move;
+  pointer-events: all;
+}
+.react-flow__pane.selection .react-flow__panel {
+  pointer-events: none;
+}
+.react-flow__panel {
+  position: absolute;
+  z-index: 5;
+  margin: 15px;
+}
+.react-flow__panel.top {
+    top: 0;
+  }
+.react-flow__panel.bottom {
+    bottom: 0;
+  }
+.react-flow__panel.top.center, .react-flow__panel.bottom.center {
+      left: 50%;
+      transform: translateX(-15px) translateX(-50%);
+    }
+.react-flow__panel.left {
+    left: 0;
+  }
+.react-flow__panel.right {
+    right: 0;
+  }
+.react-flow__panel.left.center, .react-flow__panel.right.center {
+      top: 50%;
+      transform: translateY(-15px) translateY(-50%);
+    }
+.react-flow__attribution {
+  font-size: 10px;
+  background: var(--xy-attribution-background-color, var(--xy-attribution-background-color-default));
+  padding: 2px 3px;
+  margin: 0;
+}
+.react-flow__attribution a {
+    text-decoration: none;
+    color: #999;
+  }
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+.react-flow__edgelabel-renderer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  left: 0;
+  top: 0;
+}
+.react-flow__viewport-portal {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+.react-flow__minimap {
+  background: var(
+    --xy-minimap-background-color-props,
+    var(--xy-minimap-background-color, var(--xy-minimap-background-color-default))
+  );
+}
+.react-flow__minimap-svg {
+    display: block;
+  }
+.react-flow__minimap-mask {
+    fill: var(
+      --xy-minimap-mask-background-color-props,
+      var(--xy-minimap-mask-background-color, var(--xy-minimap-mask-background-color-default))
+    );
+    stroke: var(
+      --xy-minimap-mask-stroke-color-props,
+      var(--xy-minimap-mask-stroke-color, var(--xy-minimap-mask-stroke-color-default))
+    );
+    stroke-width: var(
+      --xy-minimap-mask-stroke-width-props,
+      var(--xy-minimap-mask-stroke-width, var(--xy-minimap-mask-stroke-width-default))
+    );
+  }
+.react-flow__minimap-node {
+    fill: var(
+      --xy-minimap-node-background-color-props,
+      var(--xy-minimap-node-background-color, var(--xy-minimap-node-background-color-default))
+    );
+    stroke: var(
+      --xy-minimap-node-stroke-color-props,
+      var(--xy-minimap-node-stroke-color, var(--xy-minimap-node-stroke-color-default))
+    );
+    stroke-width: var(
+      --xy-minimap-node-stroke-width-props,
+      var(--xy-minimap-node-stroke-width, var(--xy-minimap-node-stroke-width-default))
+    );
+  }
+.react-flow__background-pattern.dots {
+    fill: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-dots-color-default))
+    );
+  }
+.react-flow__background-pattern.lines {
+    stroke: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-lines-color-default))
+    );
+  }
+.react-flow__background-pattern.cross {
+    stroke: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-cross-color-default))
+    );
+  }
+.react-flow__controls {
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--xy-controls-box-shadow, var(--xy-controls-box-shadow-default));
+}
+.react-flow__controls.horizontal {
+    flex-direction: row;
+  }
+.react-flow__controls-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 26px;
+    width: 26px;
+    padding: 4px;
+    border: none;
+    background: var(--xy-controls-button-background-color, var(--xy-controls-button-background-color-default));
+    border-bottom: 1px solid
+      var(
+        --xy-controls-button-border-color-props,
+        var(--xy-controls-button-border-color, var(--xy-controls-button-border-color-default))
+      );
+    color: var(
+      --xy-controls-button-color-props,
+      var(--xy-controls-button-color, var(--xy-controls-button-color-default))
+    );
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+.react-flow__controls-button svg {
+      width: 100%;
+      max-width: 12px;
+      max-height: 12px;
+      fill: currentColor;
+    }
+.react-flow__edge.updating .react-flow__edge-path {
+      stroke: #777;
+    }
+.react-flow__edge-text {
+    font-size: 10px;
+  }
+.react-flow__node.selectable:focus,
+  .react-flow__node.selectable:focus-visible {
+    outline: none;
+  }
+.react-flow__node-input,
+.react-flow__node-default,
+.react-flow__node-output,
+.react-flow__node-group {
+  padding: 10px;
+  border-radius: var(--xy-node-border-radius, var(--xy-node-border-radius-default));
+  width: 150px;
+  font-size: 12px;
+  color: var(--xy-node-color, var(--xy-node-color-default));
+  text-align: center;
+  border: var(--xy-node-border, var(--xy-node-border-default));
+  background-color: var(--xy-node-background-color, var(--xy-node-background-color-default));
+}
+.react-flow__node-input.selectable:hover, .react-flow__node-default.selectable:hover, .react-flow__node-output.selectable:hover, .react-flow__node-group.selectable:hover {
+      box-shadow: var(--xy-node-boxshadow-hover, var(--xy-node-boxshadow-hover-default));
+    }
+.react-flow__node-input.selectable.selected,
+    .react-flow__node-input.selectable:focus,
+    .react-flow__node-input.selectable:focus-visible,
+    .react-flow__node-default.selectable.selected,
+    .react-flow__node-default.selectable:focus,
+    .react-flow__node-default.selectable:focus-visible,
+    .react-flow__node-output.selectable.selected,
+    .react-flow__node-output.selectable:focus,
+    .react-flow__node-output.selectable:focus-visible,
+    .react-flow__node-group.selectable.selected,
+    .react-flow__node-group.selectable:focus,
+    .react-flow__node-group.selectable:focus-visible {
+      box-shadow: var(--xy-node-boxshadow-selected, var(--xy-node-boxshadow-selected-default));
+    }
+.react-flow__node-group {
+  background-color: var(--xy-node-group-background-color, var(--xy-node-group-background-color-default));
+}
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  background: var(--xy-selection-background-color, var(--xy-selection-background-color-default));
+  border: var(--xy-selection-border, var(--xy-selection-border-default));
+}
+.react-flow__nodesselection-rect:focus,
+  .react-flow__nodesselection-rect:focus-visible,
+  .react-flow__selection:focus,
+  .react-flow__selection:focus-visible {
+    outline: none;
+  }
+.react-flow__controls-button:hover {
+      background: var(
+        --xy-controls-button-background-color-hover-props,
+        var(--xy-controls-button-background-color-hover, var(--xy-controls-button-background-color-hover-default))
+      );
+      color: var(
+        --xy-controls-button-color-hover-props,
+        var(--xy-controls-button-color-hover, var(--xy-controls-button-color-hover-default))
+      );
+    }
+.react-flow__controls-button:disabled {
+      pointer-events: none;
+    }
+.react-flow__controls-button:disabled svg {
+        fill-opacity: 0.4;
+      }
+.react-flow__controls-button:last-child {
+    border-bottom: none;
+  }
+.react-flow__controls.horizontal .react-flow__controls-button {
+    border-bottom: none;
+    border-right: 1px solid
+      var(
+        --xy-controls-button-border-color-props,
+        var(--xy-controls-button-border-color, var(--xy-controls-button-border-color-default))
+      );
+  }
+.react-flow__controls.horizontal .react-flow__controls-button:last-child {
+    border-right: none;
+  }
+.react-flow__resize-control {
+  position: absolute;
+}
+.react-flow__resize-control.left,
+.react-flow__resize-control.right {
+  cursor: ew-resize;
+}
+.react-flow__resize-control.top,
+.react-flow__resize-control.bottom {
+  cursor: ns-resize;
+}
+.react-flow__resize-control.top.left,
+.react-flow__resize-control.bottom.right {
+  cursor: nwse-resize;
+}
+.react-flow__resize-control.bottom.left,
+.react-flow__resize-control.top.right {
+  cursor: nesw-resize;
+}
+/* handle styles */
+.react-flow__resize-control.handle {
+  width: 5px;
+  height: 5px;
+  border: 1px solid #fff;
+  border-radius: 1px;
+  background-color: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+  translate: -50% -50%;
+}
+.react-flow__resize-control.handle.left {
+  left: 0;
+  top: 50%;
+}
+.react-flow__resize-control.handle.right {
+  left: 100%;
+  top: 50%;
+}
+.react-flow__resize-control.handle.top {
+  left: 50%;
+  top: 0;
+}
+.react-flow__resize-control.handle.bottom {
+  left: 50%;
+  top: 100%;
+}
+.react-flow__resize-control.handle.top.left {
+  left: 0;
+}
+.react-flow__resize-control.handle.bottom.left {
+  left: 0;
+}
+.react-flow__resize-control.handle.top.right {
+  left: 100%;
+}
+.react-flow__resize-control.handle.bottom.right {
+  left: 100%;
+}
+/* line styles */
+.react-flow__resize-control.line {
+  border-color: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+  border-width: 0;
+  border-style: solid;
+}
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right {
+  width: 1px;
+  transform: translate(-50%, 0);
+  top: 0;
+  height: 100%;
+}
+.react-flow__resize-control.line.left {
+  left: 0;
+  border-left-width: 1px;
+}
+.react-flow__resize-control.line.right {
+  left: 100%;
+  border-right-width: 1px;
+}
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom {
+  height: 1px;
+  transform: translate(0, -50%);
+  left: 0;
+  width: 100%;
+}
+.react-flow__resize-control.line.top {
+  top: 0;
+  border-top-width: 1px;
+}
+.react-flow__resize-control.line.bottom {
+  border-bottom-width: 1px;
+  top: 100%;
+}
+.react-flow__edge-textbg {
+  fill: var(--xy-edge-label-background-color, var(--xy-edge-label-background-color-default));
+}
+.react-flow__edge-text {
+  fill: var(--xy-edge-label-color, var(--xy-edge-label-color-default));
+}
+</style><style type="text/css" data-vite-dev-id="/home/robot/robot control/Robot-Code/frontend/src/styles.css">:root {
+  color-scheme: light;
+  font-family: "IBM Plex Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  background:
+    radial-gradient(circle at top, #fff8ef 0%, #f1f0ea 42%, #e3ece8 100%);
+  color: #17322a;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 0 12px 28px;
+}
+
+.app-shell--no-scroll {
+  height: 100vh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.app-shell__inner {
+  width: calc(100% - 24px);
+  margin: 0 auto;
+}
+
+.app-shell--no-scroll .app-shell__inner {
+  height: calc(100vh - 78px);
+  overflow: hidden;
+}
+
+/* Workflow page: let the canvas run edge-to-edge with no surrounding frame. */
+.app-shell--workflow .app-shell__inner {
+  width: 100%;
+  overflow: visible;
+}
+
+.app-shell--workflow .editor-workspace--workflow-page {
+  margin: 0 -12px;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  margin: 0 -12px 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(23, 50, 42, 0.1);
+  background: rgba(246, 249, 247, 0.94);
+  box-shadow: 0 10px 28px rgba(23, 50, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.app-header__inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  width: calc(100% - 24px);
+  margin: 0 auto;
+}
+
+.app-header__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-header__identity span,
+.app-header__status span {
+  color: #55766b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.app-header__identity strong {
+  overflow: hidden;
+  color: #17322a;
+  font-size: 1.1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: flex-start;
+  padding: 3px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.app-nav__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #47675c;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-nav__item:hover,
+.app-nav__item--active {
+  background: #17322a;
+  color: #ffffff;
+}
+
+.app-header__workflow-slot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-header__workflow-slot:empty {
+  display: none;
+}
+
+.app-header__workflow-slot .workflow-editor__actions {
+  justify-content: flex-end;
+}
+
+.app-header__workflow-slot .workflow-editor__action,
+.app-header__workflow-slot .workflow-editor__skip-flash {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.app-header__workflow-slot .toolbar-group--run {
+  gap: 10px;
+  padding: 0 8px;
+}
+
+.workflow-editor__action--saved {
+  border-color: rgba(31, 143, 74, 0.4) !important;
+  background: rgba(31, 143, 74, 0.14) !important;
+  color: #1f8f4a !important;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.workflow-error-banner {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  z-index: 12000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: min(680px, calc(100vw - 32px));
+  padding: 12px 14px 12px 18px;
+  border: 1px solid rgba(168, 7, 7, 0.28);
+  border-radius: 12px;
+  background: #fdecec;
+  color: #6d0707;
+  box-shadow: 0 18px 44px rgba(109, 7, 7, 0.24);
+  transform: translateX(-50%);
+  animation: workflow-error-banner-in 180ms ease;
+}
+
+.workflow-error-banner__message {
+  flex: 1 1 auto;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.workflow-error-banner__dismiss {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(168, 7, 7, 0.12);
+  color: #6d0707;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.workflow-error-banner__dismiss:hover {
+  background: rgba(168, 7, 7, 0.2);
+}
+
+@keyframes workflow-error-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.app-header__estop {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.emergency-stop {
+  min-width: 132px;
+  min-height: 58px;
+  border: 4px solid #6d0707;
+  border-radius: 8px;
+  background: #d10f0f;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(109, 7, 7, 0.28);
+  cursor: pointer;
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.emergency-stop:hover,
+.emergency-stop:focus-visible,
+.emergency-stop--active {
+  background: #a80707;
+  outline: 4px solid rgba(209, 15, 15, 0.22);
+}
+
+.app-header__estop span {
+  max-width: 180px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #6d0707;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.page-heading {
+  margin-bottom: 18px;
+  padding: 0 2px;
+}
+
+.page-heading h1 {
+  margin: 0;
+  font-size: 2.2rem;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 28px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 50px rgba(34, 69, 58, 0.08);
+}
+
+.hero h1,
+.panel h2,
+.subpanel h3 {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #4a6b61;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hero__description {
+  max-width: 640px;
+  margin: 12px 0 0;
+  color: #456157;
+}
+
+.hero__status {
+  min-width: 220px;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+}
+
+.hero__status small {
+  color: #55766b;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.overview-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.panel {
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 12px 30px rgba(34, 69, 58, 0.06);
+}
+
+.panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 22px 0;
+}
+
+.panel__header p {
+  margin: 8px 0 0;
+  color: #55766b;
+}
+
+.panel__body {
+  padding: 22px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.status-badge--online {
+  background: #dff6e8;
+  color: #17633b;
+}
+
+.status-badge--offline {
+  background: #fde8e8;
+  color: #932525;
+}
+
+.status-badge--neutral {
+  background: #ecf1ef;
+  color: #3f5b52;
+}
+
+.kv-grid,
+.position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.kv-grid__label {
+  display: block;
+  margin-bottom: 6px;
+  color: #55766b;
+  font-size: 0.9rem;
+}
+
+.robot-state {
+  display: grid;
+  gap: 18px;
+}
+
+.subpanel {
+  padding: 16px;
+  border-radius: 16px;
+  background: #f5f9f7;
+}
+
+.subpanel h3 {
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.sensor-list,
+.alarm-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sensor-list li,
+.alarm-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(23, 50, 42, 0.08);
+}
+
+.sensor-list li:last-child,
+.alarm-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.workflows-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.workflows-card__list {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workflows-card__list li {
+  border-bottom: 1px solid rgba(23, 50, 42, 0.08);
+}
+
+.workflows-card__list li:last-child {
+  border-bottom: 0;
+}
+
+.workflows-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflows-card__row:hover {
+  background: #f4f8f6;
+}
+
+.workflows-card__row--selected {
+  border-color: rgba(239, 139, 44, 0.5);
+  background: rgba(239, 139, 44, 0.1);
+}
+
+.workflows-card__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.workflows-card__name-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+}
+
+.workflows-card__name-row input:focus-visible {
+  border-color: #ef8b2c;
+  outline: 2px solid rgba(239, 139, 44, 0.25);
+}
+
+.workflows-card__list-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflows-card__active-tag {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #dff6e8;
+  color: #17633b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.placeholder-box {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 20px;
+  border: 1px dashed rgba(23, 50, 42, 0.18);
+  border-radius: 16px;
+  background: #f7fbf9;
+  color: #55766b;
+}
+
+.camera-feed {
+  display: grid;
+  gap: 14px;
+}
+
+.camera-feed__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.camera-feed__power {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(23, 50, 42, 0.18);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: #ffffff;
+  color: #17322a;
+  box-shadow: 0 1px 2px rgba(23, 50, 42, 0.06);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.camera-feed__power:hover:not(:disabled) {
+  border-color: rgba(23, 50, 42, 0.32);
+  background: #f7fbf9;
+}
+
+.camera-feed__power:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.camera-feed__power--on {
+  border-color: rgba(147, 37, 37, 0.28);
+  color: #932525;
+}
+
+.camera-feed__power--off {
+  border-color: rgba(23, 99, 59, 0.28);
+  color: #17633b;
+}
+
+.camera-feed__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff4f1 0%, #dfe9e5 100%);
+}
+
+.camera-feed__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #55766b;
+  font-size: 0.95rem;
+}
+
+.workflow-editor {
+  display: grid;
+  gap: 18px;
+}
+
+.editor-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* Higher specificity than the standalone .workflow-editor/.hardware-map
+   grid rules below, which would otherwise win on source order alone. */
+.editor-workspace.workflow-editor,
+.editor-workspace.hardware-map {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-workspace--map-page {
+  position: relative;
+  height: calc(100vh - 78px);
+  min-height: 680px;
+  overflow: hidden;
+}
+
+.editor-workspace--workflow-page {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-workspace__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(34, 69, 58, 0.05);
+}
+
+.editor-workspace__toolbar strong {
+  display: block;
+}
+
+.editor-workspace__toolbar p {
+  margin: 4px 0 0;
+  color: #55766b;
+}
+
+.editor-workspace__canvas-frame {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.editor-workspace--map-page.function-map-page {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.editor-workspace--map-page .function-map-page__surface {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.editor-workspace .workflow-editor__canvas-shell,
+.editor-workspace .hardware-map__canvas-shell {
+  height: calc(100vh - 110px);
+  min-height: 700px;
+}
+
+.editor-workspace--map-page .hardware-map__canvas-shell {
+  height: 100%;
+  min-height: 0;
+  border-radius: 12px;
+}
+
+.editor-workspace--workflow-page .workflow-editor__canvas-shell,
+.editor-workspace--workflow-page .workflow-editor__canvas {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.editor-drawer {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(540px, calc(100% - 16px));
+  min-height: 0;
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 12px;
+  background: rgba(251, 253, 252, 0.98);
+  box-shadow: 0 24px 64px rgba(23, 50, 42, 0.26);
+}
+
+.editor-drawer--workflow {
+  width: min(620px, calc(100% - 24px));
+}
+
+.editor-drawer__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(23, 50, 42, 0.08);
+}
+
+.editor-drawer__header span {
+  color: #55766b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.editor-drawer__header strong {
+  display: block;
+  color: #17322a;
+}
+
+.editor-drawer__close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: #edf4f1;
+  color: #17322a;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.editor-drawer__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 2px 0 0;
+}
+
+.editor-drawer .hardware-settings__header {
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.editor-drawer--hardware .hardware-settings__header span {
+  letter-spacing: 0;
+}
+
+.editor-drawer--hardware .hardware-settings__body {
+  gap: 14px;
+}
+
+.editor-drawer--hardware .hardware-settings__field,
+.editor-drawer--hardware .hardware-settings__check,
+.editor-drawer--hardware .hardware-settings__connection-row,
+.editor-drawer--hardware .hardware-settings__stat,
+.editor-drawer--hardware .hardware-settings__pin-header {
+  padding: 11px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.editor-drawer--hardware .hardware-settings__check {
+  width: 100%;
+}
+
+.editor-drawer--hardware .hardware-settings__field-grid {
+  gap: 10px;
+}
+
+.editor-drawer--hardware .hardware-settings input,
+.editor-drawer--hardware .hardware-settings select,
+.editor-drawer--hardware .hardware-settings textarea {
+  background: #f8fbfa;
+}
+
+.editor-drawer--hardware .hardware-settings__pin-list {
+  padding: 11px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.editor-drawer--hardware .hardware-settings__actions {
+  justify-content: flex-start;
+}
+
+.editor-drawer .workflow-palette {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.editor-drawer .workflow-palette__scroll {
+  display: grid;
+  gap: 14px;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.editor-drawer .workflow-palette__group {
+  min-width: 0;
+}
+
+.hardware-map {
+  display: grid;
+  gap: 16px;
+}
+
+.hardware-map__header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hardware-map__summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 16px;
+  background: #f4f8f6;
+}
+
+.hardware-map__summary strong,
+.hardware-map__summary span {
+  display: block;
+}
+
+.hardware-map__summary span,
+.hardware-map__save-message {
+  color: #55766b;
+}
+
+.function-hardware-map {
+  display: grid;
+  gap: 14px;
+  min-height: calc(100vh - 110px);
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(34, 69, 58, 0.06);
+}
+
+.editor-workspace--map-page .function-hardware-map {
+  height: auto;
+  min-height: 0;
+  border-radius: 12px;
+}
+
+.editor-workspace--map-page .function-map-page__surface .function-hardware-map {
+  align-content: start;
+}
+
+.function-hardware-map__header div,
+.function-hardware-map__function-title {
+  display: grid;
+  gap: 2px;
+}
+
+.function-hardware-map__header strong,
+.function-hardware-map__function-title strong {
+  color: #17322a;
+}
+
+.function-hardware-map__header span,
+.function-hardware-map__function-title span {
+  color: #60756f;
+  font-size: 0.82rem;
+}
+
+.function-hardware-map__groups {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
+.function-hardware-map__group {
+  position: relative;
+  display: block;
+}
+
+.function-hardware-map__group summary,
+.function-hardware-map__function summary {
+  display: grid;
+  grid-template-columns: 16px minmax(0, auto) auto;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #17322a;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.function-hardware-map__group summary::-webkit-details-marker,
+.function-hardware-map__function summary::-webkit-details-marker {
+  display: none;
+}
+
+.function-hardware-map__group summary:hover,
+.function-hardware-map__function summary:hover {
+  background: #eef5f2;
+}
+
+.function-hardware-map__group summary strong,
+.function-hardware-map__function summary strong {
+  overflow: hidden;
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.function-hardware-map__group summary small,
+.function-hardware-map__function summary small {
+  color: #60756f;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.function-hardware-map__tree-icon {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid #60756f;
+}
+
+.function-hardware-map__group[open] > summary .function-hardware-map__tree-icon,
+.function-hardware-map__function[open] > summary .function-hardware-map__tree-icon {
+  transform: rotate(90deg);
+}
+
+.function-hardware-map__empty {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f8f6;
+  color: #55766b;
+}
+
+.function-hardware-map__function {
+  position: relative;
+  display: block;
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(23, 50, 42, 0.14);
+}
+
+.function-hardware-map__assignments {
+  display: grid;
+  gap: 2px;
+  margin-left: 24px;
+  padding: 2px 0 6px 14px;
+  border-left: 1px solid rgba(23, 50, 42, 0.14);
+}
+
+.function-hardware-map__assignment {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(180px, 300px) minmax(240px, 360px);
+  gap: 8px;
+  align-items: center;
+  justify-content: start;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.function-hardware-map__assignment::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 17px;
+  width: 12px;
+  border-top: 1px solid rgba(23, 50, 42, 0.14);
+}
+
+.function-hardware-map__assignment:hover {
+  background: #f3f8f6;
+}
+
+.function-hardware-map__leaf {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.function-hardware-map__leaf-icon {
+  width: 10px;
+  height: 12px;
+  border: 1px solid #9eb6ae;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.function-hardware-map__leaf strong,
+.function-hardware-map__leaf small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.function-hardware-map__leaf strong {
+  color: #17322a;
+  font-size: 0.84rem;
+}
+
+.function-hardware-map__leaf small {
+  color: #60756f;
+  font-size: 0.76rem;
+}
+
+.function-hardware-map__assignment select {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 30px 5px 9px;
+  border: 1px solid rgba(23, 50, 42, 0.16);
+  border-radius: 6px;
+  background:
+    linear-gradient(45deg, transparent 50%, #47675c 50%) calc(100% - 15px) 13px / 5px 5px no-repeat,
+    linear-gradient(135deg, #47675c 50%, transparent 50%) calc(100% - 11px) 13px / 5px 5px no-repeat,
+    #ffffff;
+  color: #17322a;
+  font: inherit;
+  font-weight: 700;
+}
+
+.function-hardware-map__assignment select:focus {
+  border-color: rgba(14, 116, 144, 0.48);
+  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+  outline: none;
+}
+
+.function-map-page__surface {
+  width: 100%;
+  min-height: 0;
+}
+
+.editor-workspace--map-page > .error-text,
+.editor-workspace--map-page > .hardware-map__save-message {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 24px rgba(34, 69, 58, 0.1);
+}
+
+.hardware-map__flow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 500px;
+  gap: 16px;
+  align-items: start;
+}
+
+.hardware-map__canvas-shell {
+  position: relative;
+  width: 100%;
+  height: 930px;
+  min-height: 930px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: #f8fbfa;
+}
+
+.hardware-map__canvas-shell .react-flow__edge-path {
+  stroke: #6f8d84;
+  stroke-width: 2;
+}
+
+.hardware-map__canvas-shell .react-flow__edge-textbg {
+  fill: #f8fbfa;
+}
+
+.hardware-map__canvas-shell .react-flow__edge-text {
+  fill: #42645a;
+  font-weight: 700;
+}
+
+.hardware-flow-node {
+  --hardware-node-accent: #0e7490;
+  width: 210px;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-left: 5px solid var(--hardware-node-accent);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(34, 69, 58, 0.08);
+  color: #17322a;
+}
+
+.hardware-flow-node--selected {
+  border-color: rgba(14, 116, 144, 0.35);
+  box-shadow: 0 16px 34px rgba(14, 116, 144, 0.16);
+}
+
+.hardware-flow-node--group {
+  border: 1px dashed rgba(109, 91, 208, 0.38);
+  border-left: 5px solid var(--hardware-node-accent);
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(34, 69, 58, 0.08);
+}
+
+.hardware-flow-node--group.hardware-flow-node--selected {
+  background: rgba(109, 91, 208, 0.08);
+  box-shadow: 0 16px 34px rgba(109, 91, 208, 0.16);
+}
+
+.hardware-flow-node--disabled {
+  opacity: 0.55;
+  filter: saturate(0.65);
+  background: #f3f4f6;
+}
+
+.hardware-flow-node__type {
+  color: var(--hardware-node-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hardware-flow-node strong,
+.hardware-flow-node span,
+.hardware-flow-node small,
+.hardware-flow-node em {
+  display: block;
+}
+
+.hardware-flow-node span,
+.hardware-flow-node small {
+  color: #55766b;
+}
+
+.hardware-flow-node em {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf4f1;
+  color: #42645a;
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.hardware-context-menu {
+  position: fixed;
+  z-index: 45;
+  display: grid;
+  gap: 4px;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(23, 50, 42, 0.18);
+}
+
+.hardware-context-menu button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #17322a;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hardware-context-menu button:hover {
+  background: #f4f8f6;
+}
+
+.hardware-flow-node__handle {
+  width: 10px;
+  height: 10px;
+  border-color: #ffffff;
+  background: var(--hardware-node-accent);
+}
+
+.hardware-settings {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.hardware-settings__header {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(23, 50, 42, 0.08);
+}
+
+.hardware-settings__header span {
+  color: #4a6b61;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hardware-settings__body {
+  display: grid;
+  gap: 12px;
+}
+
+.hardware-settings__field,
+.hardware-map label {
+  display: grid;
+  gap: 6px;
+}
+
+.hardware-settings__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: #17322a;
+  font-weight: 800;
+}
+
+.hardware-settings__check input {
+  width: auto;
+}
+
+.hardware-settings__field span,
+.hardware-map small {
+  color: #55766b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hardware-settings input,
+.hardware-settings select,
+.hardware-settings textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 8px;
+  background: #fbfdfc;
+  color: #17322a;
+  font: inherit;
+}
+
+.hardware-settings textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.hardware-settings__field-grid,
+.hardware-settings__pin {
+  display: grid;
+  gap: 8px;
+}
+
+.hardware-settings__pin-signal {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 8px;
+  background: #f4f8f6;
+  color: #17322a;
+  font-weight: 700;
+}
+
+.hardware-settings__field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hardware-settings__connection-row,
+.hardware-settings__actions,
+.hardware-settings__pin-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.hardware-settings__pin-header p {
+  margin: 4px 0 0;
+  color: #55766b;
+  font-size: 0.86rem;
+}
+
+.hardware-settings__connection-row,
+.hardware-settings__stat {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f8f6;
+}
+
+.hardware-settings__group-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hardware-settings__connection-row span,
+.hardware-settings__stat span {
+  color: #55766b;
+}
+
+.hardware-settings__pin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.hardware-settings__pin,
+.hardware-settings__pin-labels {
+  grid-template-columns: minmax(90px, 0.8fr) minmax(70px, 0.5fr) minmax(120px, 1fr) auto;
+}
+
+.hardware-settings__pin-labels {
+  display: grid;
+  gap: 8px;
+  padding: 0 2px;
+  color: #55766b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hardware-map__small-button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 8px;
+  background: #f4f8f6;
+  color: #17322a;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.workflow-editor__toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 247, 234, 0.9), rgba(244, 250, 247, 0.88));
+}
+
+.workflow-editor__toolbar strong,
+.workflow-palette__header h3 {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.workflow-editor__toolbar p,
+.workflow-palette__header p {
+  margin: 0;
+  color: #55766b;
+}
+
+.workflow-editor__run-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.workflow-editor__run-stats span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #17322a;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.workflow-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(23, 50, 42, 0.1);
+}
+
+.toolbar-group:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.toolbar-group--run {
+  padding: 5px 12px 5px 14px;
+  border-radius: 999px;
+  background: rgba(239, 139, 44, 0.07);
+}
+
+.toolbar-group__count {
+  display: inline-flex;
+  margin-left: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(23, 50, 42, 0.08);
+  color: #3f5b52;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.toolbar-unsaved-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border-radius: 999px;
+  background: #ef8b2c;
+  vertical-align: middle;
+}
+
+.toolbar-unsaved-dot--on-primary {
+  background: #ffffff;
+}
+
+.workflow-editor__action--ghost {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #47675c;
+}
+
+.workflow-editor__action--ghost:hover {
+  border-color: rgba(23, 50, 42, 0.12);
+  background: #f4f8f6;
+  box-shadow: none;
+  transform: none;
+}
+
+.workflow-editor__skip-flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: #47675c;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.workflow-editor__skip-flash input {
+  width: 16px;
+  height: 16px;
+  accent-color: #ef8b2c;
+}
+
+.workflow-editor__action,
+.workflow-palette__item {
+  font: inherit;
+}
+
+.workflow-editor__action {
+  padding: 10px 14px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #17322a;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.workflow-editor__action:hover,
+.workflow-palette__item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(35, 58, 49, 0.08);
+}
+
+.workflow-editor__action--primary {
+  border-color: #ef8b2c;
+  background: #ef8b2c;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(239, 139, 44, 0.24);
+}
+
+.workflow-editor__action--primary:hover {
+  box-shadow: 0 12px 26px rgba(239, 139, 44, 0.3);
+}
+
+.workflow-editor__action--danger {
+  border-color: #d6453b;
+  background: #d6453b;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(214, 69, 59, 0.24);
+}
+
+.workflow-editor__action--danger:hover {
+  box-shadow: 0 12px 26px rgba(214, 69, 59, 0.3);
+}
+
+.workflow-editor__action--danger:disabled {
+  border-color: rgba(23, 50, 42, 0.12);
+  background: #ffffff;
+  color: #17322a;
+  box-shadow: none;
+}
+
+.workflow-editor__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.workflow-editor__surface {
+  display: block;
+  min-height: 0;
+}
+
+.workflow-editor__save-as {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  padding: 14px 18px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(34, 69, 58, 0.05);
+}
+
+.workflow-editor__save-field {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.workflow-editor__save-field span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #47675c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.workflow-editor__save-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.workflow-palette {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.workflow-palette__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.workflow-palette__toggle {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-palette__toggle:hover {
+  box-shadow: 0 8px 18px rgba(35, 58, 49, 0.08);
+}
+
+.workflow-palette__toggle:disabled {
+  cursor: default;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.workflow-palette__scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.workflow-palette__group {
+  display: grid;
+  gap: 10px;
+  min-width: 250px;
+  align-content: start;
+}
+
+.workflow-palette__group h4,
+.workflow-palette__issues h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #47675c;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.workflow-palette__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workflow-palette__item-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-palette__item {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 50, 42, 0.09);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff, #f4f8f6);
+  text-align: left;
+  cursor: grab;
+}
+
+.workflow-palette__item--hidden {
+  border-style: dashed;
+  background: #ffffff;
+}
+
+.workflow-palette__item--selectable {
+  cursor: pointer;
+}
+
+.workflow-palette__item--selectable:hover {
+  border-color: rgba(239, 139, 44, 0.5);
+  box-shadow: 0 10px 22px rgba(239, 139, 44, 0.16);
+}
+
+.workflow-palette__item-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.workflow-palette__delete {
+  padding: 6px 10px;
+  border: 1px solid rgba(150, 39, 39, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 244, 244, 0.96);
+  color: #932525;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-palette__delete:hover {
+  background: #fff0f0;
+  box-shadow: 0 8px 18px rgba(147, 37, 37, 0.12);
+}
+
+.workflow-palette__hide {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 7px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #47675c;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-palette__hide:hover {
+  background: #f4f8f6;
+  box-shadow: 0 8px 18px rgba(35, 58, 49, 0.08);
+}
+
+.workflow-palette__hide--unhide {
+  border-color: rgba(239, 139, 44, 0.32);
+  color: #9a5716;
+}
+
+.workflow-palette__item strong {
+  padding-right: 62px;
+  font-size: 0.98rem;
+}
+
+.workflow-palette__item span {
+  color: #55766b;
+  font-size: 0.84rem;
+  line-height: 1.25;
+}
+
+.workflow-palette__issues {
+  padding: 14px;
+  border-radius: 16px;
+  background: #fff4e9;
+}
+
+.workflow-palette__empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f4f8f6;
+  color: #55766b;
+}
+
+.workflow-palette__issues ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #7f4a1b;
+}
+
+.workflow-editor__canvas {
+  height: 810px;
+  min-height: 810px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(255, 225, 180, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(248, 251, 249, 0.98), rgba(237, 244, 240, 0.98));
+}
+
+.workflow-editor__canvas-shell {
+  position: relative;
+  min-height: 810px;
+}
+
+.workflow-canvas-add {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 50%;
+  background: #17322a;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 10px 24px rgba(23, 50, 42, 0.22);
+}
+
+.workflow-canvas-add:hover {
+  background: #24493d;
+}
+
+.workflow-palette__search {
+  margin-bottom: 10px;
+}
+
+.workflow-palette__search input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+}
+
+.workflow-palette__search input:focus-visible {
+  border-color: #ef8b2c;
+  outline: 2px solid rgba(239, 139, 44, 0.25);
+}
+
+.workflow-editor__stats {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 18px rgba(34, 69, 58, 0.08);
+  color: #3f5b52;
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.workflow-editor__stats span + span {
+  padding-left: 10px;
+  border-left: 1px solid rgba(23, 50, 42, 0.14);
+}
+
+.workflow-context-menu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid rgba(23, 50, 42, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(23, 50, 42, 0.18);
+}
+
+.workflow-context-menu button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #17322a;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflow-context-menu button:hover {
+  background: #f4f8f6;
+}
+
+.workflow-compound-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  padding: 28px;
+  background: rgba(11, 28, 23, 0.5);
+}
+
+.workflow-compound-editor__shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  height: 100%;
+  padding: 18px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 20px;
+  background: #f8fbf9;
+  box-shadow: 0 24px 80px rgba(11, 28, 23, 0.28);
+}
+
+.workflow-compound-editor__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.workflow-compound-editor__header span {
+  display: block;
+  color: #55766b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-compound-editor__header strong {
+  font-size: 1.15rem;
+}
+
+.workflow-compound-editor__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.workflow-compound-editor__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 16px;
+  min-height: 0;
+}
+
+.workflow-compound-editor__canvas {
+  position: relative;
+  min-height: 0;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(109, 91, 208, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(248, 251, 249, 0.98), rgba(237, 244, 240, 0.98));
+}
+
+.workflow-compound-editor__panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid rgba(23, 50, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.workflow-compound-editor__panel h4 {
+  margin: 0 0 6px;
+  color: #17322a;
+}
+
+.workflow-compound-editor__panel p,
+.workflow-compound-editor__empty {
+  margin: 0;
+  color: #55766b;
+  font-size: 0.9rem;
+}
+
+.workflow-compound-editor__output-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.workflow-compound-editor__output-list span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef1ff;
+  color: #463b9b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.workflow-compound-editor__fields {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-compound-editor__field {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-compound-editor__field span {
+  color: #47675c;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workflow-compound-editor__field input,
+.workflow-compound-editor__field select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+}
+
+.workflow-editor__canvas .react-flow__controls,
+.workflow-editor__canvas .react-flow__minimap {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(23, 50, 42, 0.12);
+}
+
+.workflow-edge__actions {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  pointer-events: all;
+}
+
+.workflow-edge__delete,
+.workflow-edge__insert {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(31, 18, 18, 0.18);
+}
+
+.workflow-edge__delete {
+  background: #932525;
+  color: #ffffff;
+}
+
+.workflow-edge__insert {
+  background: #17633b;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(23, 99, 59, 0.24);
+}
+
+.workflow-node {
+  position: relative;
+  width: 210px;
+  min-height: 76px;
+  padding: 10px 14px 8px 12px;
+  border: 1px solid rgba(23, 50, 42, 0.1);
+  border-left: 5px solid var(--workflow-node-accent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 246, 0.98));
+  box-shadow: 0 8px 20px rgba(33, 53, 46, 0.08);
+  transition: box-shadow 140ms ease;
+  overflow: visible;
+}
+
+.workflow-node--selected {
+  box-shadow: 0 16px 42px rgba(33, 53, 46, 0.16);
+}
+
+.workflow-node--running {
+  box-shadow:
+    0 0 0 3px rgba(14, 116, 144, 0.3),
+    0 16px 42px rgba(14, 116, 144, 0.18);
+  animation: workflow-node-running-pulse 1.4s ease-in-out infinite;
+}
+
+.workflow-node--error {
+  box-shadow:
+    0 0 0 3px rgba(147, 37, 37, 0.24),
+    0 16px 42px rgba(147, 37, 37, 0.16);
+}
+
+.workflow-node--broken {
+  background: linear-gradient(180deg, rgba(255, 250, 250, 0.98), rgba(255, 238, 236, 0.98));
+  border-color: rgba(180, 35, 24, 0.24);
+}
+
+.workflow-node--inactive {
+  opacity: 0.58;
+  filter: saturate(0.7);
+}
+
+.workflow-node__disabled-reason {
+  margin: 8px 0 0;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.workflow-node__actions {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 26px rgba(33, 53, 46, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.workflow-node:hover .workflow-node__actions,
+.workflow-node--selected .workflow-node__actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.workflow-node__action {
+  border: 0;
+  border-radius: 999px;
+  background: #eff5f1;
+  color: #17322a;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px 9px;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.workflow-node__action:hover {
+  background: #17322a;
+  color: #ffffff;
+}
+
+.workflow-node__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.workflow-node__header {
+  display: grid;
+  gap: 2px;
+}
+
+.workflow-node__kind {
+  color: var(--workflow-node-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-node__header strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.15;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.workflow-node__header p,
+.workflow-node__empty {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #55766b;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.workflow-node__ports {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.workflow-node__port {
+  position: absolute;
+  right: -4px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.workflow-node__port-label {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  z-index: 6;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(23, 50, 42, 0.92);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(6px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.workflow-node__port:hover .workflow-node__port-label {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.workflow-node__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #ffffff;
+  background: var(--workflow-node-accent);
+}
+
+.workflow-node__quick-add {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  z-index: 7;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1.5px dashed var(--workflow-node-accent);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--workflow-node-accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.workflow-node:hover .workflow-node__quick-add,
+.workflow-node--selected .workflow-node__quick-add {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.workflow-node__quick-add:hover {
+  background: var(--workflow-node-accent);
+  color: #ffffff;
+  border-style: solid;
+}
+
+.workflow-node__execution {
+  margin-top: 6px;
+}
+
+.workflow-node__execution span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.1);
+  color: #0e7490;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+@keyframes workflow-node-running-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(14, 116, 144, 0.22),
+      0 16px 42px rgba(14, 116, 144, 0.16);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(14, 116, 144, 0.12),
+      0 16px 42px rgba(14, 116, 144, 0.22);
+  }
+}
+
+.workflow-overlay__field input,
+.workflow-overlay__field select,
+.workflow-overlay__expression-preview {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #17322a;
+}
+
+.workflow-overlay__expression-preview {
+  background: rgba(242, 245, 251, 0.98);
+  color: #31404d;
+}
+
+.workflow-overlay__input-range {
+  margin: 2px 0 0;
+  color: #8a97b0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.workflow-overlay__field textarea.workflow-overlay__expression-preview {
+  resize: vertical;
+  min-height: 56px;
+  font: inherit;
+  line-height: 1.4;
+}
+
+.workflow-overlay__field input[type="checkbox"] {
+  width: auto;
+  justify-self: start;
+  transform: scale(1.15);
+}
+
+.workflow-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #1c1a22;
+}
+
+.workflow-overlay__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 2px 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f4f0f8;
+}
+
+.workflow-overlay__title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workflow-overlay__node-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+.workflow-overlay__topbar {
+  display: grid;
+  grid-template-columns: minmax(280px, 31%) minmax(0, 38%) minmax(280px, 31%);
+  gap: 12px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.workflow-overlay__topbar-side,
+.workflow-overlay__topbar-center {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+}
+
+.workflow-overlay__topbar-side {
+  padding: 0 6px;
+}
+
+.workflow-overlay__topbar-side span {
+  color: #d5cde0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.workflow-overlay__topbar-center {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 10px;
+}
+
+.workflow-overlay__topbar-side--right {
+  justify-content: space-between;
+}
+
+.workflow-overlay__title {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.workflow-overlay__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Reads as the plain title until hovered/focused, then shows as a text field. */
+.workflow-overlay__name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.workflow-overlay__name-input:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.workflow-overlay__name-input:focus-visible {
+  border-color: rgba(239, 139, 44, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.workflow-overlay__layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 31%) minmax(0, 38%) minmax(280px, 31%);
+  gap: 12px;
+  align-items: stretch;
+  justify-content: center;
+  height: 100%;
+}
+
+.workflow-overlay__panel,
+.workflow-overlay__editor {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 18px 48px rgba(10, 7, 16, 0.24);
+}
+
+.workflow-overlay__panel:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.workflow-overlay__editor {
+  border-radius: 0;
+}
+
+.workflow-overlay__panel:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.workflow-overlay__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  position: relative;
+  padding: 14px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: visible;
+  background: rgba(27, 25, 35, 0.95);
+  color: #f0eef5;
+}
+
+.workflow-overlay__editor {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  position: relative;
+  min-height: 0;
+  background: linear-gradient(180deg, rgba(69, 68, 76, 0.98), rgba(61, 60, 68, 0.98));
+  color: #f4f0f8;
+  overflow: hidden;
+}
+
+.workflow-overlay__close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.workflow-overlay__section {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.workflow-overlay__section--stretch {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.workflow-overlay__list {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-overlay__list-item {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-overlay__list-item strong,
+.workflow-overlay__list-item span,
+.workflow-overlay__list-item p {
+  margin: 0;
+}
+
+.workflow-overlay__list-item span {
+  color: #c5b5ff;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.83rem;
+}
+
+.workflow-overlay__list-item p,
+.workflow-overlay__empty-text {
+  color: #cbc7d1;
+  font-size: 0.9rem;
+}
+
+.workflow-overlay__eyebrow {
+  display: inline-block;
+  margin-bottom: 0;
+  color: #f59d52;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-overlay__nav {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(34, 31, 43, 0.9);
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(10, 7, 16, 0.28);
+  z-index: 20;
+  transform: translateY(-50%);
+}
+
+.workflow-overlay__nav--prev {
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.workflow-overlay__nav--next {
+  right: 0;
+  transform: translate(50%, -50%);
+}
+
+.workflow-overlay__nav-arrow {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.workflow-overlay__run {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #ff7c66;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-overlay__run--cancel {
+  background: #ef5b5b;
+}
+
+.workflow-overlay__tabs {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.workflow-overlay__tab {
+  padding: 6px 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #d4d0da;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workflow-overlay__tab--active {
+  color: #ff8a75;
+  border-bottom-color: #ff8a75;
+}
+
+.workflow-overlay__editor-body {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 14px;
+  padding: 16px 24px 24px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.workflow-overlay__empty-state {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.workflow-overlay__fields {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-node__repair {
+  color: #932525;
+  font-weight: 700;
+}
+
+.workflow-overlay__hardware-links {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-overlay__hardware-links strong {
+  color: #fff4ef;
+  font-size: 0.88rem;
+}
+
+.workflow-overlay__hardware-links div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-overlay__hardware-links span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #efe8f6;
+  font-size: 0.82rem;
+}
+
+.workflow-overlay__hardware-links small {
+  color: #c5b5ff;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.workflow-overlay__advanced {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-overlay__advanced-toggle,
+.workflow-overlay__save-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #efe8f6;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workflow-overlay__advanced-body,
+.workflow-overlay__custom-block {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-overlay__save-block {
+  justify-content: center;
+  background: rgba(255, 138, 117, 0.18);
+  border-color: rgba(255, 138, 117, 0.34);
+  color: #fff4ef;
+}
+
+.workflow-overlay__save-block:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.workflow-overlay__success-text {
+  margin: 0;
+  color: #b8f0c8;
+  font-size: 0.88rem;
+}
+
+.workflow-overlay__field {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-overlay__field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.workflow-overlay__field-meta small {
+  color: #d4d0da;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.workflow-overlay__field p {
+  margin: 0;
+  color: #cbc7d1;
+  font-size: 0.88rem;
+}
+
+.workflow-overlay__settings {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-overlay__missing-reference {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 124, 102, 0.32);
+  border-radius: 14px;
+  background: rgba(255, 124, 102, 0.12);
+}
+
+.workflow-overlay__missing-reference strong {
+  color: #fff0eb;
+}
+
+.workflow-overlay__missing-reference p {
+  margin: 0;
+  color: #ffd7cf;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.workflow-overlay__input-switches {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.workflow-overlay__input-switch {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d7d3df;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workflow-overlay__input-switch--active {
+  border-color: rgba(255, 138, 117, 0.42);
+  background: rgba(255, 138, 117, 0.16);
+  color: #fff0eb;
+}
+
+.workflow-overlay__token-list {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.workflow-overlay__token {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f0f8;
+  text-align: left;
+  font: inherit;
+  cursor: grab;
+}
+
+.workflow-overlay__token strong,
+.workflow-overlay__token span {
+  margin: 0;
+}
+
+.workflow-overlay__token span {
+  color: #c5b5ff;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-overlay__all-blocks {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.workflow-overlay__all-block {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.workflow-overlay__all-block-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.workflow-overlay__all-block-header span {
+  color: #c5b5ff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.workflow-overlay__setting-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-overlay__setting-row span {
+  color: #cbc7d1;
+}
+
+.workflow-overlay__result {
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(7, 10, 19, 0.85);
+  color: #c7f0d5;
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.workflow-overlay__result--input {
+  max-height: 320px;
+}
+
+.workflow-overlay__copyable-result {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-overlay__result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workflow-overlay__result-header strong {
+  color: #d7d3df;
+  font-size: 0.83rem;
+  letter-spacing: 0.03em;
+}
+
+.workflow-overlay__copy-button {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f4f0f8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.muted-text {
+  color: #55766b;
+}
+
+.error-text {
+  color: #932525;
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    padding: 0 12px 36px;
+  }
+
+  .app-header {
+    margin: 0 -12px 18px;
+    padding: 10px 12px;
+  }
+
+  .app-header__inner {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .app-nav {
+    justify-content: stretch;
+    border-radius: 16px;
+  }
+
+  .app-nav__item {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .app-header__estop {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .app-header__workflow-slot {
+    justify-content: flex-start;
+  }
+
+  .app-header__workflow-slot .workflow-editor__actions {
+    justify-content: flex-start;
+  }
+
+  .editor-workspace__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editor-workspace .workflow-editor__canvas-shell,
+  .editor-workspace .hardware-map__canvas-shell {
+    height: calc(100vh - 260px);
+    min-height: 560px;
+  }
+
+  .editor-drawer {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+
+  .hero__status {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .overview-grid,
+  .kv-grid,
+  .position-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-editor__toolbar {
+    flex-direction: column;
+  }
+
+  .hardware-map__flow-layout,
+  .function-hardware-map__assignment,
+  .hardware-settings__field-grid,
+  .hardware-settings__pin,
+  .hardware-settings__pin-labels {
+    grid-template-columns: 1fr;
+  }
+
+  .hardware-map__canvas-shell {
+    height: 840px;
+    min-height: 840px;
+  }
+
+  .editor-workspace--map-page {
+    height: calc(100vh - 170px);
+    min-height: 560px;
+  }
+
+  .editor-workspace--map-page .hardware-map__canvas-shell {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .workflow-editor__canvas {
+    height: 630px;
+    min-height: 630px;
+  }
+
+  .workflow-overlay {
+    inset: 8px;
+    padding: 14px;
+    overflow: auto;
+  }
+
+  .workflow-overlay__layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .workflow-overlay__panel {
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .workflow-overlay__nav {
+    position: static;
+    margin: 0 24px;
+    justify-content: center;
+  }
+}
+</style></head>
+  <body>
+    <div id="root"><main class="app-shell app-shell--no-scroll"><header class="app-header"><div class="app-header__inner"><nav aria-label="Primary pages" class="app-nav"><button class="app-nav__item" type="button">Dashboard</button><button class="app-nav__item" type="button">Workflow Editor</button><button class="app-nav__item" type="button">Function Map</button><button class="app-nav__item app-nav__item--active" type="button" aria-current="page">Hardware Map</button></nav><div class="app-header__workflow-slot"><div class="workflow-editor__actions"><div class="toolbar-group"><button class="workflow-editor__action workflow-editor__action--primary" type="button" title="You have unsaved changes">Save map<span class="toolbar-unsaved-dot toolbar-unsaved-dot--on-primary"></span></button></div></div></div><div class="app-header__estop"><button class="emergency-stop" type="button">E-STOP</button></div></div></header><div class="app-shell__inner"><div style="display: contents;"><section class="editor-workspace editor-workspace--map-page hardware-map"><div class="editor-workspace__canvas-frame"><div class="hardware-map__canvas-shell"><div data-testid="rf__wrapper" class="react-flow light" role="application" style="width: 100%; height: 100%; overflow: hidden; position: relative; z-index: 0;"><div class="react-flow__renderer" style="position: absolute; width: 100%; height: 100%; top: 0px; left: 0px;"><div class="react-flow__pane selection" style="position: absolute; width: 100%; height: 100%; top: 0px; left: 0px;"><div class="react-flow__viewport xyflow__viewport react-flow__container" style="transform: translate(306.188px, 104.934px) scale(0.5);"><div class="react-flow__edges"><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-controller-x83xnc-1" data-testid="rf__edge-edge-raspberry-pi-controller-x83xnc-1" aria-label="Edge from raspberry-pi to controller-x83xnc" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L 270,270.234375Q 275,270.234375 275,275.234375L 275,772.9046875Q 275,777.9046875 270,777.9046875L 12.410000000000025,777.9046875Q 7.410000000000025,777.9046875 7.410000000000025,782.9046875L 7.410000000000025,1280.575Q 7.410000000000025,1285.575 12.410000000000025,1285.575L27.410000000000025 1285.575" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L 270,270.234375Q 275,270.234375 275,275.234375L 275,772.9046875Q 275,777.9046875 270,777.9046875L 12.410000000000025,777.9046875Q 7.410000000000025,777.9046875 7.410000000000025,782.9046875L 7.410000000000025,1280.575Q 7.410000000000025,1285.575 12.410000000000025,1285.575L27.410000000000025 1285.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(110.14347656250001 771.9046875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="66.123046875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">/dev/ttyUSB0</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-controller-ykkl80-2" data-testid="rf__edge-edge-raspberry-pi-controller-ykkl80-2" aria-label="Edge from raspberry-pi to controller-ykkl80" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 447,270.234375Q 452,270.234375 452,275.234375L 452,533.875Q 452,538.875 457,538.875L629 538.875L649 538.875" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 447,270.234375Q 452,270.234375 452,275.234375L 452,533.875Q 452,538.875 457,538.875L629 538.875L649 538.875" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(420.9384765625 398.5546875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="66.123046875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">/dev/ttyUSB0</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-x-axis-motor-3" data-testid="rf__edge-edge-raspberry-pi-x-axis-motor-3" aria-label="Edge from raspberry-pi to x-axis-motor" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-487.35562500000003Q 631.92,-492.35562500000003 636.92,-492.35562500000003L988.8399999999999 -492.35562500000003L1008.8399999999999 -492.35562500000003" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-487.35562500000003Q 631.92,-492.35562500000003 636.92,-492.35562500000003L988.8399999999999 -492.35562500000003L1008.8399999999999 -492.35562500000003" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(619.30671875 -117.06062500000002)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="29.2265625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">GPIO</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-y-axis-motor-4" data-testid="rf__edge-edge-raspberry-pi-y-axis-motor-4" aria-label="Edge from raspberry-pi to y-axis-motor" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-377.35562500000003Q 631.92,-382.35562500000003 636.92,-382.35562500000003L988.8399999999999 -382.35562500000003L1008.8399999999999 -382.35562500000003" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-377.35562500000003Q 631.92,-382.35562500000003 636.92,-382.35562500000003L988.8399999999999 -382.35562500000003L1008.8399999999999 -382.35562500000003" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(619.30671875 -62.060625000000016)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="29.2265625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">GPIO</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-x-min-limit-switch-5" data-testid="rf__edge-edge-raspberry-pi-x-min-limit-switch-5" aria-label="Edge from raspberry-pi to x-min-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-267.355625Q 631.92,-272.355625 636.92,-272.355625L988.8399999999999 -272.355625L1008.8399999999999 -272.355625" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-267.355625Q 631.92,-272.355625 636.92,-272.355625L988.8399999999999 -272.355625L1008.8399999999999 -272.355625" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(619.30671875 -7.0606249999999875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="29.2265625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">GPIO</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-x-max-limit-switch-6" data-testid="rf__edge-edge-raspberry-pi-x-max-limit-switch-6" aria-label="Edge from raspberry-pi to x-max-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-157.35559448242185Q 631.92,-162.35559448242185 636.92,-162.35559448242185L988.8399999999999 -162.35559448242185L1008.8399999999999 -162.35559448242185" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-157.35559448242185Q 631.92,-162.35559448242185 636.92,-162.35559448242185L988.8399999999999 -162.35559448242185L1008.8399999999999 -162.35559448242185" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(619.30671875 47.939390258789075)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="29.2265625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">GPIO</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan animated selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-raspberry-pi-y-min-limit-switch-7" data-testid="rf__edge-edge-raspberry-pi-y-min-limit-switch-7" aria-label="Edge from raspberry-pi to y-min-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-47.35562500000003Q 631.92,-52.35562500000003 636.92,-52.35562500000003L988.8399999999999 -52.35562500000003L1008.8399999999999 -52.35562500000003" fill="none" class="react-flow__edge-path"></path><path d="M255 270.234375L275 270.234375L 626.92,270.234375Q 631.92,270.234375 631.92,265.234375L 631.92,-47.35562500000003Q 631.92,-52.35562500000003 636.92,-52.35562500000003L988.8399999999999 -52.35562500000003L1008.8399999999999 -52.35562500000003" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(619.30671875 102.93937499999998)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="29.2265625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">GPIO</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-a-8" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-a-8" aria-label="Edge from controller-x83xnc to syringe-head-a" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1280.575L 484.4100305175781,1094.5749389648438Q 484.4100305175781,1089.5749389648438 489.4100305175781,1089.5749389648438L707.41 1089.5749389648438L727.41 1089.5749389648438" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1280.575L 484.4100305175781,1094.5749389648438Q 484.4100305175781,1089.5749389648438 489.4100305175781,1089.5749389648438L707.41 1089.5749389648438L727.41 1089.5749389648438" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1181.574969482422)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-b-9" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-b-9" aria-label="Edge from controller-x83xnc to syringe-head-b" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1280.575L 484.4100305175781,1204.575Q 484.4100305175781,1199.575 489.4100305175781,1199.575L707.41 1199.575L727.41 1199.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1280.575L 484.4100305175781,1204.575Q 484.4100305175781,1199.575 489.4100305175781,1199.575L707.41 1199.575L727.41 1199.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1236.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-c-10" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-c-10" aria-label="Edge from controller-x83xnc to syringe-head-c" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1304.575Q 484.4100305175781,1309.575 489.4100305175781,1309.575L707.41 1309.575L727.41 1309.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1304.575Q 484.4100305175781,1309.575 489.4100305175781,1309.575L707.41 1309.575L727.41 1309.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1291.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-d-11" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-d-11" aria-label="Edge from controller-x83xnc to syringe-head-d" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1414.575Q 484.4100305175781,1419.575 489.4100305175781,1419.575L707.41 1419.575L727.41 1419.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1414.575Q 484.4100305175781,1419.575 489.4100305175781,1419.575L707.41 1419.575L727.41 1419.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1346.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-e-12" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-e-12" aria-label="Edge from controller-x83xnc to syringe-head-e" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1524.575Q 484.4100305175781,1529.575 489.4100305175781,1529.575L707.41 1529.575L727.41 1529.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1524.575Q 484.4100305175781,1529.575 489.4100305175781,1529.575L707.41 1529.575L727.41 1529.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1401.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-f-13" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-f-13" aria-label="Edge from controller-x83xnc to syringe-head-f" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1634.575Q 484.4100305175781,1639.575 489.4100305175781,1639.575L707.41 1639.575L727.41 1639.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1634.575Q 484.4100305175781,1639.575 489.4100305175781,1639.575L707.41 1639.575L727.41 1639.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1456.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-x83xnc-syringe-head-g-14" data-testid="rf__edge-edge-controller-x83xnc-syringe-head-g-14" aria-label="Edge from controller-x83xnc to syringe-head-g" aria-describedby="react-flow__edge-desc-1"><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1744.575Q 484.4100305175781,1749.575 489.4100305175781,1749.575L707.41 1749.575L727.41 1749.575" fill="none" class="react-flow__edge-path"></path><path d="M241.41006103515628 1285.575L261.4100610351563 1285.575L 479.4100305175781,1285.575Q 484.4100305175781,1285.575 484.4100305175781,1290.575L 484.4100305175781,1744.575Q 484.4100305175781,1749.575 489.4100305175781,1749.575L707.41 1749.575L727.41 1749.575" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(450.1859094238281 1511.575)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-left-motor-15" data-testid="rf__edge-edge-controller-ykkl80-z-left-motor-15" aria-label="Edge from controller-ykkl80 to z-left-motor" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1106,538.875Q 1111,538.875 1111,543.875L 1111,1228.984375Q 1111,1233.984375 1116,1233.984375L1333 1233.984375L1353 1233.984375" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1106,538.875Q 1111,538.875 1111,543.875L 1111,1228.984375Q 1111,1233.984375 1116,1233.984375L1333 1233.984375L1353 1233.984375" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1076.77587890625 880.4296875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-right-motor-16" data-testid="rf__edge-edge-controller-ykkl80-z-right-motor-16" aria-label="Edge from controller-ykkl80 to z-right-motor" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1346.984375Q 1113,1351.984375 1118,1351.984375L1337 1351.984375L1357 1351.984375" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1346.984375Q 1113,1351.984375 1118,1351.984375L1337 1351.984375L1357 1351.984375" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1078.77587890625 939.4296875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="72.4482421875" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Stepper motor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-left-min-limit-switch-17" data-testid="rf__edge-edge-controller-ykkl80-z-left-min-limit-switch-17" aria-label="Edge from controller-ykkl80 to z-left-min-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1456.984375Q 1113,1461.984375 1118,1461.984375L1337 1461.984375L1357 1461.984375" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1456.984375Q 1113,1461.984375 1118,1461.984375L1337 1461.984375L1357 1461.984375" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1095.9951171875 994.4296875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="38.009765625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Sensor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-left-max-limit-switch-18" data-testid="rf__edge-edge-controller-ykkl80-z-left-max-limit-switch-18" aria-label="Edge from controller-ykkl80 to z-left-max-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1578.984375Q 1113,1583.984375 1118,1583.984375L1337 1583.984375L1357 1583.984375" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1578.984375Q 1113,1583.984375 1118,1583.984375L1337 1583.984375L1357 1583.984375" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1095.9951171875 1055.4296875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="38.009765625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Sensor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-right-min-limit-switch-19" data-testid="rf__edge-edge-controller-ykkl80-z-right-min-limit-switch-19" aria-label="Edge from controller-ykkl80 to z-right-min-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1688.984375Q 1113,1693.984375 1118,1693.984375L1337 1693.984375L1357 1693.984375" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1108,538.875Q 1113,538.875 1113,543.875L 1113,1688.984375Q 1113,1693.984375 1118,1693.984375L1337 1693.984375L1357 1693.984375" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1095.9951171875 1110.4296875)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="38.009765625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Sensor</text></g></g></svg><svg style="z-index: 0;"><g class="react-flow__edge react-flow__edge-smoothstep nopan selectable" tabindex="0" role="group" aria-roledescription="edge" data-id="edge-controller-ykkl80-z-right-max-limit-switch-20" data-testid="rf__edge-edge-controller-ykkl80-z-right-max-limit-switch-20" aria-label="Edge from controller-ykkl80 to z-right-max-limit-switch" aria-describedby="react-flow__edge-desc-1"><path d="M869 538.875L889 538.875L 1115.4511252678462,538.875Q 1120.4511252678462,538.875 1120.4511252678462,543.875L 1120.4511252678462,1811.5881064880948Q 1120.4511252678462,1816.5881064880948 1125.4511252678462,1816.5881064880948L1351.9022505356925 1816.5881064880948L1371.9022505356925 1816.5881064880948" fill="none" class="react-flow__edge-path"></path><path d="M869 538.875L889 538.875L 1115.4511252678462,538.875Q 1120.4511252678462,538.875 1120.4511252678462,543.875L 1120.4511252678462,1811.5881064880948Q 1120.4511252678462,1816.5881064880948 1125.4511252678462,1816.5881064880948L1351.9022505356925 1816.5881064880948L1371.9022505356925 1816.5881064880948" fill="none" stroke-opacity="0" stroke-width="20" class="react-flow__edge-interaction"></path><g transform="translate(1103.4462424553462 1171.7315532440475)" class="react-flow__edge-textwrapper" visibility="visible"><rect width="38.009765625" x="-2" y="-4" height="20" class="react-flow__edge-textbg" rx="2" ry="2"></rect><text class="react-flow__edge-text" y="6" dy="0.3em">Sensor</text></g></g></svg></div><div class="react-flow__edgelabel-renderer"></div><div class="react-flow__nodes" style="position: absolute; width: 100%; height: 100%; top: 0px; left: 0px;"><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="raspberry-pi" data-testid="rf__node-raspberry-pi" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(40px, 180px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--raspberry" style="--hardware-node-accent: #175c96;"><div class="hardware-flow-node__type">raspberry</div><strong>Raspberry Pi</strong><span>USB host + GPIO/I2C</span><small>2 controllers, 5 direct devices</small><em>source</em><div data-nodeid="raspberry-pi" data-handlepos="right" data-id="1-raspberry-pi-null-source" class="react-flow__handle react-flow__handle-right nodrag nopan hardware-flow-node__handle source connectable connectablestart connectableend connectionindicator"></div></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="y-max-limit-switch" data-testid="rf__node-y-max-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -558.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="y-max-limit-switch" data-handlepos="left" data-id="1-y-max-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Y Max Limit Switch</strong><span>Position / limit switch</span><small>unconnected</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="x-axis-motor" data-testid="rf__node-x-axis-motor" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -558.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #a85d13;"><div data-nodeid="x-axis-motor" data-handlepos="left" data-id="1-x-axis-motor-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>CoreXY A Motor</strong><span>Stepper motor</span><small>6 pins</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="y-axis-motor" data-testid="rf__node-y-axis-motor" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -448.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #a85d13;"><div data-nodeid="y-axis-motor" data-handlepos="left" data-id="1-y-axis-motor-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>CoreXY B Motor</strong><span>Stepper motor</span><small>6 pins</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="x-min-limit-switch" data-testid="rf__node-x-min-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -338.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="x-min-limit-switch" data-handlepos="left" data-id="1-x-min-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>X Min Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="x-max-limit-switch" data-testid="rf__node-x-max-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -228.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="x-max-limit-switch" data-handlepos="left" data-id="1-x-max-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>X Max Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="y-min-limit-switch" data-testid="rf__node-y-min-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1013.84px, -118.34px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="y-min-limit-switch" data-handlepos="left" data-id="1-y-min-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Y Min Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="controller-x83xnc" data-testid="rf__node-controller-x83xnc" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(27.41px, 1192.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--controller hardware-flow-node--disabled" style="--hardware-node-accent: #6b7280;"><div data-nodeid="controller-x83xnc" data-handlepos="left" data-id="1-controller-x83xnc-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">controller</div><strong>7 syringe pump controller</strong><span>/dev/ttyUSB0</span><small>7 devices</small><em>disabled</em><div data-nodeid="controller-x83xnc" data-handlepos="right" data-id="1-controller-x83xnc-null-source" class="react-flow__handle react-flow__handle-right nodrag nopan hardware-flow-node__handle source connectable connectablestart connectableend connectionindicator"></div></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-a" data-testid="rf__node-syringe-head-a" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1008.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-a" data-handlepos="left" data-id="1-syringe-head-a-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head A</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-b" data-testid="rf__node-syringe-head-b" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1118.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-b" data-handlepos="left" data-id="1-syringe-head-b-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head B</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-c" data-testid="rf__node-syringe-head-c" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1228.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-c" data-handlepos="left" data-id="1-syringe-head-c-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head C</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-d" data-testid="rf__node-syringe-head-d" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1338.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-d" data-handlepos="left" data-id="1-syringe-head-d-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head D</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-e" data-testid="rf__node-syringe-head-e" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1448.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-e" data-handlepos="left" data-id="1-syringe-head-e-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head E</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-f" data-testid="rf__node-syringe-head-f" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1558.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-f" data-handlepos="left" data-id="1-syringe-head-f-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head F</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="syringe-head-g" data-testid="rf__node-syringe-head-g" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(727.41px, 1668.7px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device hardware-flow-node--disabled" style="--hardware-node-accent: #9ca3af;"><div data-nodeid="syringe-head-g" data-handlepos="left" data-id="1-syringe-head-g-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Syringe Head G</strong><span>Stepper motor</span><small>6 pins</small><em>disabled</em></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="controller-ykkl80" data-testid="rf__node-controller-ykkl80" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(654px, 446px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--controller" style="--hardware-node-accent: #0e7490;"><div data-nodeid="controller-ykkl80" data-handlepos="left" data-id="1-controller-ykkl80-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">controller</div><strong>Double Z axis and pumps</strong><span>/dev/ttyUSB0</span><small>6 devices</small><em>offline</em><div data-nodeid="controller-ykkl80" data-handlepos="right" data-id="1-controller-ykkl80-null-source" class="react-flow__handle react-flow__handle-right nodrag nopan hardware-flow-node__handle source connectable connectablestart connectableend connectionindicator"></div></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-left-motor" data-testid="rf__node-z-left-motor" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1358px, 1168px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #a85d13;"><div data-nodeid="z-left-motor" data-handlepos="left" data-id="1-z-left-motor-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Left Motor</strong><span>Stepper motor</span><small>6 pins</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-right-motor" data-testid="rf__node-z-right-motor" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1362px, 1286px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #a85d13;"><div data-nodeid="z-right-motor" data-handlepos="left" data-id="1-z-right-motor-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Right Motor</strong><span>Stepper motor</span><small>6 pins</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-left-min-limit-switch" data-testid="rf__node-z-left-min-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1362px, 1396px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="z-left-min-limit-switch" data-handlepos="left" data-id="1-z-left-min-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Left Min Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-left-max-limit-switch" data-testid="rf__node-z-left-max-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1362px, 1506px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="z-left-max-limit-switch" data-handlepos="left" data-id="1-z-left-max-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Left Max Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-right-min-limit-switch" data-testid="rf__node-z-right-min-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1362px, 1616px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="z-right-min-limit-switch" data-handlepos="left" data-id="1-z-right-min-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Right Min Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div><div class="react-flow__node react-flow__node-hardwareNode nopan selectable draggable" data-id="z-right-max-limit-switch" data-testid="rf__node-z-right-max-limit-switch" tabindex="0" role="group" aria-roledescription="node" aria-describedby="react-flow__node-desc-1" style="z-index: 0; transform: translate(1376.9px, 1738.6px); pointer-events: all; visibility: visible;"><div class="hardware-flow-node hardware-flow-node--device" style="--hardware-node-accent: #1b7f5c;"><div data-nodeid="z-right-max-limit-switch" data-handlepos="left" data-id="1-z-right-max-limit-switch-null-target" class="react-flow__handle react-flow__handle-left nodrag nopan hardware-flow-node__handle target connectable connectablestart connectableend connectionindicator"></div><div class="hardware-flow-node__type">device</div><strong>Z Right Max Limit Switch</strong><span>Position / limit switch</span><small>1 pin</small></div></div></div><div class="react-flow__viewport-portal"></div></div></div></div><div class="react-flow__panel react-flow__minimap bottom right" data-testid="rf__minimap"><svg width="200" height="150" viewBox="-695.225 -657.4681342559527 3479.7 2651.2" class="react-flow__minimap-svg" role="img" aria-labelledby="react-flow__minimap-desc-1"><title id="react-flow__minimap-desc-1">Mini Map</title><rect class="react-flow__minimap-node" x="40" y="180" rx="5" ry="5" width="210" height="180" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-558.34" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-558.34" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-448.34000000000003" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-338.34" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-228.33999999999997" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1013.8399999999999" y="-118.34000000000003" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="27.410000000000025" y="1192.7" rx="5" ry="5" width="210" height="186" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1008.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1118.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1228.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1338.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1448.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1558.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="727.41" y="1668.7" rx="5" ry="5" width="210" height="162" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="654" y="446" rx="5" ry="5" width="210" height="186" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1358" y="1168" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1362" y="1286" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1362" y="1396" rx="5" ry="5" width="210" height="132" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1362" y="1506" rx="5" ry="5" width="210" height="156" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1362" y="1616" rx="5" ry="5" width="210" height="156" shape-rendering="crispEdges"></rect><rect class="react-flow__minimap-node" x="1376.9022505356925" y="1738.6037314880948" rx="5" ry="5" width="210" height="156" shape-rendering="crispEdges"></rect><path class="react-flow__minimap-mask" d="M-778.075,-740.3181342559527h3645.3999999999996v2816.8999999999996h-3645.3999999999996z
+        M-612.375,-209.86813425595267h3314v1362h-3314z" fill-rule="evenodd" pointer-events="none"></path></svg></div><div class="react-flow__panel react-flow__controls vertical bottom left" data-testid="rf__controls" aria-label="Control Panel"><button type="button" class="react-flow__controls-button react-flow__controls-zoomin" title="Zoom In" aria-label="Zoom In"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M32 18.133H18.133V32h-4.266V18.133H0v-4.266h13.867V0h4.266v13.867H32z"></path></svg></button><button type="button" class="react-flow__controls-button react-flow__controls-zoomout" title="Zoom Out" aria-label="Zoom Out" disabled=""><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 5"><path d="M0 0h32v4.2H0z"></path></svg></button><button type="button" class="react-flow__controls-button react-flow__controls-fitview" title="Fit View" aria-label="Fit View"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 30"><path d="M3.692 4.63c0-.53.4-.938.939-.938h5.215V0H4.708C2.13 0 0 2.054 0 4.63v5.216h3.692V4.631zM27.354 0h-5.2v3.692h5.17c.53 0 .984.4.984.939v5.215H32V4.631A4.624 4.624 0 0027.354 0zm.954 24.83c0 .532-.4.94-.939.94h-5.215v3.768h5.215c2.577 0 4.631-2.13 4.631-4.707v-5.139h-3.692v5.139zm-23.677.94c-.531 0-.939-.4-.939-.94v-5.138H0v5.139c0 2.577 2.13 4.707 4.708 4.707h5.138V25.77H4.631z"></path></svg></button><button type="button" class="react-flow__controls-button react-flow__controls-interactive" title="Toggle Interactivity" aria-label="Toggle Interactivity"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 32"><path d="M21.333 10.667H19.81V7.619C19.81 3.429 16.38 0 12.19 0c-4.114 1.828-1.37 2.133.305 2.438 1.676.305 4.42 2.59 4.42 5.181v3.048H3.047A3.056 3.056 0 000 13.714v15.238A3.056 3.056 0 003.048 32h18.285a3.056 3.056 0 003.048-3.048V13.714a3.056 3.056 0 00-3.048-3.047zM12.19 24.533a3.056 3.056 0 01-3.047-3.047 3.056 3.056 0 013.047-3.048 3.056 3.056 0 013.048 3.048 3.056 3.056 0 01-3.048 3.047z"></path></svg></button></div><svg class="react-flow__background" data-testid="rf__background" style="position: absolute; width: 100%; height: 100%; top: 0px; left: 0px;"><pattern id="pattern-1" x="6.1875" y="8.934067127976334" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="translate(-7,-7)"><circle cx="0.25" cy="0.25" r="0.25" class="react-flow__background-pattern dots"></circle></pattern><rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-1)"></rect></svg><div class="react-flow__panel react-flow__attribution bottom right" data-message="Please only hide this attribution when you are subscribed to React Flow Pro: https://pro.reactflow.dev"><a href="https://reactflow.dev/" target="_blank" rel="noopener noreferrer" aria-label="React Flow attribution">React Flow</a></div><div id="react-flow__node-desc-1" style="display: none;">Press enter or space to select a node. You can then use the arrow keys to move the node around. Press delete to remove it and escape to cancel.</div><div id="react-flow__edge-desc-1" style="display: none;">Press enter or space to select an edge. You can then press delete to remove it or escape to cancel.</div><div id="react-flow__aria-live-1" aria-live="assertive" aria-atomic="true" style="position: absolute; width: 1px; height: 1px; margin: -1px; border: 0px; padding: 0px; overflow: hidden; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(100%);"></div></div></div></div></section></div></div></main></div>
+    <script type="module" src="./Robot Control_files/main.tsx"></script>
+  
+
+</body></html>
