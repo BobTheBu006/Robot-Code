@@ -24,10 +24,20 @@ from app.services.gpio_backend import load_gpio_backend
 
 STATE_VERSION = 1
 DEFAULT_STEPS_PER_CM = 100.0
-# Homing bursts: small enough that even a slow/laggy serial round trip only
-# lets the motor overtravel a fraction of a millimeter past a tripped switch.
-FAST_PROBE_CHUNK_STEPS = 40
+# Homing bursts. The limit switches are on the Pi but the motors are on the
+# ESP32, so a burst cannot be interrupted mid-flight: the burst size is the
+# worst-case overtravel past a switch. The coarse pass only has to get close
+# (the slow re-touch below is what actually measures the switch position), so
+# it uses a bigger burst to keep the number of serial round trips sane - at
+# 40 steps a full-length probe was thousands of round trips and looked like a
+# hang. The slow pass stays tiny for precision.
+FAST_PROBE_CHUNK_STEPS = 200
 SLOW_PROBE_CHUNK_STEPS = 4
+# Safety margin on the probe budget, over the track length the user entered.
+# Generous enough to absorb a wrong steps-per-cm estimate, small enough that a
+# side which never reaches its switch (unpowered driver, broken wiring) fails
+# in seconds with a clear message instead of grinding for minutes.
+PROBE_BUDGET_MARGIN = 2.0
 SLOW_HOMING_RPM = 10.0
 
 
@@ -70,6 +80,10 @@ class HybridZAxisService:
         self._right_track_length_cm = 60.0
         self._steps_per_cm = DEFAULT_STEPS_PER_CM
         self._calibrated = False
+        # Tracked per side so one-sided bring-up calibration stays honest:
+        # moves need both sides established, not just whichever was last run.
+        self._left_calibrated = False
+        self._right_calibrated = False
         self._limit_buffer_cm = 0.5
         self._serial_port_path: str | None = None
         self._serial_port: Any = None
@@ -84,6 +98,8 @@ class HybridZAxisService:
         payload = {
             "version": STATE_VERSION,
             "calibrated": self._calibrated,
+            "left_calibrated": self._left_calibrated,
+            "right_calibrated": self._right_calibrated,
             "steps_per_cm": self._steps_per_cm,
             "limit_buffer_cm": self._limit_buffer_cm,
             "left_track_length_cm": self._left_track_length_cm,
@@ -117,15 +133,26 @@ class HybridZAxisService:
         buffer_cm = payload.get("limit_buffer_cm")
         if isinstance(buffer_cm, (int, float)) and buffer_cm >= 0:
             self._limit_buffer_cm = float(buffer_cm)
-        if payload.get("calibrated"):
-            self._calibrated = True
+        # Per-side flags fall back to the old single flag so a state file
+        # written before one-sided calibration existed still loads correctly.
+        legacy_calibrated = bool(payload.get("calibrated"))
+        self._left_calibrated = bool(payload.get("left_calibrated", legacy_calibrated))
+        self._right_calibrated = bool(payload.get("right_calibrated", legacy_calibrated))
+        self._calibrated = self._left_calibrated and self._right_calibrated
+        if self._left_calibrated or self._right_calibrated:
             self._left_track_length_cm = float(payload.get("left_track_length_cm", 60.0))
             self._right_track_length_cm = float(payload.get("right_track_length_cm", 60.0))
             self._left_steps = int(payload.get("left_steps", 0))
             self._right_steps = int(payload.get("right_steps", 0))
 
-    def _invalidate_calibration(self) -> None:
-        self._calibrated = False
+    def _invalidate_calibration(self, sides: tuple[str, ...] = ("left", "right")) -> None:
+        """Drop calibration for the sides about to be re-homed. A side that is
+        not being touched keeps the calibration it already had."""
+        if "left" in sides:
+            self._left_calibrated = False
+        if "right" in sides:
+            self._right_calibrated = False
+        self._calibrated = self._left_calibrated and self._right_calibrated
         self._save_state()
 
     # ---- emergency stop ----
@@ -152,6 +179,37 @@ class HybridZAxisService:
             raise HybridZAxisStoppedError("Z axis motion stopped by emergency stop.")
 
     # ---- serial connection to the Z-axis ESP32 ----
+    def _resolve_port(self, context: dict, requested_port: str | None) -> str:
+        """Pick the port to talk to the Z controller on.
+
+        Linux renumbers /dev/ttyUSB* by plug order, so the port recorded in
+        the Hardware Map goes stale as soon as the board is reconnected. The
+        board that owns the Z motors is looked up instead and resolved by its
+        USB serial number, falling back to the recorded port when there is no
+        workspace to identify it from.
+        """
+        from app.services.esp32_builder import esp32_builder_service
+
+        hardware_map = context.get("hardware_map")
+        board_id = None
+        if isinstance(hardware_map, dict):
+            for device in hardware_map.get("devices", []):
+                if isinstance(device, dict) and device.get("id") in ("z-left-motor", "z-right-motor"):
+                    board_id = device.get("board_id")
+                    if board_id:
+                        break
+
+        if board_id:
+            resolved = esp32_builder_service.resolve_board_port(board_id)
+            if resolved:
+                return resolved
+
+        if requested_port:
+            return requested_port
+        raise HybridZAxisError(
+            "No serial port is configured for the Z controller, and it could not be found by USB serial number."
+        )
+
     def _load_serial_module(self):
         try:
             import serial  # type: ignore
@@ -171,22 +229,70 @@ class HybridZAxisService:
 
         serial_module = self._load_serial_module()
         serial_port = serial_module.Serial(port, baud_rate, timeout=1.0)
-        time.sleep(2.0)  # boot delay, matching the rest of this codebase's ESP32 handling
+
+        # Opening the port toggles DTR/RTS, which resets the ESP32. Drive the
+        # reset deliberately and wait the board out, then throw away every
+        # byte of boot output. Reading it as a command reply is what produced
+        # replacement characters instead of an acknowledgement - the ROM's
+        # early boot chatter is not valid UTF-8 at this baud rate.
+        try:
+            serial_port.dtr = False
+            time.sleep(0.1)
+            serial_port.dtr = True
+        except Exception:
+            pass
+        time.sleep(2.5)
         self._drain_startup_output(serial_port)
+
+        # Confirm the firmware is actually listening before trusting any
+        # reply. A board still mid-boot answers with garbage; PING/PONG is
+        # the cheapest proof that we are in sync.
+        if not self._handshake(serial_port):
+            try:
+                serial_port.close()
+            except Exception:
+                pass
+            raise HybridZAxisError(
+                f"The Z controller on {port} did not respond to PING. It may still be booting, "
+                "running the wrong firmware, or another program may be holding the port."
+            )
+
         self._serial_port = serial_port
         self._serial_port_path = port
         return serial_port
 
-    def _drain_startup_output(self, serial_port, *, quiet_seconds: float = 0.25, max_seconds: float = 3.0) -> None:
+    def _drain_startup_output(self, serial_port, *, quiet_seconds: float = 0.3, max_seconds: float = 4.0) -> None:
+        """Discard everything the board emits after reset, bytes not lines:
+        boot chatter arrives without newlines and can sit in the buffer as a
+        partial line that a later readline() would splice onto a real reply."""
         deadline = time.monotonic() + max_seconds
         last_data_at = time.monotonic()
         while time.monotonic() < deadline:
-            line = serial_port.readline().decode("utf-8", errors="replace").strip()
-            if line:
+            waiting = serial_port.in_waiting
+            if waiting:
+                serial_port.read(waiting)
                 last_data_at = time.monotonic()
                 continue
             if time.monotonic() - last_data_at >= quiet_seconds:
                 break
+            time.sleep(0.02)
+        serial_port.reset_input_buffer()
+
+    def _handshake(self, serial_port, attempts: int = 4) -> bool:
+        for _ in range(attempts):
+            serial_port.reset_input_buffer()
+            serial_port.reset_output_buffer()
+            serial_port.write(b"PING\n")
+            serial_port.flush()
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                line = serial_port.readline().decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                if "PONG" in line.upper():
+                    serial_port.reset_input_buffer()
+                    return True
+        return False
 
     def _send(self, serial_port, command: str, *, terminal_prefixes: tuple[str, ...], deadline_seconds: float) -> tuple[str | None, bool]:
         serial_port.reset_input_buffer()
@@ -237,6 +343,71 @@ class HybridZAxisService:
         self._left_steps += left_delta
         self._right_steps += right_delta
 
+    def _seek_switch(
+        self, serial_port, gpio: Any, side: str, direction: int, limit_pin: int,
+        max_steps: int, rpm: float, trapezoidal: bool, acceleration_rpm_per_s: float,
+        steps_per_rotation: int,
+    ) -> tuple[int, bool]:
+        """Drive one side toward a switch in a single continuous move, sending
+        STOP the instant this Pi's own GPIO sees the switch trip.
+
+        The firmware checks for STOP between every step, so overtravel is one
+        step period of serial latency rather than a whole burst - and because
+        it is one uninterrupted move, the axis travels smoothly instead of
+        hopping between round trips. Returns (steps actually travelled,
+        whether the switch tripped).
+        """
+        if max_steps <= 0:
+            return 0, self._limit_active(gpio, limit_pin)
+
+        signed = direction * max_steps
+        left = signed if side == "left" else 0
+        right = signed if side == "right" else 0
+        command = f"STEP Z {left} {right} {int(rpm)} {1 if trapezoidal else 0} {int(acceleration_rpm_per_s)}"
+
+        serial_port.reset_input_buffer()
+        serial_port.reset_output_buffer()
+        serial_port.write((command + "\n").encode("utf-8"))
+        serial_port.flush()
+
+        steps_per_second = max(1.0, rpm * steps_per_rotation / 60.0)
+        deadline = time.monotonic() + (max_steps / steps_per_second) * 2.0 + 10.0
+        stop_sent = False
+        buffer = b""
+
+        while time.monotonic() < deadline:
+            if self._stop_requested.is_set():
+                if not stop_sent:
+                    serial_port.write(b"STOP\n")
+                    serial_port.flush()
+                    stop_sent = True
+                raise HybridZAxisStoppedError("Z axis motion stopped by emergency stop.")
+
+            if not stop_sent and self._limit_active(gpio, limit_pin):
+                serial_port.write(b"STOP\n")
+                serial_port.flush()
+                stop_sent = True
+
+            waiting = serial_port.in_waiting
+            if waiting:
+                buffer += serial_port.read(waiting)
+                if b"\n" in buffer:
+                    for raw_line in buffer.split(b"\n"):
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        if not line.upper().startswith(("OK STEP Z", "OK STOP STEP Z")):
+                            continue
+                        parts = line.split()
+                        travelled_left = int(parts[-2])
+                        travelled_right = int(parts[-1])
+                        self._left_steps += travelled_left
+                        self._right_steps += travelled_right
+                        travelled = abs(travelled_left if side == "left" else travelled_right)
+                        return travelled, self._limit_active(gpio, limit_pin)
+
+        raise HybridZAxisError(
+            f"Timed out waiting for the Z {side} axis to finish seeking its limit switch."
+        )
+
     # ---- Pi-side limit switch reading ----
     def _setup_limit_gpio(self, gpio: Any, pins: _ZPinPlan) -> None:
         gpio.setwarnings(False)
@@ -279,38 +450,46 @@ class HybridZAxisService:
             right = steps if side == "right" else 0
             self._send_step(serial_port, left, right, rpm, trapezoidal, acceleration_rpm_per_s, steps_per_rotation)
 
-        # Fast touch: chunked bursts toward the switch until it trips.
-        travelled = 0
-        while travelled < max_probe_steps:
-            self._raise_if_stopped()
-            if self._limit_active(gpio, limit_pin):
-                break
-            chunk = min(FAST_PROBE_CHUNK_STEPS, max_probe_steps - travelled)
-            pulse(direction * chunk, fast_rpm)
-            travelled += chunk
-        else:
-            if not self._limit_active(gpio, limit_pin):
-                raise HybridZAxisError(f"Z {side} {'max' if direction > 0 else 'min'} limit switch was not hit during fast probe.")
-        if not self._limit_active(gpio, limit_pin):
-            raise HybridZAxisError(f"Z {side} {'max' if direction > 0 else 'min'} limit switch was not hit during fast probe.")
+        end = "max" if direction > 0 else "min"
+
+        # Fast touch: one continuous move toward the switch, stopped the
+        # instant the Pi sees it trip.
+        self._raise_if_stopped()
+        travelled, tripped = self._seek_switch(
+            serial_port, gpio, side, direction, limit_pin, max_probe_steps,
+            fast_rpm, trapezoidal, acceleration_rpm_per_s, steps_per_rotation,
+        )
+        if not tripped:
+            raise HybridZAxisError(
+                f"Z {side} {end} limit switch (Pi GPIO {limit_pin}) never tripped after {travelled} steps "
+                f"toward it. Either the Z {side} motor is not reaching its switch (check that its driver is "
+                f"powered and enabled, its step/dir wiring, and that the axis is free to move), or the axis "
+                f"needs more travel than the probe allowed - raise 'Steps per cm (estimate)' if this machine "
+                f"has a finer drive than the estimate."
+            )
 
         # Back off one full rotation to release the switch.
         pulse(-direction * steps_per_rotation, fast_rpm)
 
-        # Slow re-touch: small bursts, capped at two rotations of travel.
-        slow_cap = steps_per_rotation * 2
-        travelled = 0
-        while travelled < slow_cap:
-            self._raise_if_stopped()
-            if self._limit_active(gpio, limit_pin):
-                break
-            chunk = min(SLOW_PROBE_CHUNK_STEPS, slow_cap - travelled)
-            pulse(direction * chunk, SLOW_HOMING_RPM)
-            travelled += chunk
-        if not self._limit_active(gpio, limit_pin):
-            raise HybridZAxisError(f"Z {side} {'max' if direction > 0 else 'min'} limit switch was not hit during slow probe.")
+        # Slow re-touch at homing speed for a repeatable, precise contact.
+        self._raise_if_stopped()
+        _, tripped = self._seek_switch(
+            serial_port, gpio, side, direction, limit_pin, steps_per_rotation * 2,
+            SLOW_HOMING_RPM, trapezoidal, acceleration_rpm_per_s, steps_per_rotation,
+        )
+        if not tripped:
+            raise HybridZAxisError(
+                f"Z {side} {end} limit switch (Pi GPIO {limit_pin}) tripped on the fast probe but not on the "
+                "slow re-touch. The switch may be intermittent, or the axis slipped during back-off."
+            )
 
         return self._left_steps if side == "left" else self._right_steps
+
+    def _set_axis_steps(self, side: str, value: int) -> None:
+        if side == "left":
+            self._left_steps = value
+        else:
+            self._right_steps = value
 
     def _pins_from_request(self, request: GantryZCalibrationRequest | GantryZMoveRequest) -> _ZPinPlan:
         return _ZPinPlan(
@@ -328,73 +507,108 @@ class HybridZAxisService:
     def calibrate_z(self, context: dict, request: GantryZCalibrationRequest) -> dict:
         self._raise_if_stopped()
         pins = self._pins_from_request(request)
-        port = request.tool_port or "/dev/ttyUSB0"
+        port = self._resolve_port(context, request.tool_port)
         baud_rate = request.baud_rate or 115200
         gpio, gpio_error = load_gpio_backend()
         if gpio is None:
             raise HybridZAxisError(f"Compatible Raspberry Pi GPIO backend is not available: {gpio_error}")
 
+        sides = ("left", "right") if request.axes == "both" else (request.axes,)
+
         with self._lock:
-            self._invalidate_calibration()
+            self._invalidate_calibration(sides)
             self._setup_limit_gpio(gpio, pins)
             try:
                 serial_port = self._open_serial(port, baud_rate)
                 self._send_pins(serial_port, pins)
 
                 steps_per_rotation = request.steps_per_rotation if hasattr(request, "steps_per_rotation") else 800
-                max_probe_steps = steps_per_rotation * 120
-
-                self._left_steps = 0
-                left_home_steps = self._probe_side(
-                    serial_port, gpio, pins, "left", -1, max_probe_steps, steps_per_rotation,
-                    request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
+                # Budget the probe against the track length the operator
+                # actually entered rather than an arbitrary rotation count: a
+                # side that never reaches its switch then fails in seconds
+                # naming that side, instead of pulsing a dead axis for minutes.
+                longest_track_cm = max(request.z_left_track_length_cm, request.z_right_track_length_cm)
+                # Prefer a previously measured steps-per-cm; before the first
+                # successful calibration there is nothing measured, so fall
+                # back to the operator's estimate rather than a belt-drive
+                # default that badly under-budgets a fine lead screw.
+                budget_steps_per_cm = (
+                    self._steps_per_cm if self._calibrated else request.steps_per_cm_estimate
                 )
-                self._left_steps = 0
-                left_max_steps = self._probe_side(
-                    serial_port, gpio, pins, "left", 1, max_probe_steps, steps_per_rotation,
-                    request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
-                )
-
-                self._right_steps = 0
-                self._probe_side(
-                    serial_port, gpio, pins, "right", -1, max_probe_steps, steps_per_rotation,
-                    request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
-                )
-                self._right_steps = 0
-                right_max_steps = self._probe_side(
-                    serial_port, gpio, pins, "right", 1, max_probe_steps, steps_per_rotation,
-                    request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
+                max_probe_steps = max(
+                    steps_per_rotation,
+                    round(longest_track_cm * budget_steps_per_cm * PROBE_BUDGET_MARGIN),
                 )
 
-                if left_max_steps <= 0 or right_max_steps <= 0:
-                    raise HybridZAxisError("Z max homing measured zero travel from Z min; check the limit switches.")
+                # Home each selected side: down to its min switch (that becomes
+                # zero), then up to its max switch to measure the real travel.
+                measured_steps: dict[str, int] = {}
+                track_length_cm = {
+                    "left": request.z_left_track_length_cm,
+                    "right": request.z_right_track_length_cm,
+                }
+                for side in sides:
+                    self._set_axis_steps(side, 0)
+                    self._probe_side(
+                        serial_port, gpio, pins, side, -1, max_probe_steps, steps_per_rotation,
+                        request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
+                    )
+                    self._set_axis_steps(side, 0)
+                    measured_steps[side] = self._probe_side(
+                        serial_port, gpio, pins, side, 1, max_probe_steps, steps_per_rotation,
+                        request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
+                    )
+                    if measured_steps[side] <= 0:
+                        raise HybridZAxisError(
+                            f"Z {side} measured zero travel between its min and max switches; "
+                            "check that both switches are wired to the right pins."
+                        )
 
+                # Steps-per-cm is a property of the drive train, so it is
+                # measured from the sides actually homed in this run and left
+                # untouched when a side is skipped.
                 self._steps_per_cm = max(
-                    left_max_steps / request.z_left_track_length_cm,
-                    right_max_steps / request.z_right_track_length_cm,
+                    measured_steps[side] / track_length_cm[side] for side in sides
                 )
-                self._left_track_length_cm = left_max_steps / self._steps_per_cm
-                self._right_track_length_cm = right_max_steps / self._steps_per_cm
+                for side in sides:
+                    length_cm = measured_steps[side] / self._steps_per_cm
+                    if side == "left":
+                        self._left_track_length_cm = length_cm
+                    else:
+                        self._right_track_length_cm = length_cm
                 self._limit_buffer_cm = request.limit_buffer_cm
 
-                # Homing deliberately leaves both carriages resting on their max
-                # switches. Walk back by one buffer on each side so calibration
-                # never finishes with a limit pressed - otherwise the very next
-                # move refuses (a limit switch is active) before it can even start.
+                # Homing deliberately leaves each carriage resting on its max
+                # switch. Walk back by one buffer so calibration never finishes
+                # with a limit pressed - otherwise the very next move refuses
+                # (a limit switch is active) before it can even start. Only the
+                # sides actually homed are moved.
                 backoff_steps = round(request.limit_buffer_cm * self._steps_per_cm)
                 if backoff_steps > 0:
                     self._send_step(
-                        serial_port, -backoff_steps, -backoff_steps, request.speed_rpm,
+                        serial_port,
+                        -backoff_steps if "left" in sides else 0,
+                        -backoff_steps if "right" in sides else 0,
+                        request.speed_rpm,
                         request.trapezoidal_speed, request.acceleration_rpm_per_s, steps_per_rotation,
                     )
 
-                self._calibrated = True
+                for side in sides:
+                    if side == "left":
+                        self._left_calibrated = True
+                    else:
+                        self._right_calibrated = True
+                self._calibrated = self._left_calibrated and self._right_calibrated
                 self._save_state()
             finally:
                 self._cleanup_limit_gpio(gpio, pins)
 
         return {
-            "calibrated": True,
+            "calibrated": self._calibrated,
+            "calibrated_axes": list(sides),
+            "left_calibrated": self._left_calibrated,
+            "right_calibrated": self._right_calibrated,
+            "steps_per_cm": self._steps_per_cm,
             "workspace": {
                 "z_left_track_length_cm": self._left_track_length_cm,
                 "z_right_track_length_cm": self._right_track_length_cm,
@@ -414,10 +628,17 @@ class HybridZAxisService:
     def move_z(self, context: dict, request: GantryZMoveRequest) -> dict:
         self._raise_if_stopped()
         if not self._calibrated:
-            raise HybridZAxisError("Z axis is not calibrated. Run Calibrate Z Axis before moving.")
+            missing = [
+                name for name, done in (("left", self._left_calibrated), ("right", self._right_calibrated))
+                if not done
+            ]
+            raise HybridZAxisError(
+                f"Z axis is not calibrated ({', '.join(missing)} not homed). "
+                "Run Calibrate Z Axis for both sides before moving."
+            )
 
         pins = self._pins_from_request(request)
-        port = request.tool_port or "/dev/ttyUSB0"
+        port = self._resolve_port(context, request.tool_port)
         baud_rate = request.baud_rate or 115200
         # The usable range is inset from the max switch by the calibrated
         # buffer (the position calibration parks at), matching the buffer

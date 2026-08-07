@@ -4,7 +4,7 @@
   "display_name": "Calibrate Z Axis",
   "category": "Robot Actions",
   "description": "Homes both Z motors independently: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. The actual measured travel becomes the calibrated range for later Move Z Axis calls.",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "inputs": [
     {
       "key": "tool_port",
@@ -20,6 +20,32 @@
       "options": [],
       "hidden": true,
       "resolvedFrom": "hardware_map"
+    },
+    {
+      "key": "axes",
+      "label": "Axes to Calibrate",
+      "type": "select",
+      "description": "Which Z side(s) to home. Use a single side during bring-up when the other motor is unpowered or being worked on - the skipped side keeps whatever calibration it already had. Move Z Axis still requires both sides to have been calibrated at some point.",
+      "required": false,
+      "default": "both",
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "Both Z axes",
+          "value": "both"
+        },
+        {
+          "label": "Left only",
+          "value": "left"
+        },
+        {
+          "label": "Right only",
+          "value": "right"
+        }
+      ]
     },
     {
       "key": "z_left_track_length_cm",
@@ -101,6 +127,19 @@
     }
   ],
   "advanced_inputs": [
+    {
+      "key": "steps_per_cm_estimate",
+      "label": "Steps per cm (estimate)",
+      "type": "number",
+      "description": "Rough steps-per-cm of the Z drive, used only to decide how far homing is allowed to travel before giving up. It does not affect the result - calibration measures the real value. Set it too low and homing stops part way down the axis; too high only makes a genuine failure take longer to report.",
+      "required": false,
+      "default": 2000.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
     {
       "key": "z_left_step_pin",
       "label": "Z Left Step Pin",

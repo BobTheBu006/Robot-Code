@@ -238,9 +238,7 @@ class Esp32BuilderService:
             raise Esp32BuilderError(f"Unknown ESP32 board '{board_id}'.")
 
         metadata = self._load_board_metadata(workspace_dir)
-        port = self._coerce_nullable_string(metadata.get("port"))
-        if not port:
-            raise Esp32BuilderError("This board does not have a serial port associated with it yet.")
+        port = self._resolve_flash_port(board_id, metadata)
 
         sketch_dir, sketch_entry_file = self._prepare_sketch_dir(board_id, workspace_dir, metadata)
         fqbn = self._board_fqbn(metadata)
@@ -910,6 +908,55 @@ class Esp32BuilderService:
             size_bytes=path.stat().st_size,
             content=content,
         )
+
+    def resolve_board_port(self, board_id: str) -> str | None:
+        """Current port for a board, identified by USB serial number when
+        known. Returns None when the board has no workspace or cannot be
+        found, so callers can fall back to their own default."""
+        workspace_dir = self._resolve_workspace_dir(board_id)
+        if not workspace_dir.exists():
+            return None
+        try:
+            return self._resolve_flash_port(board_id, self._load_board_metadata(workspace_dir))
+        except Esp32BuilderError:
+            return None
+
+    def _resolve_flash_port(self, board_id: str, metadata: dict) -> str:
+        """Find the port to flash, preferring the board's USB serial number.
+
+        Linux hands out /dev/ttyUSB* in plug order, so a board that is
+        unplugged and reconnected (or simply powered up in a different order)
+        can move between ttyUSB0 and ttyUSB1. Flashing the recorded port then
+        either fails outright or - far worse - writes this board's firmware
+        into whatever else happens to be sitting on that port now. The USB
+        serial number identifies the physical chip, so trust it over the port
+        whenever we have one.
+        """
+        recorded_port = self._coerce_nullable_string(metadata.get("port"))
+        expected_serial = self._coerce_nullable_string(metadata.get("serial_number"))
+
+        if expected_serial:
+            for candidate in self._list_serial_ports():
+                if candidate.serial_number == expected_serial:
+                    return candidate.device
+            raise Esp32BuilderError(
+                f"ESP32 '{board_id}' (USB serial {expected_serial}) is not connected. "
+                "Plug the board in - it is identified by its serial number, so it can be on any USB port."
+            )
+
+        if not recorded_port:
+            raise Esp32BuilderError("This board does not have a serial port associated with it yet.")
+
+        # No serial number recorded: fall back to the port, but only if the
+        # device actually exists, so the failure names the real problem.
+        if not any(candidate.device == recorded_port for candidate in self._list_serial_ports()):
+            connected = ", ".join(candidate.device for candidate in self._list_serial_ports()) or "none"
+            raise Esp32BuilderError(
+                f"ESP32 '{board_id}' is mapped to {recorded_port}, but no such port is connected "
+                f"(currently connected: {connected}). Reconnect the board, or record its USB serial "
+                "number on the board so it can be found on any port."
+            )
+        return recorded_port
 
     def _list_serial_ports(self) -> list[_SerialPortInfo]:
         return list_serial_ports()

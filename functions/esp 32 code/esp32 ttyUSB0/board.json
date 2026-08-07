@@ -3,8 +3,8 @@
   "display_name": "ESP32 ttyUSB0",
   "port": "/dev/ttyUSB0",
   "description": "CP2102N USB to UART Bridge Controller",
-  "hardware_id": "USB VID:PID=10C4:EA60 SER=b4ca1babbf71f0118167039f1045c30f LOCATION=3-1",
-  "serial_number": "b4ca1babbf71f0118167039f1045c30f",
+  "hardware_id": "USB VID:PID=10C4:EA60 SER=58d72d4c84bcf01191f2167148e9de0f LOCATION=1-2",
+  "serial_number": "58d72d4c84bcf01191f2167148e9de0f",
   "firmware_entry_file": "firmware/main.ino",
   "fqbn": "esp32:esp32:esp32"
 }

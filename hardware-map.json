@@ -13,10 +13,10 @@
       "expected_device_label": null
     },
     {
-      "id": "controller-ykkl80",
+      "id": "ttyUSB1",
       "label": "Double Z axis and pumps",
-      "usb_port": "/dev/ttyUSB0",
-      "enabled": false,
+      "usb_port": "/dev/ttyUSB1",
+      "enabled": true,
       "notes": null,
       "dynamic": false,
       "expected_serial_number": null,
@@ -615,10 +615,10 @@
     },
     {
       "id": "z-left-motor",
-      "board_id": "controller-ykkl80",
+      "board_id": "ttyUSB1",
       "name": "Z Left Motor",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -627,14 +627,14 @@
         {
           "id": "z-left-dir",
           "signal": "direction",
-          "gpio": "33",
+          "gpio": "32",
           "function_input_key": "z_left_dir_pin",
           "notes": null
         },
         {
           "id": "z-left-step",
           "signal": "step",
-          "gpio": "32",
+          "gpio": "18",
           "function_input_key": "z_left_step_pin",
           "notes": null
         },
@@ -671,10 +671,10 @@
     },
     {
       "id": "z-right-motor",
-      "board_id": "controller-ykkl80",
+      "board_id": "ttyUSB1",
       "name": "Z Right Motor",
       "kind": "stepper_motor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -683,14 +683,14 @@
         {
           "id": "z-right-dir",
           "signal": "direction",
-          "gpio": "32",
+          "gpio": "19",
           "function_input_key": "z_right_dir_pin",
           "notes": null
         },
         {
           "id": "z-right-step",
           "signal": "step",
-          "gpio": "18",
+          "gpio": "21",
           "function_input_key": "z_right_step_pin",
           "notes": null
         },
@@ -1180,7 +1180,7 @@
       "y": 1668.7
     },
     {
-      "node_id": "controller-ykkl80",
+      "node_id": "ttyUSB1",
       "x": 722.0,
       "y": 432.0
     },
@@ -1195,5 +1195,5 @@
       "y": 727.0
     }
   ],
-  "updated_at": "2026-07-27T17:47:41.614460Z"
+  "updated_at": "2026-08-07T19:24:41.910729Z"
 }

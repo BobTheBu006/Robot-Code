@@ -1,0 +1,10 @@
+{
+  "board_id": "controller-ykkl80",
+  "display_name": "Double Z axis and pumps",
+  "port": "/dev/ttyUSB1",
+  "description": "Dual Z-axis controller (motors on this ESP32, limit switches on Raspberry Pi GPIO)",
+  "hardware_id": "USB VID:PID=10C4:EA60 SER=58d72d4c84bcf01191f2167148e9de0f",
+  "serial_number": "58d72d4c84bcf01191f2167148e9de0f",
+  "firmware_entry_file": "firmware/main.ino",
+  "fqbn": "esp32:esp32:esp32"
+}

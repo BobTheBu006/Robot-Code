@@ -35,9 +35,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 36,
-        "benchmarkDurationMs": 20,
-        "lastDurationMs": 48
+        "runCount": 41,
+        "benchmarkDurationMs": 19,
+        "lastDurationMs": 0
       },
       "measured": {
         "width": 210,
@@ -563,7 +563,7 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 57,
         "benchmarkDurationMs": 30839,
         "lastDurationMs": 100221
@@ -1025,7 +1025,7 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 20,
         "benchmarkDurationMs": 3860,
         "lastDurationMs": 127
@@ -1669,7 +1669,7 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 1,
         "benchmarkDurationMs": 8204,
         "lastDurationMs": 8204
@@ -2299,7 +2299,7 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 1,
         "benchmarkDurationMs": 5152,
         "lastDurationMs": 5152
@@ -2755,10 +2755,549 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 2,
         "benchmarkDurationMs": 165738,
         "lastDurationMs": 194236
+      },
+      "measured": {
+        "width": 210,
+        "height": 120
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "calibrate_z-9bgjf",
+      "type": "workflowBlock",
+      "position": {
+        "x": 414,
+        "y": 271
+      },
+      "data": {
+        "block": {
+          "id": "calibrate_z",
+          "displayName": "Calibrate Z Axis",
+          "category": "Advanced Functions",
+          "description": "Homes both Z motors independently: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. The actual measured travel becomes the calibrated range for later Move Z Axis calls.",
+          "version": "0.4.0",
+          "kind": "advanced",
+          "acceptsInput": true,
+          "accent": "#0e7490",
+          "inputs": [
+            {
+              "key": "tool_port",
+              "label": "Selected ESP32",
+              "type": "file/path",
+              "description": "Connected ESP32 board running the dual Z-axis controller firmware.",
+              "required": true,
+              "default": "/dev/ttyUSB0",
+              "placeholder": "/dev/ttyUSB0",
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "axes",
+              "label": "Axes to Calibrate",
+              "type": "select",
+              "description": "Which Z side(s) to home. Use a single side during bring-up when the other motor is unpowered or being worked on - the skipped side keeps whatever calibration it already had. Move Z Axis still requires both sides to have been calibrated at some point.",
+              "required": false,
+              "default": "both",
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": [
+                {
+                  "label": "Both Z axes",
+                  "value": "both"
+                },
+                {
+                  "label": "Left only",
+                  "value": "left"
+                },
+                {
+                  "label": "Right only",
+                  "value": "right"
+                }
+              ]
+            },
+            {
+              "key": "z_left_track_length_cm",
+              "label": "Z Left Track Length (cm)",
+              "type": "number",
+              "description": "Expected physical travel of the left Z axis between its min and max limit switches.",
+              "required": true,
+              "default": 60,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "z_right_track_length_cm",
+              "label": "Z Right Track Length (cm)",
+              "type": "number",
+              "description": "Expected physical travel of the right Z axis between its min and max limit switches.",
+              "required": true,
+              "default": 60,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "limit_buffer_cm",
+              "label": "Limit Buffer (cm)",
+              "type": "number",
+              "description": "Safety gap kept between the usable range and each max limit switch. Calibration parks this far off the max switch when it finishes, so it never leaves a switch pressed, and later moves are capped at track length minus this buffer.",
+              "required": false,
+              "default": 0.5,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "speed_rpm",
+              "label": "Calibration Speed (RPM)",
+              "type": "number",
+              "description": "Motor speed used while homing both Z axes.",
+              "required": true,
+              "default": 100,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "trapezoidal_speed",
+              "label": "Trapezoidal Speed",
+              "type": "boolean",
+              "description": "Enable acceleration and deceleration ramping instead of jumping directly to target speed.",
+              "required": false,
+              "default": true,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "acceleration_rpm_per_s",
+              "label": "Acceleration (RPM/s)",
+              "type": "number",
+              "description": "Acceleration and deceleration rate used for trapezoidal speed ramping.",
+              "required": false,
+              "default": 300,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            }
+          ],
+          "advancedInputs": [
+            {
+              "key": "steps_per_cm_estimate",
+              "label": "Steps per cm (estimate)",
+              "type": "number",
+              "description": "Rough steps-per-cm of the Z drive, used only to decide how far homing is allowed to travel before giving up. It does not affect the result - calibration measures the real value. Set it too low and homing stops part way down the axis; too high only makes a genuine failure take longer to report.",
+              "required": false,
+              "default": 2000,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "z_left_step_pin",
+              "label": "Z Left Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z left step pin.",
+              "required": false,
+              "default": 32,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_left_dir_pin",
+              "label": "Z Left Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z left dir pin.",
+              "required": false,
+              "default": 33,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_right_step_pin",
+              "label": "Z Right Step Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z right step pin.",
+              "required": false,
+              "default": 4,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_right_dir_pin",
+              "label": "Z Right Dir Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z right dir pin.",
+              "required": false,
+              "default": 5,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_left_min_limit_pin",
+              "label": "Z Left Min Limit Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z left min limit pin.",
+              "required": false,
+              "default": 12,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_left_max_limit_pin",
+              "label": "Z Left Max Limit Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z left max limit pin.",
+              "required": false,
+              "default": 13,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_right_min_limit_pin",
+              "label": "Z Right Min Limit Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z right min limit pin.",
+              "required": false,
+              "default": 14,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "z_right_max_limit_pin",
+              "label": "Z Right Max Limit Pin",
+              "type": "number",
+              "description": "Runtime GPIO pin for z right max limit pin.",
+              "required": false,
+              "default": 15,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            }
+          ],
+          "outputs": [
+            {
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue when Z calibration completes."
+            }
+          ],
+          "builderBoardId": "controller-ykkl80",
+          "builderSourcePath": null,
+          "builderWorkspacePath": null,
+          "builderFirmwareEntryFile": null,
+          "builderBaseFunctionId": null,
+          "hardwareDevices": [
+            {
+              "id": "z-left-motor",
+              "name": "Z Left Motor",
+              "kind": "stepper_motor",
+              "board_id": "ttyUSB1",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-left-dir",
+                  "signal": "direction",
+                  "gpio": "32",
+                  "function_input_key": "z_left_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "z-left-step",
+                  "signal": "step",
+                  "gpio": "18",
+                  "function_input_key": "z_left_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "pin-3-x0wow5",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-4-mxvucv",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-5-7u80fj",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-6-9vvs62",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-z-left-motor",
+              "notes": null
+            },
+            {
+              "id": "z-right-motor",
+              "name": "Z Right Motor",
+              "kind": "stepper_motor",
+              "board_id": "ttyUSB1",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-right-dir",
+                  "signal": "direction",
+                  "gpio": "19",
+                  "function_input_key": "z_right_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "z-right-step",
+                  "signal": "step",
+                  "gpio": "21",
+                  "function_input_key": "z_right_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "pin-3-rcwdsn",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-4-6tvb4v",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-5-ns7et7",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "pin-6-659ts2",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-z-right-motor",
+              "notes": null
+            },
+            {
+              "id": "z-left-min-limit-switch",
+              "name": "Z Left Min Limit Switch",
+              "kind": "sensor",
+              "board_id": "raspberry-pi",
+              "sensor_kind": "position_limit_switch",
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-left-min-limit",
+                  "signal": "signal",
+                  "gpio": "19",
+                  "function_input_key": "z_left_min_limit_pin",
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-sensor-z-left-min-limit-switch",
+              "notes": null
+            },
+            {
+              "id": "z-left-max-limit-switch",
+              "name": "Z Left Max Limit Switch",
+              "kind": "sensor",
+              "board_id": "raspberry-pi",
+              "sensor_kind": "position_limit_switch",
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-left-max-limit",
+                  "signal": "signal",
+                  "gpio": "6",
+                  "function_input_key": "z_left_max_limit_pin",
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-sensor-z-left-max-limit-switch",
+              "notes": null
+            },
+            {
+              "id": "z-right-min-limit-switch",
+              "name": "Z Right Min Limit Switch",
+              "kind": "sensor",
+              "board_id": "raspberry-pi",
+              "sensor_kind": "position_limit_switch",
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-right-min-limit",
+                  "signal": "signal",
+                  "gpio": "16",
+                  "function_input_key": "z_right_min_limit_pin",
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-sensor-z-right-min-limit-switch",
+              "notes": null
+            },
+            {
+              "id": "z-right-max-limit-switch",
+              "name": "Z Right Max Limit Switch",
+              "kind": "sensor",
+              "board_id": "raspberry-pi",
+              "sensor_kind": "position_limit_switch",
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "z-right-max-limit",
+                  "signal": "signal",
+                  "gpio": "12",
+                  "function_input_key": "z_right_max_limit_pin",
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-sensor-z-right-max-limit-switch",
+              "notes": null
+            }
+          ],
+          "firmwareRequirements": [
+            {
+              "routine_id": "calibrate_z",
+              "controller_role": "builder_board",
+              "source": "firmware/main.ino",
+              "protocol": "Serial commands: SET Z PINS, SET Z LIMITS, CALIBRATE Z <leftCm> <rightCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware homes each Z side to its min switch (sets 0), then to its max switch, and records the measured travel as the calibrated track length.",
+              "entry_point": "calibrate_z",
+              "required_device_ids": [
+                "z-left-motor",
+                "z-right-motor",
+                "z-left-min-limit-switch",
+                "z-left-max-limit-switch",
+                "z-right-min-limit-switch",
+                "z-right-max-limit-switch"
+              ],
+              "description": "Firmware routine required by the Calibrate Z Axis block."
+            }
+          ],
+          "referencedBasicBlockIds": []
+        },
+        "parameters": {
+          "tool_port": "/dev/ttyUSB0",
+          "axes": "right",
+          "z_left_track_length_cm": 54,
+          "z_right_track_length_cm": 60,
+          "limit_buffer_cm": 0.5,
+          "speed_rpm": 100,
+          "trapezoidal_speed": true,
+          "acceleration_rpm_per_s": 300,
+          "steps_per_cm_estimate": 2000,
+          "z_left_step_pin": 32,
+          "z_left_dir_pin": 33,
+          "z_right_step_pin": 4,
+          "z_right_dir_pin": 5,
+          "z_left_min_limit_pin": 12,
+          "z_left_max_limit_pin": 13,
+          "z_right_min_limit_pin": 14,
+          "z_right_max_limit_pin": 15
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 2,
+        "benchmarkDurationMs": 4700,
+        "lastDurationMs": 5153
       },
       "measured": {
         "width": 210,
@@ -2775,7 +3314,8 @@
       "target": "calibrate_xy-jm4o7",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__start-seed-startnext-calibrate_xy-jm4o7input"
+      "id": "xy-edge__start-seed-startnext-calibrate_xy-jm4o7input",
+      "selected": false
     },
     {
       "source": "calibrate_xy-jm4o7",
@@ -2783,7 +3323,8 @@
       "target": "pickup_toolhead-k5mi0",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__calibrate_xy-jm4o7next-pickup_toolhead-k5mi0input"
+      "id": "xy-edge__calibrate_xy-jm4o7next-pickup_toolhead-k5mi0input",
+      "selected": false
     },
     {
       "source": "pickup_toolhead-k5mi0",
@@ -2791,7 +3332,8 @@
       "target": "move_gantry_xy-10k16",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__pickup_toolhead-k5mi0next-move_gantry_xy-10k16input"
+      "id": "xy-edge__pickup_toolhead-k5mi0next-move_gantry_xy-10k16input",
+      "selected": false
     },
     {
       "source": "move_gantry_xy-10k16",
@@ -2799,7 +3341,8 @@
       "target": "drop_toolhead-46ttl",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__move_gantry_xy-10k16next-drop_toolhead-46ttlinput"
+      "id": "xy-edge__move_gantry_xy-10k16next-drop_toolhead-46ttlinput",
+      "selected": false
     },
     {
       "source": "calibrate_xy-jm4o7",
@@ -2807,7 +3350,16 @@
       "target": "test_gantry_repeatability-iexaf",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__calibrate_xy-jm4o7next-test_gantry_repeatability-iexafinput"
+      "id": "xy-edge__calibrate_xy-jm4o7next-test_gantry_repeatability-iexafinput",
+      "selected": false
+    },
+    {
+      "source": "start-seed-start",
+      "sourceHandle": "next",
+      "target": "calibrate_z-9bgjf",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__start-seed-startnext-calibrate_z-9bgjfinput"
     }
   ]
 }

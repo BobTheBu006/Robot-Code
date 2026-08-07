@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 GantrySpeedProfile = Literal["slow", "normal", "fast"]
 GantryCalibrationSpeedProfile = Literal["safe", "normal"]
 GantryLimitMode = Literal["2", "4"]
+GantryZAxisSelection = Literal["both", "left", "right"]
 ToolChangeAction = Literal["get_tool", "drop_tool"]
 
 GANTRY_WORKSPACE_X_CM = 115.0
@@ -361,21 +362,33 @@ class GantryZMoveRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryZMoveRequest":
-        assigned_pins = {
+        # The Z axis is a split-controller setup (see services/hybrid_z_axis.py):
+        # the two motors are driven by the ESP32 while the limit switches are
+        # read straight off Raspberry Pi GPIO. Those are two different chips, so
+        # "GPIO 19" on one is a completely different physical pin from "GPIO 19"
+        # on the other. Validate each controller's pins as its own namespace -
+        # comparing across them reports conflicts that do not physically exist.
+        driver_pins = {
             "z_left_step_pin": self.z_left_step_pin,
             "z_left_dir_pin": self.z_left_dir_pin,
             "z_right_step_pin": self.z_right_step_pin,
             "z_right_dir_pin": self.z_right_dir_pin,
+        }
+        limit_pins = {
             "z_left_min_limit_pin": self.z_left_min_limit_pin,
             "z_right_min_limit_pin": self.z_right_min_limit_pin,
         }
         if self.limit_switch_mode == "4":
-            assigned_pins["z_left_max_limit_pin"] = self.z_left_max_limit_pin
-            assigned_pins["z_right_max_limit_pin"] = self.z_right_max_limit_pin
+            limit_pins["z_left_max_limit_pin"] = self.z_left_max_limit_pin
+            limit_pins["z_right_max_limit_pin"] = self.z_right_max_limit_pin
 
         _validate_distinct_pins(
-            assigned_pins,
-            "Each active Z driver/limit input must use a distinct GPIO pin. Conflicts",
+            driver_pins,
+            "Each active Z driver output must use a distinct GPIO pin on the motor controller. Conflicts",
+        )
+        _validate_distinct_pins(
+            limit_pins,
+            "Each active Z limit input must use a distinct GPIO pin on the Raspberry Pi. Conflicts",
         )
         if not 0.0 <= self.z_left_cm <= GANTRY_WORKSPACE_Z_CM:
             raise ValueError(f"z_left_cm must be between 0 and {GANTRY_WORKSPACE_Z_CM} cm.")
@@ -412,6 +425,14 @@ class GantryZCalibrationRequest(BaseModel):
     z_left_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
     z_right_track_length_cm: float = Field(default=GANTRY_WORKSPACE_Z_CM, gt=0)
     limit_buffer_cm: float = Field(default=0.5, ge=0)
+    # Bring-up aid: home only one side when the other is unpowered or being
+    # worked on. A side that is skipped keeps whatever calibration it already
+    # had; moves still require both sides to have been calibrated at some point.
+    axes: GantryZAxisSelection = "both"
+    # Only used to size the homing probe budget before the real value is
+    # measured. A Z lead screw is far finer than the belt-driven XY, so a
+    # too-low estimate makes homing give up part way down the axis.
+    steps_per_cm_estimate: float = Field(default=2000.0, gt=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
     speed_rpm: int = Field(default=100, gt=0)
     trapezoidal_speed: bool = Field(default=True)
