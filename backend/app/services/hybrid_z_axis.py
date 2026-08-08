@@ -19,6 +19,7 @@ from pathlib import Path
 from threading import Event, Lock
 from typing import Any
 
+from app.core.safety import PRIORITY_SERIAL, CallableActor, safety_controller
 from app.models.gantry import GantryZCalibrationRequest, GantryZMoveRequest
 from app.services.gpio_backend import load_gpio_backend
 
@@ -87,11 +88,18 @@ class HybridZAxisService:
         self._limit_buffer_cm = 0.5
         self._serial_port_path: str | None = None
         self._serial_port: Any = None
-        self._stop_requested = Event()
+        # Shared by reference with every other motion driver - see
+        # app/core/safety.py. One latch, not one per service.
+        self._stop_requested = safety_controller.motion_blocked
         self._load_state()
 
     # ---- state persistence, mirroring gantry-state.json's pattern ----
     def _state_path(self) -> Path:
+        # Overridable so tests get an isolated file - see the matching note in
+        # raspberry_gantry._state_path.
+        override = os.getenv("ROBOT_Z_GANTRY_STATE_FILE")
+        if override:
+            return Path(override)
         return Path(__file__).resolve().parents[3] / "z-gantry-state.json"
 
     def _save_state(self) -> None:
@@ -172,7 +180,8 @@ class HybridZAxisService:
         }
 
     def rearm(self) -> None:
-        self._stop_requested.clear()
+        """Deprecated: only the SafetyController may clear the shared latch."""
+        return None
 
     def _raise_if_stopped(self) -> None:
         if self._stop_requested.is_set():
@@ -694,3 +703,9 @@ class HybridZAxisService:
 
 
 hybrid_z_axis_service = HybridZAxisService()
+
+safety_controller.register_actor(
+    CallableActor("hybrid-z-axis", hybrid_z_axis_service.emergency_stop),
+    priority=PRIORITY_SERIAL,
+    description="Z axis controller (GPIO flag plus STOP over serial)",
+)

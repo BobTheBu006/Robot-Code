@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass, field
 from threading import Lock
 
+from app.core.safety import PRIORITY_SERIAL, CallableActor, safety_controller
 from app.models.gantry import (
     GANTRY_WORKSPACE_X_CM,
     GantryCircleXYRequest,
@@ -895,3 +896,9 @@ class GantryControllerService:
 
 
 gantry_controller_service = GantryControllerService()
+
+safety_controller.register_actor(
+    CallableActor("gantry-serial", gantry_controller_service.emergency_stop),
+    priority=PRIORITY_SERIAL,
+    description="Gantry ESP32 serial sessions",
+)

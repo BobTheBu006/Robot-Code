@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 
+from app.core.safety import PRIORITY_SERIAL, CallableActor, safety_controller
 from app.models.syringe import (
     SyringeCalibrationEntry,
     SyringeDispenseRequest,
@@ -821,3 +822,9 @@ class SyringeControllerService:
 
 
 syringe_controller_service = SyringeControllerService()
+
+safety_controller.register_actor(
+    CallableActor("syringe-serial", syringe_controller_service.emergency_stop),
+    priority=PRIORITY_SERIAL,
+    description="Syringe pump ESP32 serial sessions",
+)

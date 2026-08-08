@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "controller_identity.h"
 
 const int DEFAULT_STEPS_PER_REVOLUTION = 800;
 const int STEP_PULSE_WIDTH_US = 8;
@@ -1606,7 +1607,10 @@ void loop() {
     return;
   }
 
-  if (cmd == "PING") {
+  if (cmd == "ID?" || cmd == "ID") {
+    printControllerIdentity();
+  }
+  else if (cmd == "PING") {
     Serial.println("PONG");
   }
   else if (cmd == "STOP") {

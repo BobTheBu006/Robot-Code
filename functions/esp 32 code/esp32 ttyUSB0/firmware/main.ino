@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "controller_identity.h"
 #include <Preferences.h>
 
 // Non-volatile storage so the X calibration (and last known position) survive
@@ -2680,7 +2681,10 @@ void loop() {
     return;
   }
 
-  if (cmd == "PING") {
+  if (cmd == "ID?" || cmd == "ID") {
+    printControllerIdentity();
+  }
+  else if (cmd == "PING") {
     Serial.println("PONG");
   }
   else if (cmd == "STOP") {

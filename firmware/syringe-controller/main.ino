@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "controller_identity.h"
 
 const int NUM_SYRINGES = 7;
 const int spr = 200;
@@ -378,6 +379,9 @@ void loop() {
     }
     else if (handleSpeedCommand(cmd)) {
       // speed command handled above
+    }
+    else if (cmd == "ID?" || cmd == "ID") {
+      printControllerIdentity();
     }
     else if (cmd == "PING") {
       Serial.println("PONG");

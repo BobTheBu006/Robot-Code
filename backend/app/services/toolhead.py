@@ -1,22 +1,23 @@
 """Tool changer: rack geometry, held-tool tracking and the pick/drop motion.
 
 The held tool is physical state: a tool stays on the gantry across a backend
-restart, so the index is persisted to disk rather than kept in memory. If it
-were only in memory, a restart while holding a tool would make the next pick-up
-skip its automatic drop and drive a held tool into the rack.
+restart, so it is persisted to disk rather than kept in memory. It is tracked
+through `physical_state_store` so that "I do not know what is on the head" is
+representable - see that module for why guessing is what broke this before.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from threading import Lock
 
 from app.models.gantry import GantryGotoXYRequest, GantryXYMoveRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.physical_state import PhysicalStateError, physical_state_store
 from app.services.raspberry_gantry import planned_move_xy_result, xy_hardware_is_on_raspberry_pi
 from app.services.workspace_defaults import workspace_defaults_service
+
+TOOLHEAD_FACT_ID = "toolhead.held"
 
 # Speed used for every step after the initial approach. The approach speed is
 # user-editable; engagement is deliberately slow and fixed.
@@ -34,8 +35,6 @@ DEFAULT_TOOLHEAD_POSITIONS: dict[int, tuple[float, float]] = {
     5: (0.0, 42.7),
     6: (0.0, 52.7),
 }
-
-_STATE_PATH = Path(__file__).resolve().parents[3] / "toolhead-state.json"
 
 
 class ToolheadError(RuntimeError):
@@ -100,39 +99,42 @@ def _assert_waypoints_reachable(action: str, position: ToolheadPosition, waypoin
 
 
 class ToolheadStateStore:
-    def __init__(self, state_path: Path) -> None:
-        self._state_path = state_path
-        self._lock = Lock()
+    """Held-tool tracking on top of the certainty-aware physical state store.
 
-    def _read(self) -> dict:
-        if not self._state_path.exists():
-            return {}
-        try:
-            with self._state_path.open("r", encoding="utf-8") as handle:
-                return json.load(handle)
-        except (OSError, json.JSONDecodeError):
-            return {}
-
-    def _write(self, payload: dict) -> None:
-        temp_path = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
-        with temp_path.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
-            handle.write("\n")
-        temp_path.replace(self._state_path)
+    Every read goes through `require_known`, so a tool change that was
+    interrupted refuses to guess instead of reporting an empty head.
+    """
 
     def held_index(self) -> int | None:
-        with self._lock:
-            value = self._read().get("held_index")
-            return value if isinstance(value, int) else None
+        """The tool on the gantry, or None. Raises if that is not knowable."""
+        fact = physical_state_store.require_known(TOOLHEAD_FACT_ID)
+        return fact.value if isinstance(fact.value, int) else None
+
+    def held_index_or_uncertain(self) -> tuple[int | None, bool]:
+        """Read without raising, for callers that only want to report state."""
+        fact = physical_state_store.get(TOOLHEAD_FACT_ID)
+        if fact is None:
+            return None, True
+        value = fact.value if isinstance(fact.value, int) else None
+        return value, not fact.is_known
 
     def set_held_index(self, index: int | None) -> None:
-        with self._lock:
-            payload = self._read()
-            payload["held_index"] = index
-            self._write(payload)
+        physical_state_store.set_known(TOOLHEAD_FACT_ID, index)
+
+    def begin_change(self, provisional_index: int | None, phase: str) -> None:
+        """Record the intent before the gantry moves."""
+        physical_state_store.begin_transition(
+            TOOLHEAD_FACT_ID, provisional_value=provisional_index, phase=phase
+        )
+
+    def commit_change(self, index: int | None) -> None:
+        physical_state_store.commit_transition(TOOLHEAD_FACT_ID, index)
+
+    def mark_uncertain(self, reason: str) -> None:
+        physical_state_store.mark_uncertain(TOOLHEAD_FACT_ID, reason=reason)
 
 
-toolhead_state_store = ToolheadStateStore(_STATE_PATH)
+toolhead_state_store = ToolheadStateStore()
 
 
 class ToolheadService:
@@ -223,8 +225,14 @@ class ToolheadService:
     ) -> list[dict]:
         waypoints = self.drop_waypoints(position, dip_depth_cm, lift_cm, release_cm, clearance_cm)
         _assert_waypoints_reachable("be dropped", position, waypoints)
+
+        # Declare the intent before moving, keeping the tool index as the
+        # provisional value. If the sequence is interrupted, "might still be
+        # holding it" is the safe belief - assuming the head came back empty is
+        # what let the next pick-up drive a loaded head into the rack.
+        toolhead_state_store.begin_change(position.index, f"dropping toolhead {position.index}")
         moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm, context=context)
-        toolhead_state_store.set_held_index(None)
+        toolhead_state_store.commit_change(None)
         return moves
 
     def pickup(
@@ -239,8 +247,13 @@ class ToolheadService:
     ) -> list[dict]:
         waypoints = self.pickup_waypoints(position, dip_depth_cm, lift_cm, clearance_cm)
         _assert_waypoints_reachable("be picked up", position, waypoints)
+
+        # Same conservative rule as drop(): from the first move onwards the
+        # head may already be carrying this tool, so that is the provisional
+        # value an interrupted sequence leaves behind.
+        toolhead_state_store.begin_change(position.index, f"picking up toolhead {position.index}")
         moves = self.run_sequence(base_inputs, waypoints, approach_speed_rpm, context=context)
-        toolhead_state_store.set_held_index(position.index)
+        toolhead_state_store.commit_change(position.index)
         return moves
 
 

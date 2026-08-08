@@ -184,24 +184,51 @@ class GpioBackendLoaderTests(unittest.TestCase):
 
 class RaspberryGantryLgpioExecutionTests(unittest.TestCase):
     def setUp(self) -> None:
+        import json
+        import os
+        import tempfile
+
         gpio_backend.reset_gpio_backend_cache()
+
+        # Isolate the persisted calibration. Reading the repo-root state file
+        # made this test order-dependent: whether it passed came down to what a
+        # previously-run test had left in gantry-state.json.
+        self._temp_dir = tempfile.TemporaryDirectory()
+        state_path = Path(self._temp_dir.name) / "gantry-state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "calibrated": True,
+                    "steps_per_cm": 100.0,
+                    "steps_per_rotation": 800,
+                    "limit_buffer_cm": 0.5,
+                    "x_track_length_cm": 104.5,
+                    "y_track_length_cm": 55.5,
+                    "x_steps": 0,
+                    "y_steps": 0,
+                    "y_known": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+        os.environ["ROBOT_GANTRY_STATE_FILE"] = str(state_path)
 
     def tearDown(self) -> None:
         sys.modules.pop("lgpio", None)
         gpio_backend.reset_gpio_backend_cache()
         import os
         os.environ.pop("ROBOT_GPIO_XY_STEPS_PER_CM", None)
+        os.environ.pop("ROBOT_GANTRY_STATE_FILE", None)
+        self._temp_dir.cleanup()
 
     def test_move_xy_executes_for_real_through_lgpio(self) -> None:
-        import os
-
         from app.models.gantry import GantryXYMoveRequest
         from app.services.raspberry_gantry import RaspberryGantryGPIOService
 
         # gpio_read -> 1 means limit switches are inactive (active-low default).
         fake = FakeLgpio({0: "pinctrl-rp1"}, read_value=1)
         sys.modules["lgpio"] = fake
-        os.environ["ROBOT_GPIO_XY_STEPS_PER_CM"] = "1"
 
         service = RaspberryGantryGPIOService()
         result = service.move_xy(

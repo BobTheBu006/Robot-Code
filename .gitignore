@@ -33,7 +33,14 @@ OD tests/old serial logs/
 OD tests/STM32CubeG4/
 
 # Runtime machine state: which toolhead is physically on the gantry right now.
+# Superseded by physical-state.json, which also records how certain each fact
+# is; kept ignored so an existing machine's file is still migrated on upgrade.
 toolhead-state.json
+
+# Runtime machine state: physical facts plus their certainty (held toolhead,
+# calibration validity). See backend/app/services/physical_state.py.
+physical-state.json
 
 # Runtime machine state: Pi gantry calibration (mirrors ESP32 NVS).
 gantry-state.json
+z-gantry-state.json

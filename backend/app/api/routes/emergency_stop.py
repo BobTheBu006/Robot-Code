@@ -1,50 +1,48 @@
+"""Compatibility shim for the original E-Stop URLs.
+
+The behaviour now lives in `app.api.routes.safety`, which owns the single
+latch. These paths are kept so the current frontend keeps working while it is
+migrated; new callers should use `/api/safety/*`.
+
+Note the deliberate behaviour change on `/rearm`: it no longer unconditionally
+clears the latch. The frontend calls it before every block test, which is
+exactly how a pressed E-Stop used to get silently cleared. It now refuses while
+any physical fact is unconfirmed, and the caller is told what to confirm.
+"""
+
 from fastapi import APIRouter
 
-from app.services.esp32_builder import esp32_builder_service
-from app.services.gantry_controller import gantry_controller_service
-from app.services.hybrid_z_axis import hybrid_z_axis_service
-from app.services.raspberry_gantry import emergency_stop_raspberry_gantry, rearm_raspberry_gantry
-from app.services.syringe_controller import syringe_controller_service
-from app.services.toolhead import toolhead_state_store
+from app.core.safety import safety_controller
+from app.api.routes.safety import rearm as safety_rearm
+from app.models.safety import SafetyRearmRequest, SafetyRearmResponse
 
 router = APIRouter(prefix="/api/emergency-stop", tags=["emergency-stop"])
 
 
 @router.post("")
 def emergency_stop() -> dict[str, object]:
-    results = [
-        # Stop Raspberry Pi GPIO motion first: it is driven in-process, so this
-        # only sets a flag and returns immediately, whereas the serial stops
-        # below can block on a busy port.
-        emergency_stop_raspberry_gantry(),
-        hybrid_z_axis_service.emergency_stop(),
-        # Abort an in-progress board flash so the controller stops getting
-        # reprogrammed, then stop any active motion.
-        esp32_builder_service.emergency_stop(),
-        *gantry_controller_service.emergency_stop(),
-        *syringe_controller_service.emergency_stop(),
-    ]
-
-    # An E-Stop can land mid tool-change, so the recorded held tool is no
-    # longer trustworthy - the tool may be seated, half-engaged, or dropped.
-    # Forget it rather than let the next pickup route through a wrong slot;
-    # the operator confirms the physical state when work resumes.
-    toolhead_state_store.set_held_index(None)
+    record = safety_controller.stop(reason="Operator pressed emergency stop.", source="operator")
+    snapshot = safety_controller.snapshot()
 
     return {
-        "ok": all(bool(result.get("ok")) for result in results),
+        "ok": record.ok,
+        "state": snapshot["state"],
         "message": "Emergency stop signal sent.",
-        "results": results,
+        "requires_confirmation": snapshot["requires_confirmation"],
+        # Kept in the historical shape (`tool`/`tool_port`) so the existing
+        # frontend result list keeps rendering.
+        "results": [
+            {
+                "ok": report.ok,
+                "tool": report.actor_id,
+                "tool_port": report.detail.get("tool_port"),
+                "message": report.message,
+            }
+            for report in record.reports
+        ],
     }
 
 
-@router.post("/rearm")
-def rearm() -> dict[str, object]:
-    """Clear a latched emergency stop so new work can move again.
-
-    An E-Stop latches: it keeps blocking Raspberry Pi GPIO motion until the user
-    explicitly starts new work (Run all, running a block, or Resume).
-    """
-    rearm_raspberry_gantry()
-    hybrid_z_axis_service.rearm()
-    return {"ok": True, "message": "Emergency stop cleared."}
+@router.post("/rearm", response_model=SafetyRearmResponse)
+def rearm() -> SafetyRearmResponse:
+    return safety_rearm(SafetyRearmRequest())

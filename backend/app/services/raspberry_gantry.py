@@ -26,6 +26,7 @@ from app.models.gantry import (
     GantryXYCalibrationRequest,
     GantryXYMoveRequest,
 )
+from app.core.safety import PRIORITY_FLAG, CallableActor, safety_controller
 from app.services.gpio_backend import load_gpio_backend
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
@@ -198,13 +199,22 @@ class RaspberryGantryGPIOService:
         # including runs stopped early by a limit; probes measure travel from it.
         self._last_a_steps = 0
         self._last_b_steps = 0
-        # Set by emergency_stop() from the request thread; the stepping loop
-        # checks it every step so motion aborts mid-move rather than running to
-        # completion. Never cleared by motion itself - only by rearm().
-        self._stop_requested = Event()
+        # The process-wide safety latch, shared by reference rather than owned
+        # here. The stepping loop checks it every step so motion aborts
+        # mid-move rather than running to completion, and because it is the
+        # same Event the serial drivers and the E-Stop route use, there is one
+        # answer to "is the machine allowed to move" instead of five.
+        # Never cleared by motion itself - only by an explicit operator rearm.
+        self._stop_requested = safety_controller.motion_blocked
         self._load_state()
 
     def _state_path(self) -> Path:
+        # Overridable so tests get an isolated file. Pointing at the repo-root
+        # state unconditionally made the suite order-dependent: a test that
+        # moved the gantry rewrote the calibration another test then read.
+        override = os.getenv("ROBOT_GANTRY_STATE_FILE")
+        if override:
+            return Path(override)
         return Path(__file__).resolve().parents[3] / "gantry-state.json"
 
     def _save_state(self) -> None:
@@ -287,8 +297,12 @@ class RaspberryGantryGPIOService:
         }
 
     def rearm(self) -> None:
-        """Clear a latched stop so the next run can move again."""
-        self._stop_requested.clear()
+        """Deprecated: the latch is process-wide and only the SafetyController
+        may clear it, after the operator has confirmed any uncertain physical
+        state. Kept so older call sites do not break, but it no longer clears
+        anything on its own - that silent clearing is what made E-Stop
+        advisory."""
+        return None
 
     def stop_is_requested(self) -> bool:
         return self._stop_requested.is_set()
@@ -1559,6 +1573,14 @@ class RaspberryGantryGPIOService:
 
 raspberry_gantry_gpio_service = RaspberryGantryGPIOService()
 
+# Stopped first: this only sets the shared flag, so it returns instantly and
+# never delays the serial actors behind it.
+safety_controller.register_actor(
+    CallableActor("raspberry-pi-gantry", raspberry_gantry_gpio_service.emergency_stop),
+    priority=PRIORITY_FLAG,
+    description="Raspberry Pi GPIO gantry (CoreXY stepping loop)",
+)
+
 
 def planned_calibrate_xy_result(context: dict, request: GantryXYCalibrationRequest) -> dict:
     return raspberry_gantry_gpio_service.calibrate_xy(context, request)
@@ -1585,4 +1607,6 @@ def emergency_stop_raspberry_gantry() -> dict[str, object]:
 
 
 def rearm_raspberry_gantry() -> None:
+    """Deprecated. Rearming goes through `safety_controller.rearm()`, which
+    refuses while any physical fact is still unconfirmed."""
     raspberry_gantry_gpio_service.rearm()

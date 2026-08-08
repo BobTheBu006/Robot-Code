@@ -25,6 +25,7 @@ from app.models.esp32_builder import (
     Esp32WorkflowFirmwarePlanResponse,
     Esp32WorkflowFirmwarePlanRoutine,
 )
+from app.core.safety import PRIORITY_PROCESS, CallableActor, safety_controller
 from app.services.serial_ports import SerialPortInfo as _SerialPortInfo
 from app.services.serial_ports import list_serial_ports
 
@@ -87,8 +88,32 @@ class Esp32BuilderService:
             self._flash_stop_requested = False
 
     def _terminate_flash_process(self, process: subprocess.Popen) -> None:
+        """Kill arduino-cli and the esptool child it spawns.
+
+        On POSIX the whole process group is signalled, because killing only
+        arduino-cli would leave esptool happily finishing the upload. Windows
+        has no process groups in that sense, so `taskkill /T` is used to walk
+        the child tree instead; without this branch the E-Stop path fell
+        through to an exception on Windows and never killed anything.
+        """
         if process.poll() is not None:
             return
+
+        if os.name == "nt":
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                    check=False,
+                    capture_output=True,
+                )
+                process.wait(timeout=5)
+            except Exception:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+            return
+
         try:
             process_group = os.getpgid(process.pid)
             os.killpg(process_group, signal.SIGTERM)
@@ -1032,7 +1057,9 @@ class Esp32BuilderService:
             raise Esp32BuilderError(f"Firmware entry file not found: {firmware_entry_path}")
 
         sketch_name = re.sub(r"[^A-Za-z0-9_]+", "_", board_id) or "esp32_board"
-        temp_root = Path(tempfile.mkdtemp(prefix=f"esp32-{sketch_name}-", dir="/tmp"))
+        # No explicit dir: hardcoding /tmp made every build fail on a Windows
+        # development machine. tempfile picks the right location per platform.
+        temp_root = Path(tempfile.mkdtemp(prefix=f"esp32-{sketch_name}-"))
         sketch_dir = temp_root / sketch_name
         sketch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1762,4 +1789,12 @@ void loop() {
 esp32_builder_service = Esp32BuilderService(
     repo_root=Path(__file__).resolve().parents[3],
     app_functions_dir=Path(__file__).resolve().parent.parent / "functions",
+)
+
+# Killed before the serial actors: a board that is mid-upload must stop being
+# reprogrammed before anything tries to talk to it.
+safety_controller.register_actor(
+    CallableActor("esp32-flash", esp32_builder_service.emergency_stop),
+    priority=PRIORITY_PROCESS,
+    description="In-progress arduino-cli compile/upload processes",
 )

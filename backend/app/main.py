@@ -14,6 +14,7 @@ from app.api.routes.functions import router as functions_router
 from app.api.routes.hardware_map import router as hardware_map_router
 from app.api.routes.health import router as health_router
 from app.api.routes.robot import router as robot_router
+from app.api.routes.safety import router as safety_router
 from app.api.routes.syringe import router as syringe_router
 from app.api.routes.workflows import router as workflows_router
 from app.core.config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, APP_NAME, APP_VERSION
@@ -36,6 +37,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(robot_router)
 app.include_router(camera_router)
+app.include_router(safety_router)
 app.include_router(emergency_stop_router)
 app.include_router(esp32_builder_router)
 app.include_router(hardware_map_router)
