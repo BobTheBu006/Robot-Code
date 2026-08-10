@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.engine.plan import compile_plan
-from app.engine.scheduler import NodeOutcome, run_plan
+from app.engine.scheduler import NodeOutcome, PlanRunner, run_plan
 
 
 def _node(node_id, block_id, *, kind="advanced", params=None, failure_mode="stop_flow", active=True):
@@ -280,6 +280,100 @@ class OrderTests(unittest.TestCase):
         report = run_plan(plan, _runner(ran))
         self.assertTrue(report.ok, report.error)
         self.assertEqual(ran, ["s", "first", "second", "third"])
+
+
+class SteppingTests(unittest.TestCase):
+    """The engine driven from outside, which is how the run route uses it.
+
+    The browser keeps doing execution - hardware resolution, firmware, the
+    safety interlocks - and only the decisions come from here.
+    """
+
+    def test_a_run_can_be_stepped_one_result_at_a_time(self) -> None:
+        plan = compile_plan({
+            "nodes": [
+                _node("s", "start", kind="basic"),
+                _node("f", "for", kind="basic", params={"iterations": 2}),
+                _node("body", "move_z"), _node("after", "dispense"),
+            ],
+            "edges": [_edge("s", "f"), _edge("f", "body", "loop"), _edge("body", "f"), _edge("f", "after", "done")],
+        })
+        runner = PlanRunner(plan)
+
+        ran = []
+        while not runner.finished:
+            due = runner.advance()
+            if not due:
+                break
+            for item in due:
+                ran.append(item.node.node_id)
+                runner.submit(item.node.node_id, NodeOutcome(result={"status": "ok"}), item.context)
+
+        self.assertTrue(runner.finished)
+        self.assertEqual(ran.count("body"), 2)
+        self.assertIn("after", ran)
+
+    def test_control_blocks_are_never_handed_out_for_execution(self) -> None:
+        # Loops are decided inside the engine, so the caller is never asked to
+        # "run" one - which is what the placeholder blocks used to do.
+        plan = compile_plan({
+            "nodes": [
+                _node("s", "start", kind="basic"),
+                _node("f", "for", kind="basic", params={"iterations": 1}),
+                _node("body", "move_z"),
+            ],
+            "edges": [_edge("s", "f"), _edge("f", "body", "loop"), _edge("body", "f")],
+        })
+        runner = PlanRunner(plan)
+
+        handed_out = []
+        while not runner.finished:
+            due = runner.advance()
+            if not due:
+                break
+            for item in due:
+                handed_out.append(item.node.node_id)
+                runner.submit(item.node.node_id, NodeOutcome(result={}), item.context)
+
+        self.assertNotIn("f", handed_out)
+
+    def test_the_context_carries_upstream_output(self) -> None:
+        plan = compile_plan({
+            "nodes": [_node("s", "start", kind="basic"), _node("a", "move_z")],
+            "edges": [_edge("s", "a")],
+        })
+        runner = PlanRunner(plan)
+
+        first = runner.advance()
+        runner.submit("s", NodeOutcome(result={"travel_cm": 60.0}), first[0].context)
+        second = runner.advance()
+
+        self.assertEqual(second[0].node.node_id, "a")
+        self.assertEqual(second[0].context["$in"]["travel_cm"], 60.0)
+
+    def test_a_stopped_run_hands_out_nothing_further(self) -> None:
+        plan = compile_plan({
+            "nodes": [_node("s", "start", kind="basic"), _node("a", "move_z"), _node("b", "dispense")],
+            "edges": [_edge("s", "a"), _edge("a", "b")],
+        })
+        runner = PlanRunner(plan)
+        runner.advance()
+        runner.stop("Access door opened.")
+
+        self.assertTrue(runner.finished)
+        self.assertEqual(runner.advance(), [])
+        self.assertFalse(runner.report.ok)
+        self.assertIn("Access door", runner.report.error)
+
+    def test_an_invalid_plan_is_refused_before_anything_runs(self) -> None:
+        plan = compile_plan({
+            "nodes": [_node("a", "move_z"), _node("b", "dispense")],
+            "edges": [_edge("a", "b"), _edge("b", "a")],
+        })
+        runner = PlanRunner(plan)
+        self.assertTrue(runner.finished)
+        self.assertEqual(runner.advance(), [])
+        self.assertFalse(runner.report.ok)
 
 
 if __name__ == "__main__":

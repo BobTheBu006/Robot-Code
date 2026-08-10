@@ -131,89 +131,129 @@ def _should_iterate(node: PlanNode, iteration: int, context: dict) -> tuple[bool
     return decision.value, f"condition {decision.detail}"
 
 
-def run_plan(
-    plan: ExecutionPlan,
-    run_node: NodeRunner,
-    *,
-    max_iterations: int = DEFAULT_MAX_ITERATIONS,
-    should_stop: Callable[[], bool] | None = None,
-    resolve_loop_items: Callable[[PlanNode, dict], list] | None = None,
-) -> RunReport:
-    """Execute a compiled plan.
+@dataclass
+class ReadyNode:
+    """A node the caller must execute, with the data it should receive."""
 
-    `run_node` performs the actual work; everything here is scheduling. A node
-    is ready when every activated incoming edge has delivered, which is what
-    makes a fan-in a real join instead of a race.
+    node: PlanNode
+    context: dict
+
+
+class PlanRunner:
+    """Scheduling state for one run, steppable from outside.
+
+    Execution lives with the caller. `advance()` handles everything the engine
+    can decide by itself - loops, deactivated blocks, which edges are dead -
+    and hands back the nodes that actually need running; `submit()` takes each
+    result and works out what that makes ready next.
+
+    Splitting it this way is what lets the browser keep doing execution
+    (hardware resolution, firmware flashing, the safety interlocks) while the
+    decisions that were wrong - which branch, how many times, who waits for
+    whom - are made here, against tests, in one place.
     """
-    report = RunReport(ok=True)
-    if not plan.ok:
-        report.ok = False
-        report.error = "; ".join(problem.message for problem in plan.errors)
-        return report
 
-    results: dict[str, dict | None] = {}
-    loop_iteration: dict[str, int] = defaultdict(int)
-    loop_items: dict[str, list] = {}
+    def __init__(
+        self,
+        plan: ExecutionPlan,
+        *,
+        max_iterations: int = DEFAULT_MAX_ITERATIONS,
+        resolve_loop_items: Callable[[PlanNode, dict], list] | None = None,
+    ) -> None:
+        self.plan = plan
+        self.max_iterations = max_iterations
+        self._resolve_loop_items = resolve_loop_items
+        self.report = RunReport(ok=True)
 
-    # Every edge is one of three things, and the third is what makes a join
-    # work: WAITING (its source has not decided yet), LIVE (it delivered), or
-    # DEAD (its source ran and chose a different handle, so it never will).
-    # A join waits only on WAITING edges, so an `if` that took the true branch
-    # does not strand the node below it forever on the false branch.
-    edge_state: dict[str, str] = {edge.edge_id: WAITING for edge in plan.edges}
+        self._results: dict[str, dict | None] = {}
+        self._loop_iteration: dict[str, int] = defaultdict(int)
+        self._loop_items: dict[str, list] = {}
+        self._outstanding: set[str] = set()
+        self._steps = 0
+        self._halted = False
 
-    # Loop scopes are pure graph shape, so they are found once rather than on
-    # every iteration of a loop that may run thousands of times.
-    loop_scopes: dict[str, set[str]] = {
-        node_id: _loop_scope_edges(plan, node_id)
-        for node_id, node in plan.nodes.items()
-        if node.is_loop
-    }
+        if not plan.ok:
+            self.report.ok = False
+            self.report.error = "; ".join(problem.message for problem in plan.errors)
+            self._halted = True
+            self._ready: list[str] = []
+            self._queued: set[str] = set()
+            self._edge_state: dict[str, str] = {}
+            self._loop_scopes: dict[str, set[str]] = {}
+            return
 
-    ready: list[str] = list(plan.start_node_ids)
-    queued: set[str] = set(ready)
+        # Every edge is one of three things, and the third is what makes a join
+        # work: WAITING (its source has not decided yet), LIVE (it delivered),
+        # or DEAD (its source ran and chose a different handle, so it never
+        # will). A join waits only on WAITING edges, so an `if` that took the
+        # true branch does not strand the node below it on the false branch.
+        self._edge_state = {edge.edge_id: WAITING for edge in plan.edges}
 
-    def barrier_edges(node_id: str) -> list:
-        # A loop-back edge is not part of the barrier: the body it comes from
-        # runs *after* the loop node, so waiting on it would deadlock.
-        return [
-            edge for edge in plan.incoming.get(node_id, [])
-            if edge.edge_id not in plan.loop_back_edge_ids
-        ]
+        # Loop scopes are pure graph shape, so they are found once rather than
+        # on every iteration of a loop that may run thousands of times.
+        self._loop_scopes = {
+            node_id: _loop_scope_edges(plan, node_id)
+            for node_id, node in plan.nodes.items()
+            if node.is_loop
+        }
 
-    def context_for(node_id: str) -> dict:
+        self._ready = list(plan.start_node_ids)
+        self._queued = set(self._ready)
+
+    # ---- state the caller can read ----
+
+    @property
+    def finished(self) -> bool:
+        return self._halted or (not self._ready and not self._outstanding)
+
+    @property
+    def results(self) -> dict[str, dict | None]:
+        return dict(self._results)
+
+    def context_for(self, node_id: str) -> dict:
+        """The data a node should receive, from the edges that reached it."""
         merged: dict = {}
-        for edge in plan.incoming.get(node_id, []):
-            if edge_state[edge.edge_id] != LIVE:
+        for edge in self.plan.incoming.get(node_id, []):
+            if self._edge_state.get(edge.edge_id) != LIVE:
                 continue
-            upstream = results.get(edge.source)
+            upstream = self._results.get(edge.source)
             if isinstance(upstream, dict):
                 merged.update(upstream)
         return {
             "$in": merged,
-            "$blocks": dict(results),
-            "$run": {"iteration": loop_iteration.get(node_id, 0)},
-            "$loop_items": loop_items.get(node_id, []),
+            "$blocks": dict(self._results),
+            "$run": {"iteration": self._loop_iteration.get(node_id, 0)},
+            "$loop_items": self._loop_items.get(node_id, []),
         }
 
-    def enqueue(node_id: str) -> None:
-        if node_id not in queued:
-            queued.add(node_id)
-            ready.append(node_id)
+    # ---- edge bookkeeping ----
 
-    def readiness(node_id: str) -> str:
+    def _barrier_edges(self, node_id: str) -> list:
+        # A loop-back edge is not part of the barrier: the body it comes from
+        # runs *after* the loop node, so waiting on it would deadlock.
+        return [
+            edge for edge in self.plan.incoming.get(node_id, [])
+            if edge.edge_id not in self.plan.loop_back_edge_ids
+        ]
+
+    def _readiness(self, node_id: str) -> str:
         """'ready', 'waiting', or 'dead' for the node below an edge."""
-        barrier = barrier_edges(node_id)
+        barrier = self._barrier_edges(node_id)
         if not barrier:
             return "ready"
-        states = {edge_state[edge.edge_id] for edge in barrier}
+        states = {self._edge_state[edge.edge_id] for edge in barrier}
         if WAITING in states:
             return "waiting"
         if LIVE in states:
             return "ready"
         return "dead"
 
-    def settle(edge, state: str) -> None:
+    def _enqueue(self, node_id: str) -> None:
+        if node_id not in self._queued and node_id not in self._outstanding:
+            self._queued.add(node_id)
+            self._ready.append(node_id)
+
+    def _settle(self, edge, state: str) -> None:
         """Mark an edge LIVE or DEAD and let the consequences propagate.
 
         Killing an edge can orphan the node below it, which kills that node's
@@ -223,124 +263,184 @@ def run_plan(
         pending = [(edge, state)]
         while pending:
             current, current_state = pending.pop(0)
-            if edge_state[current.edge_id] == current_state:
+            if self._edge_state[current.edge_id] == current_state:
                 continue
-            edge_state[current.edge_id] = current_state
+            self._edge_state[current.edge_id] = current_state
 
             target = current.target
-            if current.edge_id in plan.loop_back_edge_ids:
+            if current.edge_id in self.plan.loop_back_edge_ids:
                 # Re-entering a loop: the loop node decides what happens next.
                 if current_state == LIVE:
-                    enqueue(target)
+                    self._enqueue(target)
                 continue
 
-            verdict = readiness(target)
+            verdict = self._readiness(target)
             if verdict == "ready":
-                enqueue(target)
+                self._enqueue(target)
             elif verdict == "dead":
-                for downstream in plan.outgoing.get(target, []):
+                for downstream in self.plan.outgoing.get(target, []):
                     pending.append((downstream, DEAD))
 
-    def activate(node_id: str, handles: list[str]) -> None:
-        for edge in plan.outgoing.get(node_id, []):
-            settle(edge, LIVE if edge.handle in handles else DEAD)
+    def _activate(self, node_id: str, handles: list[str]) -> None:
+        for edge in self.plan.outgoing.get(node_id, []):
+            self._settle(edge, LIVE if edge.handle in handles else DEAD)
 
-    guard = 0
-    while ready:
-        if should_stop is not None and should_stop():
-            report.ok = False
-            report.error = "Run stopped."
-            return report
+    def _fail(self, node_id: str | None, message: str) -> None:
+        self.report.ok = False
+        self.report.error = message
+        self.report.stopped_at = node_id
+        self._halted = True
+        self._ready.clear()
+        self._queued.clear()
+        self._outstanding.clear()
 
-        guard += 1
-        if guard > max_iterations:
-            report.ok = False
-            report.error = (
-                f"Run exceeded {max_iterations} steps and was stopped. A loop is probably not ending."
-            )
-            return report
+    # ---- stepping ----
 
-        node_id = ready.pop(0)
-        queued.discard(node_id)
-        node = plan.nodes[node_id]
+    def advance(self) -> list[ReadyNode]:
+        """Settle everything internal; return the nodes needing execution."""
+        due: list[ReadyNode] = []
+        while self._ready and not self._halted:
+            self._steps += 1
+            if self._steps > self.max_iterations:
+                self._fail(
+                    None,
+                    f"Run exceeded {self.max_iterations} steps and was stopped. "
+                    "A loop is probably not ending.",
+                )
+                return []
 
-        if not node.is_active:
-            report.events.append(RunEvent("skipped", node_id, "block is deactivated"))
-            results[node_id] = None
-            activate(node_id, [DEFAULT_HANDLE])
-            continue
+            node_id = self._ready.pop(0)
+            self._queued.discard(node_id)
+            node = self.plan.nodes[node_id]
 
-        context = context_for(node_id)
+            if not node.is_active:
+                self.report.events.append(RunEvent("skipped", node_id, "block is deactivated"))
+                self._results[node_id] = None
+                self._activate(node_id, [DEFAULT_HANDLE])
+                continue
 
-        # ---- loops are scopes, not one-shot nodes ----
-        if node.is_loop:
-            if node.block_id == "loop_over" and node_id not in loop_items:
-                items = resolve_loop_items(node, context) if resolve_loop_items else []
-                loop_items[node_id] = list(items)
-                context = context_for(node_id)
+            if node.is_loop:
+                self._step_loop(node)
+                continue
 
-            try:
-                iterate, why = _should_iterate(node, loop_iteration[node_id], context)
-            except ConditionError as exc:
-                report.ok = False
-                report.error = str(exc)
-                report.stopped_at = node_id
-                return report
+            self._outstanding.add(node_id)
+            due.append(ReadyNode(node=node, context=self.context_for(node_id)))
 
-            report.events.append(
-                RunEvent("loop", node_id, ("entering body: " if iterate else "finished: ") + why)
-            )
-            if iterate:
-                loop_iteration[node_id] += 1
-                results[node_id] = {
-                    "status": "looping",
-                    "iteration": loop_iteration[node_id],
-                    "item": (loop_items.get(node_id) or [None])[loop_iteration[node_id] - 1]
-                    if node.block_id == "loop_over" and loop_iteration[node_id] <= len(loop_items.get(node_id, []))
-                    else None,
-                }
-                # Re-entering the body means its nodes must run again, so every
-                # edge inside the body goes back to WAITING. Without this a body
-                # node would still be marked as having received last iteration's
-                # input and would never become ready again.
-                for edge_id in loop_scopes[node_id]:
-                    edge_state[edge_id] = WAITING
-                activate(node_id, [LOOP_BODY_HANDLE])
-            else:
-                results[node_id] = {"status": "completed", "iterations": loop_iteration[node_id]}
-                # The body is finished for good; retire its edges so anything
-                # downstream of both the loop and its body can still become
-                # ready instead of waiting on an iteration that will not come.
-                for edge_id in loop_scopes[node_id]:
-                    if edge_state[edge_id] == WAITING:
-                        edge_state[edge_id] = DEAD
-                activate(node_id, [LOOP_DONE_HANDLE])
-            continue
+        return due
 
-        # ---- ordinary and branch nodes ----
-        outcome = run_node(node, context)
-        results[node_id] = outcome.result
-        report.executed.append(node_id)
+    def _step_loop(self, node: PlanNode) -> None:
+        """Decide whether a loop enters its body again or moves on."""
+        node_id = node.node_id
+        context = self.context_for(node_id)
 
-        if not outcome.ok and node.failure_mode != "separate_path":
-            report.ok = False
-            report.error = outcome.error or f"'{node.display_name}' failed."
-            report.stopped_at = node_id
-            report.events.append(RunEvent("failed", node_id, report.error))
-            return report
+        if node.block_id == "loop_over" and node_id not in self._loop_items:
+            items = self._resolve_loop_items(node, context) if self._resolve_loop_items else []
+            self._loop_items[node_id] = list(items)
+            context = self.context_for(node_id)
 
         try:
-            handles, why = _handles_for_outcome(plan, node, outcome, context)
+            iterate, why = _should_iterate(node, self._loop_iteration[node_id], context)
         except ConditionError as exc:
-            report.ok = False
-            report.error = str(exc)
-            report.stopped_at = node_id
-            return report
+            self._fail(node_id, str(exc))
+            return
 
-        report.events.append(RunEvent("ran", node_id, why))
-        activate(node_id, handles)
+        self.report.events.append(
+            RunEvent("loop", node_id, ("entering body: " if iterate else "finished: ") + why)
+        )
 
-    return report
+        if iterate:
+            self._loop_iteration[node_id] += 1
+            items = self._loop_items.get(node_id, [])
+            index = self._loop_iteration[node_id] - 1
+            self._results[node_id] = {
+                "status": "looping",
+                "iteration": self._loop_iteration[node_id],
+                "item": items[index] if node.block_id == "loop_over" and index < len(items) else None,
+            }
+            # Re-entering the body means its nodes must run again, so every
+            # edge inside the body goes back to WAITING. Without this a body
+            # node would still be marked as having received last iteration's
+            # input and would never become ready again.
+            for edge_id in self._loop_scopes[node_id]:
+                self._edge_state[edge_id] = WAITING
+            self._activate(node_id, [LOOP_BODY_HANDLE])
+        else:
+            self._results[node_id] = {"status": "completed", "iterations": self._loop_iteration[node_id]}
+            # The body is finished for good; retire its edges so anything
+            # downstream of both the loop and its body can still become ready
+            # instead of waiting on an iteration that will not come.
+            for edge_id in self._loop_scopes[node_id]:
+                if self._edge_state[edge_id] == WAITING:
+                    self._edge_state[edge_id] = DEAD
+            self._activate(node_id, [LOOP_DONE_HANDLE])
+
+    def submit(self, node_id: str, outcome: NodeOutcome, context: dict | None = None) -> None:
+        """Record what executing a node produced, and open the paths it takes."""
+        if self._halted:
+            return
+
+        node = self.plan.nodes[node_id]
+        self._outstanding.discard(node_id)
+        self._results[node_id] = outcome.result
+        self.report.executed.append(node_id)
+
+        if not outcome.ok and node.failure_mode != "separate_path":
+            message = outcome.error or f"'{node.display_name}' failed."
+            self.report.events.append(RunEvent("failed", node_id, message))
+            self._fail(node_id, message)
+            return
+
+        try:
+            handles, why = _handles_for_outcome(
+                self.plan, node, outcome, context if context is not None else self.context_for(node_id)
+            )
+        except ConditionError as exc:
+            self._fail(node_id, str(exc))
+            return
+
+        self.report.events.append(RunEvent("ran", node_id, why))
+        self._activate(node_id, handles)
+
+    def stop(self, reason: str = "Run stopped.") -> None:
+        self._fail(None, reason)
+
+
+def run_plan(
+    plan: ExecutionPlan,
+    run_node: NodeRunner,
+    *,
+    max_iterations: int = DEFAULT_MAX_ITERATIONS,
+    should_stop: Callable[[], bool] | None = None,
+    resolve_loop_items: Callable[[PlanNode, dict], list] | None = None,
+) -> RunReport:
+    """Execute a compiled plan start to finish, in this thread.
+
+    A thin driver over PlanRunner: it executes what the runner hands back and
+    feeds the results in. Used by the tests and by any caller that wants the
+    whole run in one call.
+    """
+    runner = PlanRunner(plan, max_iterations=max_iterations, resolve_loop_items=resolve_loop_items)
+
+    while not runner.finished:
+        if should_stop is not None and should_stop():
+            runner.stop()
+            break
+
+        due = runner.advance()
+        if not due:
+            break
+
+        for ready in due:
+            if should_stop is not None and should_stop():
+                runner.stop()
+                break
+            outcome = run_node(ready.node, ready.context)
+            runner.submit(ready.node.node_id, outcome, ready.context)
+            if runner.report.stopped_at is not None or not runner.report.ok:
+                break
+
+    runner.report.results = runner.results
+    return runner.report
 
 
 def _loop_scope_edges(plan: ExecutionPlan, loop_node_id: str) -> set[str]:
