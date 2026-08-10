@@ -29,12 +29,17 @@ import {
   fetchHardwareMap,
   fetchSavedWorkflow,
   flashEsp32BoardFirmware,
+  fetchAccessDoor,
+  setAccessDoorOverride,
+  startRunSession,
+  endRunSession,
   planWorkflowFirmware,
   rearmEmergencyStop,
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
 } from "../../lib/api";
+import type { AccessDoorState } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   WORKFLOW_BLOCK_MIME,
@@ -1016,7 +1021,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const saveResetTimeoutRef = useRef<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const savedWorkflowSnapshotRef = useRef<string | null>(null);
-  const [skipEsp32Flashing, setSkipEsp32Flashing] = useState(false);
+  // The access door interlock. Replaces the old "Skip ESP32 flash" toggle:
+  // flashing is now decided by asking each board whether its firmware is
+  // already correct, so skipping it by hand is no longer a thing anyone needs.
+  const [accessDoor, setAccessDoor] = useState<AccessDoorState | null>(null);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
   const [quickAddSource, setQuickAddSource] = useState<QuickAddSource>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
@@ -1167,9 +1175,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     void loadFunctions(cancellationToken);
     void loadBoards(cancellationToken);
     void loadHardwareMap(cancellationToken);
+    void refreshAccessDoor();
+    // The door is physical and can change while the editor sits open, so the
+    // Run button's state has to follow it rather than a value read once.
+    const doorPoll = window.setInterval(() => void refreshAccessDoor(), 3000);
 
     return () => {
       cancellationToken.cancelled = true;
+      window.clearInterval(doorPoll);
     };
   }, []);
 
@@ -2936,6 +2949,26 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     return Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
   }
 
+  async function refreshAccessDoor(): Promise<AccessDoorState | null> {
+    try {
+      const state = await fetchAccessDoor();
+      setAccessDoor(state);
+      return state;
+    } catch {
+      // A backend that cannot report the door must not make the editor
+      // unusable; the run-session call below is the real gate anyway.
+      return null;
+    }
+  }
+
+  async function handleAccessDoorOverride(enabled: boolean) {
+    try {
+      setAccessDoor(await setAccessDoorOverride(enabled));
+    } catch (error) {
+      setFunctionsError(error instanceof Error ? error.message : "Could not change the access door override.");
+    }
+  }
+
   async function prepareEsp32FirmwareForBlocks(
     entries: Array<{ blockId: string; block: WorkflowBlockDefinition }>,
   ): Promise<void> {
@@ -2944,10 +2977,6 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     // looks like a hardware fault. Flashing is cheap now that preflight skips
     // boards already running the expected firmware, so the block test can just
     // ask for it rather than making the operator run the whole workflow first.
-    if (skipEsp32Flashing) {
-      return;
-    }
-
     const itemsByKey = new Map<string, Esp32WorkflowFirmwarePlanRequestItem>();
     const boardIds = new Set<string>();
     for (const { blockId, block } of entries) {
@@ -3065,10 +3094,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     resultsByNodeId: Map<string, FunctionTestResponse>,
     options: { flashBeforeRun: boolean },
   ) {
-    const fallbackBoardIdsToFlash = skipEsp32Flashing
-      ? []
-      : filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
-    const firmwarePlanItems = skipEsp32Flashing ? [] : collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
+    const fallbackBoardIdsToFlash = filterBoardIdsToHardwareMap(collectEsp32BoardIdsForRun(orderedNodeIds));
+    const firmwarePlanItems = collectWorkflowFirmwarePlanItemsForRun(orderedNodeIds);
     const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
     setFunctionsError(null);
@@ -3084,7 +3111,16 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       flashingBoardId: null,
     });
 
+    let runSessionStarted = false;
     try {
+      // The backend decides whether a run may start: it refuses while the
+      // access door is open (without an override) or the E-Stop is latched,
+      // and it watches the door for the rest of the run so opening it mid-run
+      // stops the machine. Gating only in the UI would leave the interlock
+      // advisory.
+      await startRunSession();
+      runSessionStarted = true;
+
       if (options.flashBeforeRun) {
         const boardIdsToFlash = await prepareEsp32FirmwareForRun(firmwarePlanItems, fallbackBoardIdsToFlash);
         await flashEsp32BoardsForRun(boardIdsToFlash);
@@ -3102,6 +3138,15 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         setFunctionsError(error instanceof Error ? error.message : "Workflow run failed.");
       }
     } finally {
+      if (runSessionStarted) {
+        try {
+          await endRunSession();
+        } catch {
+          // Losing the end call only leaves the door watcher running; it stops
+          // the machine on a real door opening, which is the safe direction.
+        }
+      }
+      void refreshAccessDoor();
       setWorkflowRunState((currentState) => ({
         ...currentState,
         isRunning: false,
@@ -3210,15 +3255,17 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       </div>
 
       <div className="toolbar-group toolbar-group--run">
-        <label className="workflow-editor__skip-flash">
-          <input
-            checked={skipEsp32Flashing}
-            disabled={workflowRunState.isRunning}
-            onChange={(event) => setSkipEsp32Flashing(event.target.checked)}
-            type="checkbox"
-          />
-          <span>Skip ESP32 flash</span>
-        </label>
+        {accessDoor?.blocks_run || accessDoor?.override_active ? (
+          <label className="workflow-editor__skip-flash" title={accessDoor.reason}>
+            <input
+              checked={accessDoor.override_active}
+              disabled={workflowRunState.isRunning}
+              onChange={(event) => void handleAccessDoorOverride(event.target.checked)}
+              type="checkbox"
+            />
+            <span>{accessDoor.override_active ? "Access door ignored" : "Door open — ignore?"}</span>
+          </label>
+        ) : null}
         <button
           className="workflow-editor__action workflow-editor__action--primary"
           disabled={workflowRunState.isRunning}

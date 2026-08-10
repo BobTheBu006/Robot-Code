@@ -295,3 +295,38 @@ export function updateMockRobotState(update: RobotStateUpdate): Promise<RobotSta
 export function getCameraStreamUrl(): string {
   return `${API_BASE_URL}/api/camera/stream`;
 }
+
+export interface AccessDoorState {
+  is_open: boolean | null;
+  pin: number;
+  detected: boolean;
+  override_active: boolean;
+  blocks_run: boolean;
+  reason: string;
+}
+
+export function fetchAccessDoor(): Promise<AccessDoorState> {
+  return request<AccessDoorState>("/api/safety/access-door");
+}
+
+export function setAccessDoorOverride(enabled: boolean): Promise<AccessDoorState> {
+  return request<AccessDoorState>("/api/safety/access-door/override", {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+// A run session is what makes the door interlock real: the backend refuses to
+// start one while the door blocks a run, and watches the door for the run's
+// duration so opening it mid-run stops the machine.
+export function startRunSession(): Promise<{ ok: boolean; watching: boolean }> {
+  return request<{ ok: boolean; watching: boolean }>("/api/safety/run-session/start", {
+    method: "POST",
+  });
+}
+
+export function endRunSession(): Promise<{ ok: boolean; watching: boolean }> {
+  return request<{ ok: boolean; watching: boolean }>("/api/safety/run-session/end", {
+    method: "POST",
+  });
+}

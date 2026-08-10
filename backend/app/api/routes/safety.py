@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.safety import safety_controller
 from app.models.safety import (
+    AccessDoorOverrideRequest,
     PhysicalStateConfirmRequest,
     SafetyRearmRequest,
     SafetyRearmResponse,
@@ -17,6 +18,7 @@ from app.models.safety import (
     SafetyStopRequest,
     SafetyStopResponse,
 )
+from app.services.access_door import access_door_sensor
 from app.services.physical_state import PhysicalStateError, physical_state_store
 
 # Importing the drivers is what registers them as stoppable actors. Without
@@ -38,7 +40,72 @@ def get_safety_state() -> SafetySnapshot:
     The UI needs this to show a latched stop and to refuse to start work; before
     it existed there was no way to ask whether the machine was blocked.
     """
-    return SafetySnapshot.model_validate(safety_controller.snapshot())
+    return SafetySnapshot.model_validate(_snapshot_with_access_door())
+
+
+def _snapshot_with_access_door() -> dict:
+    """Latch state plus the access-door interlock.
+
+    `run_allowed` folds both together so a caller cannot start a workflow with
+    either the stop latched or the door open. It deliberately does NOT gate a
+    single block test: bringing hardware up means reaching into the machine,
+    and the operator is standing there.
+    """
+    snapshot = safety_controller.snapshot()
+    door = access_door_sensor.read()
+    snapshot["access_door"] = door.to_dict()
+    snapshot["run_allowed"] = not snapshot.get("motion_blocked", False) and not door.blocks_run
+    return snapshot
+
+
+@router.get("/access-door")
+def get_access_door() -> dict:
+    """Just the door, for a UI that polls it while showing the Run button."""
+    return access_door_sensor.read().to_dict()
+
+
+@router.post("/access-door/override")
+def set_access_door_override(request: AccessDoorOverrideRequest) -> dict:
+    """Allow (or stop allowing) runs while the door is open.
+
+    Not persisted, and it does not touch the E-Stop: overriding the door must
+    never clear a latched stop. Someone who overrides the door and then hits
+    E-Stop still gets a stopped machine.
+    """
+    state = access_door_sensor.set_override(request.enabled)
+    return state.to_dict()
+
+
+@router.post("/run-session/start")
+def start_run_session() -> dict:
+    """Mark a workflow run as starting, and watch the door for its duration.
+
+    Refuses when the door blocks a run, so the interlock is enforced by the
+    backend rather than only by whichever UI happens to be driving it.
+    """
+    door = access_door_sensor.read()
+    if door.blocks_run:
+        raise HTTPException(status_code=409, detail=door.reason)
+    if safety_controller.is_blocked():
+        raise HTTPException(status_code=409, detail=safety_controller.blocked_reason())
+
+    def _door_opened(state) -> None:
+        # Opening the door mid-run is treated exactly like someone hitting the
+        # stop: every registered actor is stopped through the one authority.
+        safety_controller.stop(
+            reason=f"Access door opened during a run (GPIO {state.pin}).",
+            source="access-door",
+        )
+
+    access_door_sensor.start_watching(_door_opened)
+    return {"ok": True, "watching": True, "access_door": door.to_dict()}
+
+
+@router.post("/run-session/end")
+def end_run_session() -> dict:
+    """Stop watching the door. Safe to call when no run is in progress."""
+    access_door_sensor.stop_watching()
+    return {"ok": True, "watching": False}
 
 
 @router.post("/stop", response_model=SafetyStopResponse)
@@ -87,4 +154,4 @@ def confirm_physical_state(request: PhysicalStateConfirmRequest) -> SafetySnapsh
     except PhysicalStateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return SafetySnapshot.model_validate(safety_controller.snapshot())
+    return SafetySnapshot.model_validate(_snapshot_with_access_door())

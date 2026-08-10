@@ -31,6 +31,15 @@ class LastStopModel(BaseModel):
     reports: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AccessDoorModel(BaseModel):
+    is_open: bool | None = None
+    pin: int
+    detected: bool
+    override_active: bool
+    blocks_run: bool
+    reason: str
+
+
 class SafetySnapshot(BaseModel):
     state: str
     motion_blocked: bool
@@ -38,6 +47,16 @@ class SafetySnapshot(BaseModel):
     registered_actors: list[RegisteredActorModel] = Field(default_factory=list)
     requires_confirmation: list[UncertainFactModel] = Field(default_factory=list)
     last_stop: LastStopModel | None = None
+    access_door: AccessDoorModel | None = None
+    # False when a workflow must not be started: the E-Stop is latched, or the
+    # access door is open without an override. A single block test is allowed
+    # in the door case, so callers must not use this to gate that.
+    run_allowed: bool = True
+
+
+class AccessDoorOverrideRequest(BaseModel):
+    enabled: bool
+    operator: str = "operator"
 
 
 class SafetyStopRequest(BaseModel):
