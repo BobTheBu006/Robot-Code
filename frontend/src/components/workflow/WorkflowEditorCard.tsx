@@ -2653,6 +2653,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     startNewActivity();
 
     try {
+      const node = nodeLookup.get(nodeId);
+      if (node) {
+        await prepareEsp32FirmwareForBlocks([{ blockId: nodeId, block: node.data.block }]);
+      }
       await runNodeTestRecursively(nodeId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Block test failed.";
@@ -2673,9 +2677,20 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     startNewActivity();
 
     try {
+      await prepareEsp32FirmwareForBlocks([{ blockId: node.id, block: node.data.block }]);
       await executeNode(node.id, null, node);
-    } catch {
-      // executeNode already records the failure in the node's test state.
+    } catch (error) {
+      // Firmware preparation failing has to surface here: executeNode only
+      // records failures it caused itself, so a flash error would otherwise
+      // vanish and the block would look like it never ran.
+      updateTestState((currentState) => ({
+        ...currentState,
+        [node.id]: {
+          status: "error",
+          result: currentState[node.id]?.result ?? null,
+          error: error instanceof Error ? error.message : "Could not prepare firmware for this block.",
+        },
+      }));
     }
   }
 
@@ -2919,6 +2934,39 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
 
     return Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
+  }
+
+  async function prepareEsp32FirmwareForBlocks(
+    entries: Array<{ blockId: string; block: WorkflowBlockDefinition }>,
+  ): Promise<void> {
+    // Testing a single block needs the same firmware guarantee as a full run:
+    // a controller without the routine the block calls will fail in a way that
+    // looks like a hardware fault. Flashing is cheap now that preflight skips
+    // boards already running the expected firmware, so the block test can just
+    // ask for it rather than making the operator run the whole workflow first.
+    if (skipEsp32Flashing) {
+      return;
+    }
+
+    const itemsByKey = new Map<string, Esp32WorkflowFirmwarePlanRequestItem>();
+    const boardIds = new Set<string>();
+    for (const { blockId, block } of entries) {
+      collectWorkflowFirmwarePlanItemsFromBlock(block, blockId, itemsByKey);
+      collectEsp32BoardIdsFromBlock(block, boardIds);
+    }
+
+    const hardwareBoardIds = getHardwareMapEsp32BoardIds();
+    const planItems = hardwareBoardIds.size === 0
+      ? []
+      : Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
+    const fallbackBoardIds = filterBoardIdsToHardwareMap(Array.from(boardIds));
+
+    if (planItems.length === 0 && fallbackBoardIds.length === 0) {
+      return;
+    }
+
+    const boardIdsToFlash = await prepareEsp32FirmwareForRun(planItems, fallbackBoardIds);
+    await flashEsp32BoardsForRun(boardIdsToFlash);
   }
 
   function summarizeWorkflowFirmwarePlanFailure(errors: string[], warnings: string[]): string {
