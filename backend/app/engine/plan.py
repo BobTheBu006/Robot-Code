@@ -151,8 +151,14 @@ def _coerce_int(value, default: int = 0) -> int:
         return default
 
 
-def compile_plan(workflow: dict) -> ExecutionPlan:
-    """Build and validate a plan from a saved workflow document."""
+def compile_plan(workflow: dict, start_node_ids: list[str] | None = None) -> ExecutionPlan:
+    """Build and validate a plan from a saved workflow document.
+
+    `start_node_ids` names the entry point explicitly. A compound block needs
+    this: its inner graph is a fragment whose entry is recorded on the block,
+    and guessing from the shape could start branches the compound never meant
+    to begin on their own.
+    """
     raw_nodes = workflow.get("nodes") or []
     raw_edges = workflow.get("edges") or []
 
@@ -216,7 +222,20 @@ def compile_plan(workflow: dict) -> ExecutionPlan:
         outgoing[source].append(edge)
         incoming[target].append(edge)
 
-    start_node_ids = _find_starts(nodes, incoming)
+    if start_node_ids:
+        requested = [node_id for node_id in start_node_ids if node_id in nodes]
+        for missing in [node_id for node_id in start_node_ids if node_id not in nodes]:
+            problems.append(
+                PlanProblem(
+                    PlanProblemLevel.ERROR,
+                    f"The starting block '{missing}' is not in this workflow.",
+                    missing,
+                )
+            )
+        start_node_ids = requested
+    else:
+        start_node_ids = _find_starts(nodes, incoming)
+
     if not start_node_ids:
         problems.append(
             PlanProblem(

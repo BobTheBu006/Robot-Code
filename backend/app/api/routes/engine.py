@@ -26,6 +26,9 @@ router = APIRouter(prefix="/api/engine", tags=["engine"])
 class WorkflowGraph(BaseModel):
     nodes: list[dict] = Field(default_factory=list)
     edges: list[dict] = Field(default_factory=list)
+    # Where to begin, when the caller knows better than the graph shape does.
+    # A compound block's inner graph is a fragment with a recorded entry point.
+    start_node_ids: list[str] | None = None
 
 
 class NodeResultRequest(BaseModel):
@@ -42,13 +45,13 @@ class EndRunRequest(BaseModel):
 @router.post("/plan")
 def plan_workflow(graph: WorkflowGraph) -> dict:
     """Validate a graph without running it."""
-    plan = compile_plan(graph.model_dump())
+    plan = compile_plan(graph.model_dump(), graph.start_node_ids)
     return plan.as_dict()
 
 
 @router.post("/runs")
 def start_run(graph: WorkflowGraph) -> dict:
-    session, plan = run_session_service.start(graph.model_dump())
+    session, plan = run_session_service.start(graph.model_dump(), graph.start_node_ids)
 
     if not plan.ok:
         run_session_service.end(session.run_id)

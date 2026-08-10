@@ -395,6 +395,10 @@ export interface EngineRunStep {
 export interface WorkflowGraphPayload {
   nodes: unknown[];
   edges: unknown[];
+  // Where to begin. Omit for a whole workflow (the engine finds the Start
+  // block); a compound block passes its recorded entry node, because its inner
+  // graph is a fragment whose other roots are not entry points.
+  start_node_ids?: string[];
 }
 
 export function planWorkflowGraph(graph: WorkflowGraphPayload): Promise<WorkflowPlanResponse> {

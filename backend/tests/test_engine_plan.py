@@ -59,6 +59,43 @@ class StartAndShapeTests(unittest.TestCase):
         self.assertIn("not in this workflow", plan.errors[0].message)
 
 
+class ExplicitStartTests(unittest.TestCase):
+    """A compound block's inner graph is a fragment with a recorded entry."""
+
+    def test_a_named_start_overrides_shape_based_detection(self) -> None:
+        plan = compile_plan(
+            _workflow(
+                [_node("entry", "move_z"), _node("b", "dispense"), _node("loose", "move_z")],
+                [_edge("entry", "b")],
+            ),
+            start_node_ids=["entry"],
+        )
+        self.assertTrue(plan.ok, [p.message for p in plan.errors])
+        self.assertEqual(plan.start_node_ids, ["entry"])
+        # The other root is not an entry point just because nothing feeds it.
+        self.assertNotIn("loose", plan.reachable)
+
+    def test_a_named_start_that_is_not_in_the_graph_is_reported(self) -> None:
+        plan = compile_plan(
+            _workflow([_node("a", "move_z")], []),
+            start_node_ids=["ghost"],
+        )
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("ghost" in e.message for e in plan.errors))
+
+    def test_a_named_start_inside_a_cycle_still_gives_the_graph_a_beginning(self) -> None:
+        # Shape-based detection finds nothing here; naming the entry fixes it.
+        plan = compile_plan(
+            _workflow(
+                [_node("a", "while", kind="basic"), _node("b", "move_z")],
+                [_edge("a", "b", "loop"), _edge("b", "a")],
+            ),
+            start_node_ids=["a"],
+        )
+        self.assertTrue(plan.ok, [p.message for p in plan.errors])
+        self.assertEqual(plan.start_node_ids, ["a"])
+
+
 class JoinTests(unittest.TestCase):
     def test_a_node_fed_by_two_branches_is_a_join(self) -> None:
         # The old runner fired this on whichever branch arrived first.

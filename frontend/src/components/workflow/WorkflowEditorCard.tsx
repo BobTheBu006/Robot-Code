@@ -2395,39 +2395,95 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     const innerNodes = compound.nodes as WorkflowFlowNode[];
     const innerEdges = compound.edges as Edge[];
     const innerNodeLookup = new Map(innerNodes.map((innerNode) => [innerNode.id, innerNode]));
-    const orderedNodeIds = collectCompoundRunOrder(compound.entryNodeId, innerEdges);
     const innerResults = new Map<string, FunctionTestResponse>();
     const compoundBlockResults = { ...blockResults };
 
-    for (const innerNodeId of orderedNodeIds) {
-      const innerNode = innerNodeLookup.get(innerNodeId);
-      if (!innerNode) {
-        continue;
-      }
+    // A compound is a graph like any other, so it runs through the engine too.
+    // Collapsing an If and its branches into one block must not quietly bring
+    // back "runs both branches" inside the wrapper. The entry node is passed
+    // explicitly: this is a fragment, and its other roots are not entry points.
+    let innerStep = await startEngineRun({
+      nodes: innerNodes,
+      edges: innerEdges,
+      start_node_ids: [compound.entryNodeId],
+    });
 
-      const upstreamEdge = innerEdges.find((edge) => edge.target === innerNodeId);
-      const innerInputData = upstreamEdge
-        ? innerResults.get(upstreamEdge.source)?.result ?? null
-        : inputData;
-      const result = await runSingleNode(innerNode, innerInputData, compoundBlockResults, signal);
-      innerResults.set(innerNodeId, result);
-      compoundBlockResults[innerNodeId] = result.result ?? null;
+    if (!innerStep.ok || !innerStep.run_id) {
+      const problems = (innerStep.problems ?? [])
+        .filter((problem) => problem.level === "error")
+        .map((problem) => problem.message);
+      return {
+        function_id: block.id,
+        ok: false,
+        inputs: parameters,
+        input_data: inputData,
+        result: { status: "compound_invalid" },
+        error: `${block.displayName} cannot run. ${problems.join(" ") || innerStep.error || ""}`.trim(),
+      };
+    }
 
-      if (!result.ok) {
-        return {
-          function_id: block.id,
-          ok: false,
-          inputs: parameters,
-          input_data: inputData,
-          result: {
-            status: "compound_failed",
-            failed_node_id: innerNodeId,
-            failed_block: innerNode.data.block.displayName,
-            inner_results: Object.fromEntries(innerResults),
-          },
-          error: result.error ?? `${innerNode.data.block.displayName} failed inside ${block.displayName}.`,
-        };
+    const innerRunId = innerStep.run_id;
+    let failed: { nodeId: string; result: FunctionTestResponse } | null = null;
+
+    try {
+      while (!innerStep.finished && innerStep.due.length > 0) {
+        let next: EngineRunStep = innerStep;
+        for (const due of innerStep.due) {
+          const innerNode = innerNodeLookup.get(due.node_id);
+          if (!innerNode) {
+            continue;
+          }
+
+          // The entry block receives whatever was passed into the compound;
+          // everything after it receives what the engine routed to it.
+          const innerInputData = due.node_id === compound.entryNodeId
+            ? inputData
+            : (due.input as Record<string, unknown> | null) ?? null;
+
+          const result = await runSingleNode(innerNode, innerInputData, compoundBlockResults, signal);
+          innerResults.set(due.node_id, result);
+          compoundBlockResults[due.node_id] = result.result ?? null;
+
+          next = await submitEngineNodeResult(innerRunId, {
+            node_id: due.node_id,
+            ok: result.ok,
+            result: (result.result as Record<string, unknown> | null) ?? null,
+            error: result.ok ? null : result.error ?? "The block reported failure.",
+          });
+
+          if (!result.ok) {
+            failed = { nodeId: due.node_id, result };
+            break;
+          }
+          if (next.finished) {
+            break;
+          }
+        }
+        if (failed) {
+          break;
+        }
+        innerStep = next;
       }
+    } finally {
+      await endEngineRun(innerRunId, "Compound finished.").catch(() => undefined);
+    }
+
+    if (failed) {
+      const failedNode = innerNodeLookup.get(failed.nodeId);
+      return {
+        function_id: block.id,
+        ok: false,
+        inputs: parameters,
+        input_data: inputData,
+        result: {
+          status: "compound_failed",
+          failed_node_id: failed.nodeId,
+          failed_block: failedNode?.data.block.displayName,
+          inner_results: Object.fromEntries(innerResults),
+        },
+        error: failed.result.error
+          ?? `${failedNode?.data.block.displayName ?? failed.nodeId} failed inside ${block.displayName}.`,
+      };
     }
 
     return {
@@ -2437,32 +2493,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       input_data: inputData,
       result: {
         status: "completed",
-        inner_block_count: orderedNodeIds.length,
+        // What actually ran, which with a branch inside is not the same as how
+        // many blocks the compound contains.
+        inner_block_count: innerResults.size,
         outputs: block.outputs.map((output) => output.key),
         inner_results: Object.fromEntries(innerResults),
       },
       error: null,
     };
-  }
-
-  function collectCompoundRunOrder(
-    startNodeId: string,
-    innerEdges: Edge[],
-    visited = new Set<string>(),
-    orderedNodeIds: string[] = [],
-  ): string[] {
-    if (visited.has(startNodeId)) {
-      return orderedNodeIds;
-    }
-
-    visited.add(startNodeId);
-    orderedNodeIds.push(startNodeId);
-
-    for (const edge of innerEdges.filter((candidate) => candidate.source === startNodeId)) {
-      collectCompoundRunOrder(edge.target, innerEdges, visited, orderedNodeIds);
-    }
-
-    return orderedNodeIds;
   }
 
   async function executeNode(

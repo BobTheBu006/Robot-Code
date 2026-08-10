@@ -91,8 +91,10 @@ class RunSessionService:
         for run_id in [rid for rid, s in self._sessions.items() if s.touched_at < cutoff]:
             self._sessions.pop(run_id, None)
 
-    def start(self, workflow: dict) -> tuple[RunSession, ExecutionPlan]:
-        plan = compile_plan(workflow)
+    def start(
+        self, workflow: dict, start_node_ids: list[str] | None = None
+    ) -> tuple[RunSession, ExecutionPlan]:
+        plan = compile_plan(workflow, start_node_ids)
         runner = PlanRunner(plan, resolve_loop_items=_resolve_loop_items)
         run_id = uuid.uuid4().hex
         session = RunSession(run_id=run_id, plan=plan, runner=runner, journal=RunJournal(run_id))
