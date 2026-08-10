@@ -114,6 +114,12 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
             def cleanup(self) -> None:
                 return None
 
+        # The point of this test is "no usable backend -> simulation, and say
+        # why". ROBOT_GPIO_SIMULATE would reach the same verdict for a different
+        # reason and hide the message, so it is pinned off; the fake modules
+        # below are what keep this away from the real gantry.
+        os.environ.pop("ROBOT_GPIO_SIMULATE", None)
+
         gpio_module = IncompatibleGPIO("RPi.GPIO")
         rpi_module = types.ModuleType("RPi")
         rpi_module.GPIO = gpio_module

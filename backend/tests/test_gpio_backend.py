@@ -198,6 +198,13 @@ class RaspberryGantryLgpioExecutionTests(unittest.TestCase):
 
         gpio_backend.reset_gpio_backend_cache()
 
+        # This test is specifically about the *executed* path, driving a fake
+        # lgpio installed below. On this machine the suite is normally run with
+        # ROBOT_GPIO_SIMULATE=1 (it is the robot's own Pi), which would send it
+        # down the simulated path instead, so the flag is pinned off here rather
+        # than inherited from whoever started the run.
+        self._previous_simulate = os.environ.pop("ROBOT_GPIO_SIMULATE", None)
+
         # Isolate the persisted calibration. Reading the repo-root state file
         # made this test order-dependent: whether it passed came down to what a
         # previously-run test had left in gantry-state.json.
@@ -228,6 +235,8 @@ class RaspberryGantryLgpioExecutionTests(unittest.TestCase):
         import os
         os.environ.pop("ROBOT_GPIO_XY_STEPS_PER_CM", None)
         os.environ.pop("ROBOT_GANTRY_STATE_FILE", None)
+        if self._previous_simulate is not None:
+            os.environ["ROBOT_GPIO_SIMULATE"] = self._previous_simulate
         self._temp_dir.cleanup()
 
     def test_move_xy_executes_for_real_through_lgpio(self) -> None:
