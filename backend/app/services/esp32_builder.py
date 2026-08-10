@@ -26,6 +26,14 @@ from app.models.esp32_builder import (
     Esp32WorkflowFirmwarePlanRoutine,
 )
 from app.core.safety import PRIORITY_PROCESS, CallableActor, safety_controller
+from app.controllers.fingerprint import (
+    FirmwareBundle,
+    PinAssignment,
+    hash_firmware_sources,
+    render_identity_header,
+)
+from app.models.function_manifest import FunctionManifest
+from app.services.hardware_map import hardware_map_service
 from app.services.serial_ports import SerialPortInfo as _SerialPortInfo
 from app.services.serial_ports import list_serial_ports
 
@@ -255,7 +263,38 @@ class Esp32BuilderService:
             auto_reset_attempted=False,
         )
 
-    def flash_firmware(self, board_id: str) -> Esp32FirmwareActionResponse:
+    def preflight_board(self, board_id: str, port: str | None = None):
+        """Ask the board who it is and whether its firmware is already correct.
+
+        Returns a ControllerPreflightResult. Kept separate from flashing so a
+        caller (a run, or the UI) can decide what to do about the verdict.
+        """
+        from app.controllers.preflight import preflight_controller
+
+        workspace_dir = self._resolve_workspace_dir(board_id)
+        if not workspace_dir.exists():
+            raise Esp32BuilderError(f"Unknown ESP32 board '{board_id}'.")
+
+        metadata = self._load_board_metadata(workspace_dir)
+        if port is None:
+            try:
+                port = self._resolve_flash_port(board_id, metadata)
+            except Esp32BuilderError:
+                port = None
+
+        expected = self.build_firmware_bundle(board_id, workspace_dir, metadata)
+        return preflight_controller(controller_id=board_id, expected=expected, port=port)
+
+    def flash_firmware(self, board_id: str, *, skip_if_current: bool = False) -> Esp32FirmwareActionResponse:
+        """Flash a controller.
+
+        With skip_if_current, the board is asked who it is first: a board
+        already running the expected firmware is left alone, and a board that
+        reports a *different* controller id is refused outright rather than
+        overwritten. That is the whole point of the identity handshake - it
+        turns "reflash everything before every run" into "verify, and flash
+        only what is actually wrong".
+        """
         self.clear_flash_stop()
         self._ensure_root_structure()
         workspace_dir = self._resolve_workspace_dir(board_id)
@@ -264,6 +303,24 @@ class Esp32BuilderService:
 
         metadata = self._load_board_metadata(workspace_dir)
         port = self._resolve_flash_port(board_id, metadata)
+
+        if skip_if_current:
+            verdict = self.preflight_board(board_id, port)
+            if verdict.verdict.blocks_run:
+                raise Esp32BuilderError(verdict.message)
+            if verdict.ok:
+                return Esp32FirmwareActionResponse(
+                    board_id=board_id,
+                    action="flash",
+                    ok=True,
+                    fqbn=self._board_fqbn(metadata),
+                    port=port,
+                    sketch_entry_file=self._firmware_entry_file(metadata),
+                    command=[],
+                    log=verdict.message,
+                    auto_reset_note=self.AUTO_RESET_NOTE,
+                    auto_reset_attempted=False,
+                )
 
         sketch_dir, sketch_entry_file = self._prepare_sketch_dir(board_id, workspace_dir, metadata)
         fqbn = self._board_fqbn(metadata)
@@ -721,8 +778,18 @@ class Esp32BuilderService:
             "display_name": existing_metadata.get("display_name") or f"ESP32 {Path(port.device).name}",
             "port": port.device,
             "description": port.description or existing_metadata.get("description"),
-            "hardware_id": port.hardware_id or existing_metadata.get("hardware_id"),
-            "serial_number": port.serial_number or existing_metadata.get("serial_number"),
+            # Identity is recorded ONCE, on first sight, and then left alone.
+            #
+            # This used to prefer the connected port's values, which quietly
+            # rewrote a workspace's identity to whatever board happened to be
+            # plugged into that port - the workspace is chosen by port name, so
+            # moving one board between ports stamped its serial onto every
+            # workspace it visited. That is why all three workspaces ended up
+            # recording the same serial, and why a flash aimed at one board
+            # could resolve to another. Identity now only fills in when it is
+            # genuinely unknown.
+            "hardware_id": existing_metadata.get("hardware_id") or port.hardware_id,
+            "serial_number": existing_metadata.get("serial_number") or port.serial_number,
             "firmware_entry_file": existing_metadata.get("firmware_entry_file") or "firmware/main.ino",
             "fqbn": existing_metadata.get("fqbn") or self.DEFAULT_FQBN,
         }
@@ -1074,7 +1141,100 @@ class Esp32BuilderService:
 
             shutil.copy2(source_file, sketch_dir / destination_name)
 
+        # Stamp identity into the sketch just before it is compiled. Without
+        # this the board answers ID? with an empty id, which preflight can only
+        # read as "cannot verify" - so every controller would be reflashed
+        # before every run, which is the behaviour the handshake exists to end.
+        self._write_identity_header(sketch_dir, board_id, workspace_dir, metadata)
+
         return sketch_dir, str(firmware_entry_path)
+
+    def build_firmware_bundle(self, board_id: str, workspace_dir: Path, metadata: dict) -> FirmwareBundle:
+        """Everything that decides what should be running on this controller.
+
+        The fingerprint covers the routine set, the resolved pin table and the
+        firmware sources, so any change to what the board is supposed to do
+        makes it stop matching and get reflashed - while a rebuild that changes
+        nothing keeps matching and is skipped.
+        """
+        hardware_map = hardware_map_service.load_map()
+
+        routines: list[str] = []
+        pins: list[PinAssignment] = []
+        seen_pins: set[tuple[str, str]] = set()
+
+        for manifest in self._manifests_for_board(board_id):
+            for requirement in manifest.firmware_requirements:
+                if requirement.routine_id:
+                    routines.append(requirement.routine_id)
+
+        # Pin table as the Hardware Map currently resolves it, so re-pinning a
+        # device in the UI is a firmware change the board can detect.
+        for device in hardware_map.devices:
+            if device.board_id != board_id:
+                continue
+            for pin in device.pins:
+                if pin.gpio in (None, "", "-"):
+                    continue
+                key = (device.id, pin.signal)
+                if key in seen_pins:
+                    continue
+                seen_pins.add(key)
+                pins.append(PinAssignment(device_id=device.id, signal=pin.signal, gpio=str(pin.gpio)))
+
+        board_label = next(
+            (board.label for board in hardware_map.boards if board.id == board_id),
+            None,
+        )
+        display_name = self._coerce_nullable_string(metadata.get("display_name"))
+
+        return FirmwareBundle(
+            controller_id=board_id,
+            controller_name=board_label or display_name or board_id,
+            routines=routines,
+            pins=pins,
+            source_hashes=hash_firmware_sources(
+                (workspace_dir / self._firmware_entry_file(metadata)).parent
+            ),
+        )
+
+    def _manifests_for_board(self, board_id: str) -> list:
+        """Function manifests whose firmware belongs on this controller."""
+        manifests = []
+        if not self._app_functions_dir.exists():
+            return manifests
+        for manifest_path in sorted(self._app_functions_dir.glob("*/manifest.json")):
+            try:
+                with manifest_path.open("r", encoding="utf-8") as handle:
+                    raw = json.load(handle)
+                manifest = FunctionManifest.model_validate(raw)
+            except Exception:
+                # A broken manifest is surfaced by discovery, not here; it must
+                # not take the flash path down with it.
+                continue
+            if manifest.builder_board_id == board_id:
+                manifests.append(manifest)
+        return manifests
+
+    def _write_identity_header(
+        self,
+        sketch_dir: Path,
+        board_id: str,
+        workspace_dir: Path,
+        metadata: dict,
+    ) -> None:
+        try:
+            bundle = self.build_firmware_bundle(board_id, workspace_dir, metadata)
+        except Exception as exc:
+            # An unbuildable bundle must not block flashing: the sketch still
+            # compiles without the header (guarded by __has_include) and simply
+            # reports an empty identity, which preflight treats as "verify by
+            # flashing" - degraded, but not stuck.
+            self._last_identity_error = f"{type(exc).__name__}: {exc}"
+            return
+
+        self._last_identity_error = None
+        self._write_text_atomic(sketch_dir / "generated_identity.h", render_identity_header(bundle))
 
     def _run_firmware_action(
         self,

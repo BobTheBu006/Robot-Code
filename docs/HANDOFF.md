@@ -10,6 +10,65 @@ defect-to-phase map. This file is the current state and what to do next.
 
 ---
 
+## 0. Session update — first session actually on the Pi
+
+Everything below this section was written without hardware. This section is
+what changed once it ran on the real machine. **Robot power supply was
+unplugged for all of it, so nothing could move.**
+
+**Step 1 is done: the firmware compiles.** All five sketches build with the
+`ID?` handler, including the standalone case with no `generated_identity.h`
+(the `__has_include` guard works). Verified through the app's own
+`build_firmware` path, so it is the same compile the backend performs:
+
+| sketch | flash |
+| --- | --- |
+| `esp32 ttyUSB0` | 336,772 B (25%) |
+| `esp32 ttyUSB1` | 315,140 B (24%) |
+| `esp32 controller-ykkl80` | 315,472 B (24%) |
+| `firmware/syringe-controller` (standalone) | 305,208 B (23%) |
+| `firmware/z-axis-controller` (standalone) | 315,472 B (24%) |
+
+**The identity handshake now works end to end on real hardware.** This was the
+largest "implemented but never run against a board" item. The Z controller was
+flashed through the app's own path and asked who it was:
+
+```
+ID? -> {"controller_id":"controller-ykkl80","name":"Double Z axis and pumps",
+        "fingerprint":"c91541999072da3d","protocol":1,
+        "routines":["calibrate_z","move_z"]}
+```
+
+and preflight then made all three decisions correctly against that live board:
+
+| situation | verdict | behaviour |
+| --- | --- | --- |
+| firmware matches | `ok` | flash skipped (7 s instead of ~30 s) |
+| a pin changed in the Hardware Map | `needs_flash` | fingerprint mismatch detected |
+| board reports a different controller id | `wrong_controller` | **refuses to flash** |
+
+That last row is the fix for "flashing hit the wrong board": a board that says
+it is something else is no longer overwritten.
+
+What made it work is the missing link described in section 4a — `flash_firmware`
+now actually writes `generated_identity.h`. Before, `render_identity_header`
+existed but nothing called it, so every board answered with an empty identity.
+
+Still unverified: the **syringe** controller (it was not connected during this
+session), and therefore the two-board case where a wrong-board flash is
+actually possible.
+
+**The suite is green on the Pi: 74/74.** It was 8 failing (1 failure,
+7 errors) purely from running on real hardware. See section 4a for what that
+uncovered — one of them was a genuine production bug and one was a unit test
+quietly driving the real gantry.
+
+**Section 2's premise about USB serials is wrong — see section 2a.** The
+conclusion (do not trust the serial as recorded) still holds, but for a
+different and *fixable* reason. Read 2a before acting on section 2.
+
+---
+
 ## 1. The aim
 
 A local-first, modular lab-robot platform. A Raspberry Pi coordinates; a
@@ -100,6 +159,62 @@ Longer term, pick one: reprogram the CP2102N serials to be unique (Silicon Labs
 Map, or accept `ID?` as the sole authority after a one-time manual bring-up.
 This is a judgement call for the project owner — **ask, do not decide it
 silently.**
+
+---
+
+## 2a. Correction: the boards are NOT sharing one factory serial
+
+Section 2 states that all three workspaces record the same USB serial because
+"these are cheap CP2102N bridges that were never given unique serials at the
+factory". **That inference is wrong.** The evidence:
+
+`board.json` serials recorded over time, from git history:
+
+| workspace | commit | date | serial | USB location |
+| --- | --- | --- | --- | --- |
+| `esp32 ttyUSB0` | aec21f8 | 2026-04-02 | `76ae3066…` | 3-1 |
+| `esp32 ttyUSB0` | 4c86318 | 2026-06-26 | `b4ca1bab…` | 1-2 |
+| `esp32 ttyUSB0` | d501505 | 2026-07-06 | `b4ca1bab…` | 3-2 |
+| `esp32 ttyUSB0` | ac0d2b3 | 2026-07-19 | `b4ca1bab…` | 3-1 |
+| `esp32 ttyUSB1` | 61623c5 | 2026-04-02 | `b4ca1bab…` | 1-2 |
+| `esp32 ttyUSB1` | 57b8b07 | 2026-08-07 | `58d72d4c…` | 3-2 |
+
+Three *distinct* serials appear (`76ae3066`, `b4ca1bab`, `58d72d4c`), and the
+same serial appears at three different USB locations. Boards that shared a
+factory serial would show one value everywhere; this shows the opposite.
+
+**The real cause is that the workspace metadata is overwritten by whatever is
+plugged in.** `Esp32BuilderService._ensure_board_workspace` (esp32_builder.py,
+~line 725) writes:
+
+```python
+"serial_number": port.serial_number or existing_metadata.get("serial_number"),
+```
+
+The connected port's serial always wins. `_ensure_board_workspace` runs for
+every connected port on `list_boards()` / `get_board()`, and the workspace is
+chosen by port name (`/dev/ttyUSB1` → workspace `esp32 ttyUSB1`). So plugging
+one board into a port stamps *that board's* serial onto *that port's*
+workspace. All three currently read `58d72d4c…` because the Z board is the
+only one connected and has visited all of those ports.
+
+**What this changes:**
+
+- The serial is probably a *usable* discriminator between the two physical
+  boards. What is not usable is `board.json`'s record of it, because it is
+  continuously overwritten.
+- So the fix is not necessarily "abandon serial identity" — it may be "stop
+  auto-overwriting recorded identity", i.e. treat `board.json` identity as an
+  assertion made once, not a mirror of whatever is plugged in.
+- `ID?` firmware identity is still the most robust answer and is still worth
+  finishing. This just means the interim situation is less dire than section 2
+  implies, and that the auto-stamp is a bug worth fixing regardless.
+
+**Still an owner decision — not taken.** Confirm by plugging in each board
+alone and recording its serial. What is *not* in doubt: with only one board
+connected, every workspace resolves to it, so a flash aimed at the syringe
+controller can still land on the Z controller. The section 2 bring-up
+procedure remains the safe path until identity is settled.
 
 ---
 
@@ -199,6 +314,93 @@ before any of this work because it read the mutable repo-root `gantry-state.json
 — state paths are now overridable via `ROBOT_GANTRY_STATE_FILE`,
 `ROBOT_Z_GANTRY_STATE_FILE`, `ROBOT_PHYSICAL_STATE_FILE`.
 
+### 4a. Fixed in the first on-Pi session
+
+**Production bug — the GPIO loader could not fall back.**
+`gpio_backend._load_rpi_gpio` caught only `ImportError`. The `rpi-lgpio` shim
+executes real code at import against whatever `lgpio` it finds, so a version
+skew raises `AttributeError` (`module 'lgpio' has no attribute
+'SET_PULL_NONE'`) instead. That escaped the loader and crashed
+`load_gpio_backend()` outright — meaning a `pip` upgrade on the Pi would take
+the gantry down rather than fall back to the lgpio adapter, which is the entire
+purpose of that function. Now catches `Exception` and reports the type.
+
+**A unit test was driving the real gantry.** The three
+`test_raspberry_gantry` routing tests call the full `calibrate_xy` / `move_xy`
+path. On the Windows dev machine there was no GPIO library, so they silently
+fell back to simulation and passed. On the Pi they configured real pins,
+stepped real motors, and then failed on whatever the real limit switches read.
+They only ever assert *routing* (`controller == "raspberry-pi"`), so they now
+pin `ROBOT_GPIO_SIMULATE=1` explicitly. The fallback test additionally denies
+`lgpio` (`sys.modules["lgpio"] = None`), since on the Pi lgpio really is
+installed and it would otherwise fall through to real hardware instead of
+simulation. **If the power supply had been connected, that suite run would
+have moved the machine.**
+
+**`test_reports_both_reasons_when_no_backend_is_available`** assumed both GPIO
+libraries were absent — true on a laptop, false on the Pi. It now blocks both
+imports explicitly.
+
+**The three backend defects listed in Step 4 are done:**
+
+- `test_function` hardcoded `ok=True`, so a handler returning `{"ok": false}`
+  read as success and a workflow kept running past a failed block. It now
+  honours the handler's own `ok`, surfacing `error`/`message` when false.
+- `_load_handler_module` re-imported the handler on every call, so `cancel`
+  ran against a *different module instance* than the run it meant to abort —
+  any module-level state (open serial session, stop flag) was invisible to it.
+  Modules are now cached, keyed on path + mtime so editing a handler still
+  hot-reloads without a backend restart.
+- `GET /api/functions` had write side effects (it regenerated manifests, which
+  rewrites `hardware-map.json`) and the frontend polls it after every block
+  run. Discovery is now read-only; the regeneration moved to
+  `POST /api/functions/sync`. Blueprint edits still propagate because
+  `esp32_builder` already calls `sync_generated_functions()` from its own
+  save/delete/list endpoints.
+
+Result: **74/74 tests pass on the Pi**, and the suite no longer touches
+hardware (runtime 10s → 0.7s, which is itself the tell that it had been
+stepping real motors).
+
+### 4b. Identity handshake wired up (same session)
+
+**`flash_firmware` now writes `generated_identity.h`.** This was the missing
+link: `render_identity_header` existed but had no caller, so every flashed
+board reported an empty identity and preflight could only ever say "cannot
+verify → flash it". `_prepare_sketch_dir` now stamps the header into the sketch
+immediately before compiling, so identity ships with the firmware.
+
+**`Esp32BuilderService.build_firmware_bundle(board_id, workspace_dir, metadata)`**
+assembles what should be on a controller: routine ids from the manifests whose
+`builder_board_id` is that board, the resolved pin table for the devices the
+Hardware Map places on it, and hashes of the firmware sources. Changing any of
+those changes the fingerprint, so the board stops matching and gets reflashed;
+a rebuild that changes nothing keeps matching and is skipped.
+
+**Controller name added** (was requested): the header now also defines
+`ROBOT_CONTROLLER_NAME` and `ID?` returns a `name` field, so a board can say
+"I am the Double Z axis and pumps controller" rather than only an opaque id.
+The name is deliberately **excluded from the fingerprint** — renaming a
+controller in the Hardware Map must not make every board look stale. Names and
+ids are escaped for the C string literal, so a stray quote in the Hardware Map
+cannot emit a header that fails to compile.
+
+**`flash_firmware(board_id, skip_if_current=True)`** asks the board first:
+`ok` → skip, `wrong_controller` → refuse with an error, anything else → flash.
+`preflight_board(board_id)` exposes the verdict on its own for a caller that
+wants to decide for itself. The default is still `skip_if_current=False`, so
+nothing silently changed behaviour for existing callers — **the run path still
+needs to opt in** (see next steps).
+
+**Workspace identity is no longer overwritten by whatever is plugged in.**
+`_ensure_board_workspace` used to prefer the connected port's serial over the
+recorded one; it now only fills identity in when it is genuinely unknown. This
+is the section 2a bug. Note the corollary: `board.json` files written *before*
+this fix may still hold a wrong serial, so treat existing recorded serials as
+suspect until each board has been seen alone.
+
+8 tests added (`tests/test_identity_flash_path.py`), **82/82 pass**.
+
 ### Implemented but NEVER run against hardware
 
 Treat all of this as unverified:
@@ -225,7 +427,25 @@ Treat all of this as unverified:
 
 ## 5. What to do next, in order
 
-### Step 1 — verify the firmware compiles (blocks everything else)
+### Step 1 — verify the firmware compiles (DONE — see section 0)
+
+All five sketches compile. Nothing here is blocked any more. The command below
+is kept because it is still the way to re-check after editing the header; note
+the sketch folder name must match the `.ino` name, which is why going through
+`esp32_builder.build_firmware(board_id)` is easier than calling arduino-cli by
+hand on `firmware/`:
+
+```bash
+cd backend && ./.venv/bin/python -c \
+  "import sys; sys.path.insert(0,'.'); \
+   from app.services.esp32_builder import esp32_builder_service as s; \
+   print(s.build_firmware('ttyUSB1').ok)"
+```
+
+The remaining unverified half is a **real board answering `ID?`**, which is
+gated on the identity decision below.
+
+### Step 1 (original, for reference) — verify the firmware compiles
 
 ```bash
 cd "/home/robot/robot control/Robot-Code"
@@ -238,6 +458,30 @@ cd "/home/robot/robot control/Robot-Code"
 If `controller_identity.h` does not compile, fix it there and in the other four
 copies. If it does, do the manual one-board-at-a-time bring-up from section 2
 and confirm a real board answers `ID?`.
+
+### Step 1b — what is left on identity (do this next)
+
+The mechanism works; what remains is data and wiring:
+
+1. **Make the run path opt into `skip_if_current=True`.** Today the frontend
+   still calls flash unconditionally, so runs reflash every board even though
+   the board can now say it is already correct. This is the change that
+   actually delivers "stop reflashing everything".
+2. **Bring the syringe controller up the same way.** It was not connected this
+   session. Do it alone on the bus (section 2 procedure), flash it, confirm
+   `ID?` reports `controller-x83xnc`. After that both boards self-identify and
+   the USB-serial ambiguity stops mattering for good.
+3. **Reconcile the ids** — see the mismatch below, which the bundle builder
+   makes visible: asking for board `controller-ykkl80` yields `pins: []`
+   because the Hardware Map puts the Z motors on board `ttyUSB1`, while
+   `calibrate_z`/`move_z` declare `builder_board_id: controller-ykkl80`. The
+   fingerprint is therefore computed over an empty pin table for that board.
+   Not wrong yet — nothing depends on those pins being in the fingerprint —
+   but it means a Z pin change would *not* trigger a reflash. Fix it as part
+   of the namespace migration.
+4. Likewise `dispense` declares `builder_board_id: ttyUSB1` (the Z board) while
+   its devices sit on the syringe board, so board `ttyUSB1`'s bundle currently
+   claims a `dispense` routine. Same migration.
 
 ### Step 2 — decide the identity strategy with the owner
 
@@ -283,16 +527,17 @@ an iteration guard; every node acquires its logical resources
 global order so two branches wanting the gantry serialise while a Z move and a
 dispense genuinely overlap.
 
-Two backend defects to fix while you are in there:
+~~Two backend defects to fix while you are in there:~~ **All three are done —
+see section 4a.** (`test_function` `ok=True`, `_load_handler_module`
+re-importing, and `GET /api/functions` write side effects.)
 
-- `function_discovery.test_function` **hardcodes `ok=True`**, so a handler
-  returning `{"ok": false}` reads as success.
-- `_load_handler_module` re-imports the handler on **every** call, so
-  `POST /{id}/cancel` operates on a fresh module instance unrelated to the one
-  running. Cache the modules.
-- `GET /api/functions` has write side effects (it rewrites `hardware-map.json`),
-  and the frontend calls it after every successful block run. Make discovery
-  read-only; move the sync to an explicit endpoint.
+One follow-up they created: the frontend still calls `GET /api/functions`
+expecting the sync side effect (it refreshes the block catalog after every
+successful run so placed blocks pick up regenerated manifests). That still
+works, because the catalog is re-read — but if a *blueprint* changed and the
+manifests need regenerating, the frontend should now call
+`POST /api/functions/sync` instead. Worth doing when Phase 5 touches the
+frontend.
 
 ---
 

@@ -46,6 +46,11 @@ class FirmwareBundle:
     pins: list[PinAssignment] = field(default_factory=list)
     protocol: int = IDENTITY_PROTOCOL_VERSION
     source_hashes: dict[str, str] = field(default_factory=dict)
+    # Human-readable label, carried so a board can say "I am the Z axis
+    # controller" and not just an opaque id. Deliberately NOT part of the
+    # fingerprint: renaming a controller in the Hardware Map must not make
+    # every board look like it needs reflashing.
+    controller_name: str = ""
 
     def canonical_payload(self) -> dict:
         """Order-independent description. Two builds that differ only in the
@@ -95,6 +100,16 @@ def hash_firmware_sources(firmware_dir: Path) -> dict[str, str]:
     return hashes
 
 
+def _c_string(value: str) -> str:
+    """Escape a value for embedding in a C string literal.
+
+    Controller ids and names come from the Hardware Map, which a user edits
+    freely - a stray quote or backslash would otherwise emit a header that
+    does not compile, turning a typo into a failed flash.
+    """
+    return (value or "").replace("\\", "\\\\").replace('"', '\\"')
+
+
 def render_identity_header(bundle: FirmwareBundle) -> str:
     """The header the sketch includes so it can answer `ID?`.
 
@@ -113,7 +128,8 @@ def render_identity_header(bundle: FirmwareBundle) -> str:
             "// instead of reflashing every board before every workflow.",
             "#pragma once",
             "",
-            f'#define ROBOT_CONTROLLER_ID "{bundle.controller_id}"',
+            f'#define ROBOT_CONTROLLER_ID "{_c_string(bundle.controller_id)}"',
+            f'#define ROBOT_CONTROLLER_NAME "{_c_string(bundle.controller_name)}"',
             f'#define ROBOT_FIRMWARE_FINGERPRINT "{bundle.fingerprint()}"',
             f"#define ROBOT_IDENTITY_PROTOCOL {bundle.protocol}",
             f"#define ROBOT_ROUTINE_COUNT {len(routines)}",

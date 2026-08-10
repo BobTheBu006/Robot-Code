@@ -25,6 +25,10 @@
 #define ROBOT_CONTROLLER_ID ""
 #endif
 
+#ifndef ROBOT_CONTROLLER_NAME
+#define ROBOT_CONTROLLER_NAME ""
+#endif
+
 #ifndef ROBOT_FIRMWARE_FINGERPRINT
 #define ROBOT_FIRMWARE_FINGERPRINT ""
 #endif
@@ -43,6 +47,8 @@ static const char* ROBOT_ROUTINES[] = {""};
 inline void printControllerIdentity() {
   Serial.print("{\"controller_id\":\"");
   Serial.print(ROBOT_CONTROLLER_ID);
+  Serial.print("\",\"name\":\"");
+  Serial.print(ROBOT_CONTROLLER_NAME);
   Serial.print("\",\"fingerprint\":\"");
   Serial.print(ROBOT_FIRMWARE_FINGERPRINT);
   Serial.print("\",\"protocol\":");
