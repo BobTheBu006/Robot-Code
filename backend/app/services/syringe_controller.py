@@ -823,6 +823,39 @@ class SyringeControllerService:
 
 syringe_controller_service = SyringeControllerService()
 
+
+def dispense_result_payload(response: SyringeDispenseResponse, context: dict) -> dict:
+    """The block result for a completed dispense.
+
+    Shared so every dispensing block reports the same fields; they used to be
+    spelled out per handler, which is how they drifted apart.
+    """
+    return {
+        "status": "completed",
+        "reply": response.reply,
+        "port": response.port,
+        "baud_rate": response.baud_rate,
+        "calibration_file": response.calibration_file,
+        "command_format": response.command_format,
+        "speed": response.speed,
+        "intake_speed": response.intake_speed,
+        "outtake_speed": response.outtake_speed,
+        "speed_command_sent": response.speed_command_sent,
+        "speed_reply": response.speed_reply,
+        "speed_applied": response.speed_applied,
+        "intake_speed_command_sent": response.intake_speed_command_sent,
+        "intake_speed_reply": response.intake_speed_reply,
+        "intake_speed_applied": response.intake_speed_applied,
+        "outtake_speed_command_sent": response.outtake_speed_command_sent,
+        "outtake_speed_reply": response.outtake_speed_reply,
+        "outtake_speed_applied": response.outtake_speed_applied,
+        "command_sent": response.command_sent,
+        "requested_amounts": response.requested_amounts,
+        "calculated_steps": response.calculated_steps,
+        "mode": context.get("mode"),
+    }
+
+
 safety_controller.register_actor(
     CallableActor("syringe-serial", syringe_controller_service.emergency_stop),
     priority=PRIORITY_SERIAL,

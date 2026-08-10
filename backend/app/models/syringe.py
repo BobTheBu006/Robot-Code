@@ -45,6 +45,36 @@ class SyringeDispenseRequest(BaseModel):
             raise ValueError("At least one syringe head must be given a positive dispense amount.")
         return self
 
+    @classmethod
+    def from_block_inputs(cls, inputs: dict) -> "SyringeDispenseRequest":
+        """Build a request from a workflow block's resolved inputs.
+
+        Shared by every block that dispenses, so the mapping exists once. When
+        it was duplicated per handler, a fix applied to one block silently
+        missed the others - the per-head pin passing was added to the preset
+        block while the plain `dispense` block kept sending none, leaving the
+        firmware on its compiled-in pinout.
+        """
+        return cls.model_validate(
+            {
+                "port": inputs.get("tool_port"),
+                "calibration_file": inputs.get("calibration_file"),
+                "speed": inputs.get("speed") or None,
+                "intake_speed": inputs.get("intake_speed") or None,
+                "outtake_speed": inputs.get("outtake_speed") or None,
+                "baud_rate": inputs.get("baud_rate"),
+                # Per-head step/dir pins resolved from the Hardware Map;
+                # without them the firmware falls back to its compiled-in
+                # pinout, which no longer matches the wiring.
+                **{
+                    f"head_{head}_{signal}_pin": inputs.get(f"head_{head}_{signal}_pin")
+                    for head in "abcdefg"
+                    for signal in ("step", "dir")
+                },
+                **{head: inputs.get(head, 0) for head in ("A", "B", "C", "D", "E", "F", "G")},
+            }
+        )
+
 
 class SyringePrimeRequest(BaseModel):
     """Home the plungers against the bottom hard stop, then prime with
