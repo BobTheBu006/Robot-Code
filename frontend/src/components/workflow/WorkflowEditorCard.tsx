@@ -3076,9 +3076,28 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         inputData = resultsByNodeId.get(upstreamEdge.source)?.result ?? null;
       }
 
-      const result = await executeNode(nodeId, inputData);
+      // Per-node failure policy, which until now was editable but never read.
+      // On a physical machine "carry on regardless" is the dangerous default:
+      // a failed calibration followed by moves drives against a workspace the
+      // machine no longer knows. Retries come first, then the node's own
+      // failureMode decides whether the run continues.
+      const retryCount = Math.max(0, Math.trunc(node.data.settings?.retryCount ?? 0));
+      let result = await executeNode(nodeId, inputData);
+      for (let attempt = 0; attempt < retryCount && !result.ok; attempt += 1) {
+        result = await executeNode(nodeId, inputData);
+      }
+
       resultsByNodeId.set(nodeId, result);
       workflowResultsRef.current = resultsByNodeId;
+
+      if (!result.ok && (node.data.settings?.failureMode ?? "stop_flow") === "stop_flow") {
+        const attempts = retryCount > 0 ? ` after ${retryCount + 1} attempts` : "";
+        throw new Error(
+          `Stopped: "${node.data.block.displayName}" failed${attempts}. `
+          + (result.error ?? "The block reported failure.")
+          + " (This block's failure mode is Stop whole flow.)",
+        );
+      }
 
       setWorkflowRunState((currentState) => ({
         ...currentState,

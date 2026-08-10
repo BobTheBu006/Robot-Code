@@ -35,9 +35,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 41,
+        "runCount": 42,
         "benchmarkDurationMs": 19,
-        "lastDurationMs": 0
+        "lastDurationMs": 1
       },
       "measured": {
         "width": 210,
@@ -337,10 +337,10 @@
               "description": "Continue when X calibration completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
-          "builderSourcePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0/workflow-functions/calibrate_xy.json",
-          "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
-          "builderFirmwareEntryFile": "firmware/main.ino",
+          "builderBoardId": null,
+          "builderSourcePath": null,
+          "builderWorkspacePath": null,
+          "builderFirmwareEntryFile": null,
           "builderBaseFunctionId": null,
           "hardwareDevices": [
             {
@@ -519,23 +519,7 @@
               "notes": null
             }
           ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "calibrate_xy",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY LIMITS, CALIBRATE XY <xCm> <yCm> <speedRpm> <trapezoidFlag> <accelerationRpmPerSecond> <stepsPerRotation> <maxProbeRotations> <xCalibrationYRotations> <limitBufferCm>. Firmware nudges clear of any already-pressed limit switch, homes Y-min to set Y = 0, parks xCalibrationYRotations motor rotations clear of the Y switch, then probes X min and X max and records measured X steps per centimeter. The limit buffer is persisted and used by every later move.",
-              "entry_point": "calibrate_xy",
-              "required_device_ids": [
-                "x-axis-motor",
-                "y-axis-motor",
-                "x-min-limit-switch",
-                "x-max-limit-switch",
-                "y-min-limit-switch"
-              ],
-              "description": "Firmware routine required by the Calibrate Gantry XY block."
-            }
-          ],
+          "firmwareRequirements": [],
           "referencedBasicBlockIds": []
         },
         "parameters": {
@@ -804,7 +788,7 @@
               "description": "Continue when the XY move completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
+          "builderBoardId": null,
           "builderSourcePath": null,
           "builderWorkspacePath": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
           "builderFirmwareEntryFile": "firmware/main.ino",
@@ -986,23 +970,7 @@
               "notes": null
             }
           ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "move_gantry_xy",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. Firmware moves in a straight line using the calibrated steps-per-cm and Y track length restored from NVS, with trapezoidal ramping, and faults on workspace or limit violations.",
-              "entry_point": "moveGantryXYTo",
-              "required_device_ids": [
-                "x-axis-motor",
-                "y-axis-motor",
-                "x-min-limit-switch",
-                "x-max-limit-switch",
-                "y-min-limit-switch"
-              ],
-              "description": "Firmware routine required by the Move Gantry XY block."
-            }
-          ],
+          "firmwareRequirements": [],
           "referencedBasicBlockIds": []
         },
         "parameters": {
@@ -1435,7 +1403,7 @@
               "description": "Continue when the tool change completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
+          "builderBoardId": null,
           "builderSourcePath": null,
           "builderWorkspacePath": null,
           "builderFirmwareEntryFile": null,
@@ -1617,23 +1585,7 @@
               "notes": null
             }
           ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "pickup_toolhead",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The block issues the tool-change waypoints as a series of GOTOXY moves; no dedicated firmware routine is required.",
-              "entry_point": "pickup_toolhead",
-              "required_device_ids": [
-                "x-axis-motor",
-                "y-axis-motor",
-                "x-min-limit-switch",
-                "x-max-limit-switch",
-                "y-min-limit-switch"
-              ],
-              "description": "Firmware routine required by the Pick Up Toolhead block."
-            }
-          ],
+          "firmwareRequirements": [],
           "referencedBasicBlockIds": []
         },
         "parameters": {
@@ -2066,7 +2018,7 @@
               "description": "Continue when the tool change completes."
             }
           ],
-          "builderBoardId": "ttyUSB0",
+          "builderBoardId": null,
           "builderSourcePath": null,
           "builderWorkspacePath": null,
           "builderFirmwareEntryFile": null,
@@ -2248,23 +2200,7 @@
               "notes": null
             }
           ],
-          "firmwareRequirements": [
-            {
-              "routine_id": "drop_toolhead",
-              "controller_role": "builder_board",
-              "source": "firmware/main.ino",
-              "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, GOTOXY <xCm> <yCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The block issues the tool-change waypoints as a series of GOTOXY moves; no dedicated firmware routine is required.",
-              "entry_point": "drop_toolhead",
-              "required_device_ids": [
-                "x-axis-motor",
-                "y-axis-motor",
-                "x-min-limit-switch",
-                "x-max-limit-switch",
-                "y-min-limit-switch"
-              ],
-              "description": "Firmware routine required by the Drop Toolhead block."
-            }
-          ],
+          "firmwareRequirements": [],
           "referencedBasicBlockIds": []
         },
         "parameters": {
@@ -3822,8 +3758,8 @@
       "id": "dispense-8wkpk",
       "type": "workflowBlock",
       "position": {
-        "x": 383,
-        "y": 475
+        "x": 693.9206324495553,
+        "y": 538.2750760774534
       },
       "data": {
         "block": {
@@ -4668,16 +4604,788 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 1,
-        "benchmarkDurationMs": 8704,
-        "lastDurationMs": 8704
+        "runCount": 2,
+        "benchmarkDurationMs": 10149,
+        "lastDurationMs": 11595
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": true,
+      "selected": false,
       "dragging": false
+    },
+    {
+      "id": "prime_syringes-77daw",
+      "type": "workflowBlock",
+      "position": {
+        "x": 386.96031622477767,
+        "y": 698.2750760774534
+      },
+      "data": {
+        "block": {
+          "id": "prime_syringes",
+          "displayName": "Home & Prime Syringes",
+          "category": "Advanced Functions",
+          "description": "Establishes a known plunger position and primes all 7 pumps. The plungers have no position feedback, so every plunger is first driven in the dispense direction far enough to bottom out on the mechanical hard stop (steppers skip there by design) - that stop becomes the known zero. Then each prime cycle draws the prime volume up and pushes it back out, ending on the stop again.",
+          "version": "0.2.0",
+          "kind": "advanced",
+          "acceptsInput": true,
+          "accent": "#0e7490",
+          "inputs": [
+            {
+              "key": "tool_port",
+              "label": "ESP32 Port",
+              "type": "file/path",
+              "description": "Serial device path for the connected ESP32 syringe board.",
+              "required": false,
+              "default": "/dev/ttyUSB0",
+              "placeholder": "/dev/ttyUSB0",
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "home_overtravel_ul",
+              "label": "Homing Push (\u00b5l)",
+              "type": "number",
+              "description": "How much the plungers are over-driven in the dispense direction to guarantee they bottom out on the hard stop from any starting position. Should be at least a full syringe stroke; 1500 \u00b5l covers a 1 ml syringe with margin.",
+              "required": true,
+              "default": 1000,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "prime_volume_ul",
+              "label": "Prime Volume (\u00b5l)",
+              "type": "number",
+              "description": "Volume drawn up and pushed back out in each prime cycle.",
+              "required": true,
+              "default": 1000,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "prime_cycles",
+              "label": "Prime Cycles",
+              "type": "number",
+              "description": "How many draw/push cycles to run after homing.",
+              "required": true,
+              "default": 3,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "final_draw_ul",
+              "label": "Final Draw (\u00b5l)",
+              "type": "number",
+              "description": "Last move of the block: after the prime cycles the plungers pull up this much, so they finish drawn and ready to dispense instead of seated on the stop. Set 0 to skip.",
+              "required": false,
+              "default": 1000,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "speed",
+              "label": "Speed (RPM)",
+              "type": "number",
+              "description": "Motor speed for the homing push and every prime stroke.",
+              "required": true,
+              "default": 60,
+              "placeholder": null,
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            }
+          ],
+          "advancedInputs": [
+            {
+              "key": "calibration_file",
+              "label": "Calibration File",
+              "type": "file/path",
+              "description": "Calibration file used to convert dispense amounts into syringe motor steps.",
+              "required": true,
+              "default": "/home/robot/robot control/syringe control code/calibration.json",
+              "placeholder": "/path/to/calibration.json",
+              "advanced": false,
+              "min": null,
+              "max": null,
+              "options": []
+            },
+            {
+              "key": "head_a_step_pin",
+              "label": "Head A Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head A when saving a reusable hardware preset.",
+              "required": false,
+              "default": 33,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_a_dir_pin",
+              "label": "Head A Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head A when saving a reusable hardware preset.",
+              "required": false,
+              "default": 32,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_b_step_pin",
+              "label": "Head B Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head B when saving a reusable hardware preset.",
+              "required": false,
+              "default": 25,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_b_dir_pin",
+              "label": "Head B Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head B when saving a reusable hardware preset.",
+              "required": false,
+              "default": 4,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_c_step_pin",
+              "label": "Head C Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head C when saving a reusable hardware preset.",
+              "required": false,
+              "default": 26,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_c_dir_pin",
+              "label": "Head C Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head C when saving a reusable hardware preset.",
+              "required": false,
+              "default": 5,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_d_step_pin",
+              "label": "Head D Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head D when saving a reusable hardware preset.",
+              "required": false,
+              "default": 27,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_d_dir_pin",
+              "label": "Head D Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head D when saving a reusable hardware preset.",
+              "required": false,
+              "default": 18,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_e_step_pin",
+              "label": "Head E Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head E when saving a reusable hardware preset.",
+              "required": false,
+              "default": 14,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_e_dir_pin",
+              "label": "Head E Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head E when saving a reusable hardware preset.",
+              "required": false,
+              "default": 19,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_f_step_pin",
+              "label": "Head F Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head F when saving a reusable hardware preset.",
+              "required": false,
+              "default": 12,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_f_dir_pin",
+              "label": "Head F Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head F when saving a reusable hardware preset.",
+              "required": false,
+              "default": 21,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_g_step_pin",
+              "label": "Head G Step Pin",
+              "type": "number",
+              "description": "GPIO step pin for syringe head G when saving a reusable hardware preset.",
+              "required": false,
+              "default": 13,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            },
+            {
+              "key": "head_g_dir_pin",
+              "label": "Head G Dir Pin",
+              "type": "number",
+              "description": "GPIO direction pin for syringe head G when saving a reusable hardware preset.",
+              "required": false,
+              "default": 22,
+              "placeholder": null,
+              "advanced": true,
+              "min": null,
+              "max": null,
+              "options": [],
+              "hidden": true,
+              "resolvedFrom": "hardware_map"
+            }
+          ],
+          "outputs": [
+            {
+              "key": "next",
+              "label": "Next",
+              "type": "flow",
+              "description": "Continue when homing and priming complete."
+            }
+          ],
+          "builderBoardId": "controller-x83xnc",
+          "builderSourcePath": null,
+          "builderWorkspacePath": null,
+          "builderFirmwareEntryFile": null,
+          "builderBaseFunctionId": null,
+          "hardwareDevices": [
+            {
+              "id": "syringe-head-a",
+              "name": "Syringe Head A",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-a-dir",
+                  "signal": "direction",
+                  "gpio": "13",
+                  "function_input_key": "head_a_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-a-step",
+                  "signal": "step",
+                  "gpio": "14",
+                  "function_input_key": "head_a_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-a-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-a-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-a-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-a-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-a",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-b",
+              "name": "Syringe Head B",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-b-dir",
+                  "signal": "direction",
+                  "gpio": "27",
+                  "function_input_key": "head_b_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-b-step",
+                  "signal": "step",
+                  "gpio": "26",
+                  "function_input_key": "head_b_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-b-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-b-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-b-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-b-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-b",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-c",
+              "name": "Syringe Head C",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-c-dir",
+                  "signal": "direction",
+                  "gpio": "25",
+                  "function_input_key": "head_c_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-c-step",
+                  "signal": "step",
+                  "gpio": "33",
+                  "function_input_key": "head_c_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-c-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-c-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-c-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-c-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-c",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-d",
+              "name": "Syringe Head D",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-d-dir",
+                  "signal": "direction",
+                  "gpio": "17",
+                  "function_input_key": "head_d_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-d-step",
+                  "signal": "step",
+                  "gpio": "16",
+                  "function_input_key": "head_d_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-d-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-d-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-d-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-d-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-d",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-e",
+              "name": "Syringe Head E",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-e-dir",
+                  "signal": "direction",
+                  "gpio": "5",
+                  "function_input_key": "head_e_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-e-step",
+                  "signal": "step",
+                  "gpio": "18",
+                  "function_input_key": "head_e_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-e-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-e-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-e-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-e-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-e",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-f",
+              "name": "Syringe Head F",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-f-dir",
+                  "signal": "direction",
+                  "gpio": "19",
+                  "function_input_key": "head_f_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-f-step",
+                  "signal": "step",
+                  "gpio": "21",
+                  "function_input_key": "head_f_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-f-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-f-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-f-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-f-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-f",
+              "notes": null
+            },
+            {
+              "id": "syringe-head-g",
+              "name": "Syringe Head G",
+              "kind": "stepper_motor",
+              "board_id": "controller-x83xnc",
+              "sensor_kind": null,
+              "rotation_min_deg": null,
+              "rotation_max_deg": null,
+              "calibration_ml_per_200_steps": null,
+              "pins": [
+                {
+                  "id": "head-g-dir",
+                  "signal": "direction",
+                  "gpio": "22",
+                  "function_input_key": "head_g_dir_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-g-step",
+                  "signal": "step",
+                  "gpio": "23",
+                  "function_input_key": "head_g_step_pin",
+                  "notes": null
+                },
+                {
+                  "id": "head-g-enable",
+                  "signal": "enable",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-g-ms1",
+                  "signal": "micro_step_1",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-g-ms2",
+                  "signal": "micro_step_2",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                },
+                {
+                  "id": "head-g-ms3",
+                  "signal": "micro_step_3",
+                  "gpio": "-",
+                  "function_input_key": null,
+                  "notes": null
+                }
+              ],
+              "basic_block_id": "basic-stepper-syringe-head-g",
+              "notes": null
+            }
+          ],
+          "firmwareRequirements": [],
+          "referencedBasicBlockIds": []
+        },
+        "parameters": {
+          "tool_port": "/dev/ttyUSB0",
+          "home_overtravel_ul": 1000,
+          "prime_volume_ul": 1000,
+          "prime_cycles": 3,
+          "final_draw_ul": 1000,
+          "speed": 60,
+          "calibration_file": "/home/robot/robot control/syringe control code/calibration.json",
+          "head_a_step_pin": 33,
+          "head_a_dir_pin": 32,
+          "head_b_step_pin": 25,
+          "head_b_dir_pin": 4,
+          "head_c_step_pin": 26,
+          "head_c_dir_pin": 5,
+          "head_d_step_pin": 27,
+          "head_d_dir_pin": 18,
+          "head_e_step_pin": 14,
+          "head_e_dir_pin": 19,
+          "head_f_step_pin": 12,
+          "head_f_dir_pin": 21,
+          "head_g_step_pin": 13,
+          "head_g_dir_pin": 22
+        },
+        "settings": {
+          "failureMode": "stop_flow",
+          "retryCount": 0
+        },
+        "isActive": true,
+        "runCount": 1,
+        "benchmarkDurationMs": 101143,
+        "lastDurationMs": 101143
+      },
+      "measured": {
+        "width": 210,
+        "height": 120
+      },
+      "selected": true
     }
   ],
   "edges": [
@@ -4746,10 +5454,18 @@
     {
       "source": "start-seed-start",
       "sourceHandle": "next",
+      "target": "prime_syringes-77daw",
+      "targetHandle": "input",
+      "type": "workflowEdge",
+      "id": "xy-edge__start-seed-startnext-prime_syringes-77dawinput"
+    },
+    {
+      "source": "prime_syringes-77daw",
+      "sourceHandle": "next",
       "target": "dispense-8wkpk",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__start-seed-startnext-dispense-8wkpkinput"
+      "id": "xy-edge__prime_syringes-77dawnext-dispense-8wkpkinput"
     }
   ]
 }
