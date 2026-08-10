@@ -3113,6 +3113,24 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     });
   }
 
+  // Loop blocks and deactivated blocks are settled inside the engine and never
+  // handed over to run, so they would otherwise sit unmarked on the canvas
+  // while their body repeated. Mark them from what the engine reports instead.
+  function applyEngineEvents(step: EngineRunStep) {
+    const settled = (step.events ?? [])
+      .filter((event) => (event.kind === "loop" || event.kind === "skipped") && event.node_id)
+      .map((event) => event.node_id as string);
+
+    if (settled.length === 0) {
+      return;
+    }
+
+    setWorkflowRunState((currentState) => ({
+      ...currentState,
+      completedNodeIds: Array.from(new Set([...currentState.completedNodeIds, ...settled])),
+    }));
+  }
+
   // Hand the engine a result this block already produced, without running it
   // again. This is what makes RESUME pick up where the run stopped.
   async function reportCompletedNode(
@@ -3175,6 +3193,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
 
     try {
+      applyEngineEvents(step);
       while (!step.finished && step.due.length > 0) {
         // Blocks due at the same moment are independent branches. They are run
         // one at a time on purpose: they share one gantry, and nothing yet
@@ -3187,6 +3206,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
           } else {
             next = await executeAndReportNode(runId, due, resultsByNodeId);
           }
+          applyEngineEvents(next);
           if (next.finished || !next.ok) {
             break;
           }

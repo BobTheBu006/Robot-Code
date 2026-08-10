@@ -7,10 +7,14 @@ route shape shows up here rather than on the machine.
 
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 os.environ.setdefault("ROBOT_GPIO_SIMULATE", "1")
+# Runs write a journal. Keep it out of the repo when the suite runs.
+_JOURNAL_DIR = tempfile.TemporaryDirectory()
+os.environ["ROBOT_RUN_JOURNAL_DIR"] = _JOURNAL_DIR.name
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -123,6 +127,63 @@ class EngineRunRouteTests(unittest.TestCase):
         self.assertEqual(executed.count("body"), 3)
         self.assertIn("after", executed)
 
+    def test_loop_decisions_are_reported_even_though_loops_never_execute(self) -> None:
+        # A loop block is decided inside the engine and never handed out, so
+        # without these events the editor could not show it running at all.
+        workflow = {
+            "nodes": [
+                _node("s", "start", kind="basic"),
+                _node("f", "for", kind="basic", params={"iterations": 2}),
+                _node("body", "move_z"),
+            ],
+            "edges": [_edge("s", "f"), _edge("f", "body", "loop"), _edge("body", "f")],
+        }
+        started = self.client.post("/api/engine/runs", json=workflow).json()
+        run_id = started["run_id"]
+
+        seen_loop_events = []
+        due = started["due"]
+        last = started
+        while due:
+            for item in due:
+                last = self.client.post(
+                    f"/api/engine/runs/{run_id}/results",
+                    json={"node_id": item["node_id"], "ok": True, "result": {}},
+                ).json()
+                seen_loop_events.extend(e for e in last["events"] if e["kind"] == "loop")
+            due = last["due"]
+            if last["finished"]:
+                break
+
+        self.assertTrue(any(e["node_id"] == "f" for e in seen_loop_events))
+        self.assertTrue(any("finished" in e["detail"] for e in seen_loop_events))
+
+    def test_events_are_not_repeated_across_steps(self) -> None:
+        workflow = {
+            "nodes": [_node("s", "start", kind="basic"), _node("a", "move_z"), _node("b", "dispense")],
+            "edges": [_edge("s", "a"), _edge("a", "b")],
+        }
+        started = self.client.post("/api/engine/runs", json=workflow).json()
+        run_id = started["run_id"]
+
+        collected = list(started["events"])
+        due = started["due"]
+        last = started
+        while due:
+            for item in due:
+                last = self.client.post(
+                    f"/api/engine/runs/{run_id}/results",
+                    json={"node_id": item["node_id"], "ok": True, "result": {}},
+                ).json()
+                collected.extend(last["events"])
+            due = last["due"]
+            if last["finished"]:
+                break
+
+        # Each step reports only what is new, so the pieces add up to the whole
+        # log rather than resending it every time.
+        self.assertEqual(len(collected), len(last["report"]["events"]))
+
     def test_a_failed_block_stops_the_run(self) -> None:
         workflow = {
             "nodes": [_node("s", "start", kind="basic"), _node("a", "move_z"), _node("b", "dispense")],
@@ -134,6 +195,59 @@ class EngineRunRouteTests(unittest.TestCase):
         self.assertFalse(final["ok"])
         self.assertNotIn("b", executed)
         self.assertIn("Limit switch tripped", final["report"]["error"])
+
+    def test_a_run_leaves_a_readable_record_behind(self) -> None:
+        # The browser tab is gone an hour later; the question "what did the
+        # machine actually do" still has to have an answer.
+        from app.engine.journal import read_run
+
+        workflow = {
+            "nodes": [
+                _node("s", "start", kind="basic"),
+                _node("i", "if", kind="basic", params={"condition": "$in.ready == true"}),
+                _node("go", "move_z"), _node("skip", "dispense"),
+            ],
+            "edges": [_edge("s", "i"), _edge("i", "go", "true"), _edge("i", "skip", "false")],
+        }
+        started = self.client.post("/api/engine/runs", json=workflow).json()
+        run_id = started["run_id"]
+
+        due, last = started["due"], started
+        while due:
+            for item in due:
+                result = {"ready": True} if item["node_id"] == "s" else {"status": "ok"}
+                last = self.client.post(
+                    f"/api/engine/runs/{run_id}/results",
+                    json={"node_id": item["node_id"], "ok": True, "result": result},
+                ).json()
+            due = last["due"]
+            if last["finished"]:
+                break
+
+        records = read_run(run_id, Path(_JOURNAL_DIR.name))
+        kinds = [record["kind"] for record in records]
+        self.assertEqual(kinds[0], "run_started")
+        self.assertIn("run_finished", kinds)
+
+        # The branch that was taken, and why, is the interesting part.
+        decisions = [r for r in records if r["kind"] == "decision" and r["node_id"] == "i"]
+        self.assertTrue(any("True" in r.get("detail", "") for r in decisions))
+
+        executed = {r["node_id"] for r in records if r["kind"] == "block_finished"}
+        self.assertIn("go", executed)
+        self.assertNotIn("skip", executed)
+
+    def test_history_lists_runs_and_does_not_collide_with_a_run_id(self) -> None:
+        self._drive({
+            "nodes": [_node("s", "start", kind="basic"), _node("a", "move_z")],
+            "edges": [_edge("s", "a")],
+        })
+        response = self.client.get("/api/engine/runs/history")
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(len(response.json()["runs"]), 1)
+
+    def test_a_run_that_was_never_recorded_reads_as_missing(self) -> None:
+        self.assertEqual(self.client.get("/api/engine/runs/nope/journal").status_code, 404)
 
     def test_a_broken_graph_never_opens_a_run(self) -> None:
         started = self.client.post("/api/engine/runs", json={

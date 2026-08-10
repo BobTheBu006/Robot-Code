@@ -373,10 +373,19 @@ export interface EngineRunReport {
   stopped_at: string | null;
 }
 
+export interface EngineRunEvent {
+  kind: string;
+  node_id: string | null;
+  detail: string;
+}
+
 export interface EngineRunStep {
   ok: boolean;
   run_id?: string | null;
   due: EngineDueNode[];
+  // What the engine settled by itself since the last step: loop decisions and
+  // deactivated blocks, which are never handed over for execution.
+  events?: EngineRunEvent[];
   finished: boolean;
   report?: EngineRunReport;
   problems?: PlanProblem[];

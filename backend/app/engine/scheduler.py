@@ -114,21 +114,32 @@ def _handles_for_outcome(plan: ExecutionPlan, node: PlanNode, outcome: NodeOutco
 
 
 def _should_iterate(node: PlanNode, iteration: int, context: dict) -> tuple[bool, str]:
-    """Does this loop run its body again?"""
+    """Does this loop run its body again, and how would you explain that?
+
+    `iteration` is how many times the body has already run, so the description
+    has to be phrased from that side: on the way out, "3 of 3 done" - never
+    "iteration 4 of 3", which reads like the loop overran.
+    """
     if node.block_id == "for":
         try:
             total = int(float(node.parameters.get("iterations") or 0))
         except (TypeError, ValueError):
             total = 0
-        return iteration < total, f"iteration {iteration + 1} of {total}"
+        if iteration < total:
+            return True, f"iteration {iteration + 1} of {total}"
+        return False, f"{iteration} of {total} done"
 
     if node.block_id == "loop_over":
         items = context.get("$loop_items") or []
-        return iteration < len(items), f"item {iteration + 1} of {len(items)}"
+        if iteration < len(items):
+            return True, f"item {iteration + 1} of {len(items)}"
+        return False, f"{iteration} of {len(items)} done"
 
     # while
     decision = evaluate_condition(node.parameters.get("condition"), context)
-    return decision.value, f"condition {decision.detail}"
+    if decision.value:
+        return True, f"condition {decision.detail}"
+    return False, f"after {iteration}, condition {decision.detail}"
 
 
 @dataclass

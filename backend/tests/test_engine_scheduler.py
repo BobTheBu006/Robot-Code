@@ -150,6 +150,22 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(ran.count("body"), 4)
         self.assertIn("after", ran)
 
+    def test_a_finished_loop_is_described_as_done_not_as_overrunning(self) -> None:
+        # "iteration 4 of 3" reads like the loop ran once too many times.
+        plan = compile_plan({
+            "nodes": [
+                _node("s", "start", kind="basic"),
+                _node("f", "for", kind="basic", params={"iterations": 3}),
+                _node("body", "move_z"),
+            ],
+            "edges": [_edge("s", "f"), _edge("f", "body", "loop"), _edge("body", "f")],
+        })
+        report = run_plan(plan, _runner([]))
+        exit_events = [e for e in report.events if e.kind == "loop" and "finished" in e.detail]
+        self.assertEqual(len(exit_events), 1)
+        self.assertIn("3 of 3 done", exit_events[0].detail)
+        self.assertNotIn("4 of 3", exit_events[0].detail)
+
     def test_a_runaway_loop_is_stopped_rather_than_running_forever(self) -> None:
         plan = compile_plan({
             "nodes": [

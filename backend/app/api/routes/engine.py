@@ -15,6 +15,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.engine.journal import list_runs, read_run
 from app.engine.plan import compile_plan
 from app.engine.scheduler import NodeOutcome
 from app.services.run_sessions import run_session_service
@@ -66,6 +67,7 @@ def start_run(graph: WorkflowGraph) -> dict:
         "run_id": session.run_id,
         "problems": [problem.as_dict() for problem in plan.problems],
         "due": due,
+        "events": run_session_service.new_events(session),
         "finished": session.runner.finished,
         "report": session.runner.report.as_dict(),
     }
@@ -90,12 +92,36 @@ def submit_node_result(run_id: str, payload: NodeResultRequest) -> dict:
     )
 
     due = run_session_service.due_payload(session)
+    events = run_session_service.new_events(session)
     finished = session.runner.finished
     report = session.runner.report.as_dict()
     if finished:
         run_session_service.end(run_id)
 
-    return {"ok": session.runner.report.ok, "due": due, "finished": finished, "report": report}
+    return {
+        "ok": session.runner.report.ok,
+        "due": due,
+        "events": events,
+        "finished": finished,
+        "report": report,
+    }
+
+
+# Declared before /runs/{run_id} on purpose: FastAPI matches in order, and the
+# other route would happily treat "history" as a run id.
+@router.get("/runs/history")
+def get_run_history(limit: int = 50) -> dict:
+    """Recent runs, newest first, read back from the journal."""
+    return {"runs": list_runs(limit=max(1, min(limit, 200)))}
+
+
+@router.get("/runs/{run_id}/journal")
+def get_run_journal(run_id: str) -> dict:
+    """Everything recorded for one run, whether or not it is still going."""
+    records = read_run(run_id)
+    if not records:
+        raise HTTPException(status_code=404, detail=f"No record of run '{run_id}'.")
+    return {"run_id": run_id, "records": records}
 
 
 @router.get("/runs/{run_id}")

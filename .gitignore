@@ -12,6 +12,9 @@ backend/.venv/
 .venv/
 .arduino-cli/
 
+# Run records (per-run JSONL, pruned automatically)
+run-journal/
+
 # Env files
 .env
 frontend/.env
