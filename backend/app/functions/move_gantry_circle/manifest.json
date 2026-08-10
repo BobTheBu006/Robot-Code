@@ -202,7 +202,7 @@
       "id": "x-axis-motor",
       "name": "CoreXY A Motor",
       "kind": "stepper_motor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -230,7 +230,7 @@
       "id": "y-axis-motor",
       "name": "CoreXY B Motor",
       "kind": "stepper_motor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -258,7 +258,7 @@
       "id": "x-min-limit-switch",
       "name": "X Min Limit Switch",
       "kind": "sensor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -279,7 +279,7 @@
       "id": "x-max-limit-switch",
       "name": "X Max Limit Switch",
       "kind": "sensor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -300,7 +300,7 @@
       "id": "y-min-limit-switch",
       "name": "Y Min Limit Switch",
       "kind": "sensor",
-      "board_id": "ttyUSB0",
+      "board_id": "raspberry-pi",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -318,24 +318,8 @@
       "notes": null
     }
   ],
-  "firmware_requirements": [
-    {
-      "routine_id": "move_gantry_circle",
-      "controller_role": "builder_board",
-      "source": "firmware/main.ino",
-      "protocol": "Serial commands: SET XY PINS, SET XY ENABLE, SET XY LIMITS, CIRCLEXY <centerXCm> <centerYCm> <radiusCm> <rpm> <trapezoidFlag> <accelerationRpmPerSecond>. The backend sends CIRCLEXY once per requested repeat. Firmware moves to the circle start point, then traces the circle in short chords using the calibrated steps-per-cm restored from NVS, with one trapezoidal ramp across each lap, and faults on workspace or limit violations.",
-      "entry_point": "circleGantryXY",
-      "required_device_ids": [
-        "x-axis-motor",
-        "y-axis-motor",
-        "x-min-limit-switch",
-        "x-max-limit-switch",
-        "y-min-limit-switch"
-      ],
-      "description": "Firmware routine required by the Move Gantry Circle block."
-    }
-  ],
-  "builder_board_id": "ttyUSB0",
+  "firmware_requirements": [],
+  "builder_board_id": null,
   "builder_source_path": null,
   "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
   "builder_firmware_entry_file": "firmware/main.ino",
