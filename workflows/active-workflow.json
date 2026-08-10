@@ -3819,11 +3819,11 @@
       "dragging": false
     },
     {
-      "id": "dispense-twjq4",
+      "id": "dispense-8wkpk",
       "type": "workflowBlock",
       "position": {
-        "x": 323,
-        "y": 411
+        "x": 383,
+        "y": 475
       },
       "data": {
         "block": {
@@ -4639,13 +4639,13 @@
           "tool_port": "/dev/ttyUSB1",
           "calibration_file": "/home/robot/robot control/Robot-Code/functions/syringe control code/calibration.json",
           "speed": 100,
-          "A": 100,
-          "B": 100,
-          "C": 100,
-          "D": 100,
-          "E": 100,
-          "F": 100,
-          "G": 100,
+          "A": 300,
+          "B": 300,
+          "C": 300,
+          "D": 300,
+          "E": 300,
+          "F": 300,
+          "G": 300,
           "intake_speed": 100,
           "outtake_speed": 100,
           "head_a_step_pin": 33,
@@ -4668,13 +4668,13 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 0,
-        "benchmarkDurationMs": null,
-        "lastDurationMs": null
+        "runCount": 1,
+        "benchmarkDurationMs": 8704,
+        "lastDurationMs": 8704
       },
       "measured": {
         "width": 210,
-        "height": 88
+        "height": 120
       },
       "selected": true,
       "dragging": false
@@ -4746,10 +4746,10 @@
     {
       "source": "start-seed-start",
       "sourceHandle": "next",
-      "target": "dispense-twjq4",
+      "target": "dispense-8wkpk",
       "targetHandle": "input",
       "type": "workflowEdge",
-      "id": "xy-edge__start-seed-startnext-dispense-twjq4input"
+      "id": "xy-edge__start-seed-startnext-dispense-8wkpkinput"
     }
   ]
 }

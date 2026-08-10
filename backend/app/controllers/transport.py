@@ -56,6 +56,7 @@ class SerialTransport:
         self.device = device
         self._baud_rate = baud_rate
         self._port = None
+        self._retried_after_reset = False
 
     def open(self) -> None:
         try:
@@ -63,14 +64,61 @@ class SerialTransport:
         except ImportError as exc:  # pragma: no cover - depends on host install
             raise TransportError(f"pyserial is not available: {exc}") from exc
 
+        # Open WITHOUT asserting DTR/RTS. On these boards EN is driven from
+        # those lines, so a normal open resets the ESP32 and forces a ~2s wait
+        # for it to boot before it can answer - paid on every handshake, for
+        # every board, on every run. Firmware that is already running answers
+        # immediately, so the reset is pure cost in the common case.
         try:
-            self._port = serial.Serial(self.device, self._baud_rate, timeout=1)
-        except Exception as exc:
-            raise TransportError(f"Could not open '{self.device}': {exc}") from exc
+            port = serial.Serial()
+            port.port = self.device
+            port.baudrate = self._baud_rate
+            port.timeout = 1
+            port.dtr = False
+            port.rts = False
+            port.open()
+            self._port = port
+        except Exception:
+            # Some adapters refuse the staged open; fall back to the plain one,
+            # which resets the board and therefore has to wait it out.
+            try:
+                self._port = serial.Serial(self.device, self._baud_rate, timeout=1)
+            except Exception as exc:
+                raise TransportError(f"Could not open '{self.device}': {exc}") from exc
+            self._settle_after_reset()
+            return
 
-        # ESP32 boards reset when the port opens (DTR/RTS toggling), so the
-        # first thing on the wire is boot chatter. Give it a moment, then throw
-        # away whatever is buffered rather than parsing it as a reply.
+        # Discard anything already in flight before asking a question. A fixed
+        # short sleep is not enough: if this adapter does reset the board after
+        # all, its boot banner is still streaming and the first line read back
+        # ("OK XY PINS ...") gets parsed as the answer, which reads as "no
+        # identity" and reflashes a perfectly good controller. Draining until
+        # the line goes quiet costs nothing when the board is idle and waits
+        # out a boot when it is not.
+        self._drain_until_quiet()
+
+    def _drain_until_quiet(self, *, quiet_seconds: float = 0.25, max_seconds: float = 3.5) -> None:
+        deadline = time.monotonic() + max_seconds
+        last_data_at = time.monotonic()
+        while time.monotonic() < deadline:
+            try:
+                waiting = self._port.in_waiting
+                if waiting:
+                    self._port.read(waiting)
+                    last_data_at = time.monotonic()
+                    continue
+            except Exception:
+                break
+            if time.monotonic() - last_data_at >= quiet_seconds:
+                break
+            time.sleep(0.02)
+        try:
+            self._port.reset_input_buffer()
+        except Exception:
+            pass
+
+    def _settle_after_reset(self) -> None:
+        """Wait out an ESP32 boot and discard its chatter."""
         time.sleep(2.0)
         try:
             self._port.reset_input_buffer()
@@ -107,6 +155,14 @@ class SerialTransport:
             line = raw.decode("utf-8", errors="replace").strip()
             if line:
                 return line
+
+        # Silence can mean the board really was reset by this open (adapter
+        # dependent) and is still booting. Wait it out once and re-ask, so
+        # skipping the reset never turns a live board into "unresponsive".
+        if not self._retried_after_reset:
+            self._retried_after_reset = True
+            self._settle_after_reset()
+            return self.ask(command, timeout_seconds=timeout_seconds)
 
         return None
 
