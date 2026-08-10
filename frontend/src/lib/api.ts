@@ -144,11 +144,20 @@ export function buildEsp32BoardFirmware(boardId: string): Promise<Esp32FirmwareA
 export function flashEsp32BoardFirmware(
   boardId: string,
   signal?: AbortSignal,
+  // A run passes true: the board is asked who it is, and one already running
+  // the expected firmware is left alone instead of being reflashed. The
+  // builder's Flash button leaves this false, because clicking Flash means
+  // flash it.
+  skipIfCurrent = false,
 ): Promise<Esp32FirmwareActionResponse> {
-  return request<Esp32FirmwareActionResponse>(`/api/esp32-builder/boards/${encodeURIComponent(boardId)}/flash`, {
-    method: "POST",
-    signal,
-  });
+  const query = skipIfCurrent ? "?skip_if_current=true" : "";
+  return request<Esp32FirmwareActionResponse>(
+    `/api/esp32-builder/boards/${encodeURIComponent(boardId)}/flash${query}`,
+    {
+      method: "POST",
+      signal,
+    },
+  );
 }
 
 export function planWorkflowFirmware(

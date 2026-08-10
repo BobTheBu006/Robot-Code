@@ -51,11 +51,44 @@ def build_esp32_board_firmware(board_id: str) -> Esp32FirmwareActionResponse:
 
 
 @router.post("/boards/{board_id}/flash", response_model=Esp32FirmwareActionResponse)
-def flash_esp32_board_firmware(board_id: str) -> Esp32FirmwareActionResponse:
+def flash_esp32_board_firmware(
+    board_id: str,
+    skip_if_current: bool = False,
+) -> Esp32FirmwareActionResponse:
+    """Flash a controller.
+
+    `skip_if_current` asks the board who it is first and leaves it alone when
+    it already runs the expected firmware - what a workflow run wants, so it
+    stops reflashing every controller before every run. It defaults to false so
+    that pressing Flash in the builder UI always flashes, which is what someone
+    who clicked the button meant.
+    """
     try:
-        return esp32_builder_service.flash_firmware(board_id)
+        return esp32_builder_service.flash_firmware(board_id, skip_if_current=skip_if_current)
     except Esp32BuilderError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/boards/{board_id}/preflight")
+def preflight_esp32_board(board_id: str) -> dict:
+    """Ask the board who it is and whether its firmware is already correct."""
+    try:
+        result = esp32_builder_service.preflight_board(board_id)
+    except Esp32BuilderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "controller_id": result.controller_id,
+        "verdict": result.verdict.value,
+        "message": result.message,
+        "port": result.port,
+        "expected_fingerprint": result.expected_fingerprint,
+        "reported_fingerprint": result.reported_fingerprint,
+        "reported_controller_id": result.reported_controller_id,
+        "missing_routines": result.missing_routines,
+        "needs_flash": result.needs_flash,
+        "blocks_run": result.verdict.blocks_run,
+    }
 
 
 @router.post("/workflow-firmware/plan", response_model=Esp32WorkflowFirmwarePlanResponse)

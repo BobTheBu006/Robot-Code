@@ -2963,7 +2963,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
           flashingBoardId: boardId,
         }));
 
-        const response = await flashEsp32BoardFirmware(boardId, abortController.signal);
+        // Verify before flashing: a controller already running the expected
+        // firmware is skipped, and one reporting a different identity is
+        // refused rather than overwritten. This is what stops a run from
+        // reflashing every board every time.
+        const response = await flashEsp32BoardFirmware(boardId, abortController.signal, true);
         if (!response.ok) {
           throw new Error(`Could not flash ESP32 '${boardId}'. ${response.log || response.auto_reset_note}`);
         }
