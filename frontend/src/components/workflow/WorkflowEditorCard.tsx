@@ -38,8 +38,11 @@ import {
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
+  startEngineRun,
+  submitEngineNodeResult,
+  endEngineRun,
 } from "../../lib/api";
-import type { AccessDoorState } from "../../lib/api";
+import type { AccessDoorState, EngineDueNode, EngineRunStep } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   WORKFLOW_BLOCK_MIME,
@@ -987,6 +990,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [discoveryErrors, setDiscoveryErrors] = useState<FunctionDiscoveryError[]>([]);
   const [functionsStatus, setFunctionsStatus] = useState<"loading" | "success" | "error">("loading");
   const [functionsError, setFunctionsError] = useState<string | null>(null);
+  // Things the engine noticed about the graph that do not stop the run - most
+  // often a block nothing reaches, which otherwise just silently never runs.
+  const [workflowNotice, setWorkflowNotice] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [openedNodeId, setOpenedNodeId] = useState<string | null>(null);
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
@@ -1036,6 +1042,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     flashingBoardId: null,
   });
   const workflowResultsRef = useRef<Map<string, FunctionTestResponse>>(new Map());
+  // The engine run currently being driven, so an E-Stop or a closed run can
+  // release it on the backend instead of leaving it sitting in memory.
+  const engineRunIdRef = useRef<string | null>(null);
   const reactFlow = useReactFlow<WorkflowFlowNode, Edge>();
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
 
@@ -2752,7 +2761,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
   }
 
-  function collectRunAllOrder(
+  // Every block the run could reach, in no particular order. This used to be
+  // the run order too, which is what made control flow wrong: it followed the
+  // edge array and visited each block once, so an If ran both branches and a
+  // loop body ran a single time. The engine decides order now; this is kept
+  // only to answer "which boards might this run need flashed", where reaching
+  // for too many is harmless and missing one is not.
+  function collectReachableNodeIds(
     startNodeId: string,
     traversalVisited = new Set<string>(),
     orderedNodeIds: string[] = [],
@@ -2766,7 +2781,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
     const downstreamEdges = edges.filter((edge) => edge.source === startNodeId);
     for (const edge of downstreamEdges) {
-      collectRunAllOrder(edge.target, traversalVisited, orderedNodeIds);
+      collectReachableNodeIds(edge.target, traversalVisited, orderedNodeIds);
     }
 
     return orderedNodeIds;
@@ -3054,57 +3069,139 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
   }
 
-  async function runOrderedWorkflowNodes(orderedNodeIds: string[], resultsByNodeId: Map<string, FunctionTestResponse>) {
-    for (const nodeId of orderedNodeIds) {
-      if (resultsByNodeId.has(nodeId)) {
-        continue;
+  // Execute one block and report the outcome back to the engine, retrying
+  // first if the block asks for it. Retries stay here because this is where
+  // execution happens; the engine only needs the final answer.
+  async function executeAndReportNode(
+    runId: string,
+    due: EngineDueNode,
+    resultsByNodeId: Map<string, FunctionTestResponse>,
+  ) {
+    const nodeId = due.node_id;
+    const node = nodeLookup.get(nodeId);
+
+    setWorkflowRunState((currentState) => ({ ...currentState, currentNodeId: nodeId }));
+
+    // The engine already merged whatever reached this block along live edges,
+    // so there is no need to guess an upstream node from the edge list.
+    const inputData = node && blockUsesUpstreamInput(node.data.block)
+      ? (due.input as Record<string, unknown> | null) ?? null
+      : null;
+
+    const retryCount = Math.max(0, Math.trunc(node?.data.settings?.retryCount ?? 0));
+    let result = await executeNode(nodeId, inputData);
+    for (let attempt = 0; attempt < retryCount && !result.ok; attempt += 1) {
+      result = await executeNode(nodeId, inputData);
+    }
+
+    resultsByNodeId.set(nodeId, result);
+    workflowResultsRef.current = resultsByNodeId;
+
+    setWorkflowRunState((currentState) => ({
+      ...currentState,
+      completedNodeIds: currentState.completedNodeIds.includes(nodeId)
+        ? currentState.completedNodeIds
+        : [...currentState.completedNodeIds, nodeId],
+    }));
+
+    const attempts = retryCount > 0 && !result.ok ? ` after ${retryCount + 1} attempts` : "";
+    return submitEngineNodeResult(runId, {
+      node_id: nodeId,
+      ok: result.ok,
+      result: (result.result as Record<string, unknown> | null) ?? null,
+      error: result.ok ? null : `${result.error ?? "The block reported failure."}${attempts}`,
+    });
+  }
+
+  // Hand the engine a result this block already produced, without running it
+  // again. This is what makes RESUME pick up where the run stopped.
+  async function reportCompletedNode(
+    runId: string,
+    nodeId: string,
+    resultsByNodeId: Map<string, FunctionTestResponse>,
+  ) {
+    const previous = resultsByNodeId.get(nodeId);
+    setWorkflowRunState((currentState) => ({
+      ...currentState,
+      completedNodeIds: currentState.completedNodeIds.includes(nodeId)
+        ? currentState.completedNodeIds
+        : [...currentState.completedNodeIds, nodeId],
+    }));
+
+    return submitEngineNodeResult(runId, {
+      node_id: nodeId,
+      ok: previous?.ok ?? true,
+      result: (previous?.result as Record<string, unknown> | null) ?? null,
+      error: previous?.ok === false ? previous.error ?? "The block reported failure." : null,
+    });
+  }
+
+  // The engine drives: it hands back the blocks that are due, we execute them
+  // and report, and it works out what that made ready. Per-node failure policy
+  // lives there too - a block set to "stop whole flow" ends the run, one set to
+  // "separate path" continues down its error edge.
+  async function runWorkflowThroughEngine(resultsByNodeId: Map<string, FunctionTestResponse>) {
+    // RESUME after an E-Stop replays the workflow with the results it already
+    // has, and those blocks must not run a second time - re-running a move or
+    // a dispense is a physical action, not a wasted call. Only blocks finished
+    // *before* this run are skipped, and each only once: a loop body that
+    // completed one iteration still has to run the rest.
+    const alreadyCompleted = new Set(resultsByNodeId.keys());
+
+    const graph = { nodes, edges };
+    let step = await startEngineRun(graph);
+
+    if (!step.ok || !step.run_id) {
+      const problems = (step.problems ?? [])
+        .filter((problem) => problem.level === "error")
+        .map((problem) => problem.message);
+      throw new Error(
+        problems.length > 0
+          ? `This workflow cannot run yet. ${problems.join(" ")}`
+          : step.error ?? "This workflow cannot run yet.",
+      );
+    }
+
+    const runId = step.run_id;
+    engineRunIdRef.current = runId;
+
+    // Blocks sitting on the canvas with nothing leading to them do not run.
+    // Saying so beats leaving someone to wonder why a block never fired.
+    const warnings = (step.problems ?? []).filter((problem) => problem.level === "warning");
+    if (warnings.length > 0) {
+      const shown = warnings.slice(0, 3).map((problem) => problem.message);
+      const more = warnings.length - shown.length;
+      setWorkflowNotice(shown.join(" ") + (more > 0 ? ` (and ${more} more.)` : ""));
+    }
+
+    try {
+      while (!step.finished && step.due.length > 0) {
+        // Blocks due at the same moment are independent branches. They are run
+        // one at a time on purpose: they share one gantry, and nothing yet
+        // stops two of them reaching for it at once. Resource locks are what
+        // would make this safe to overlap.
+        let next: EngineRunStep = step;
+        for (const due of step.due) {
+          if (alreadyCompleted.delete(due.node_id)) {
+            next = await reportCompletedNode(runId, due.node_id, resultsByNodeId);
+          } else {
+            next = await executeAndReportNode(runId, due, resultsByNodeId);
+          }
+          if (next.finished || !next.ok) {
+            break;
+          }
+        }
+        step = next;
       }
+    } finally {
+      engineRunIdRef.current = null;
+    }
 
-      const node = nodeLookup.get(nodeId);
-      if (!node) {
-        continue;
-      }
-
-      setWorkflowRunState((currentState) => ({
-        ...currentState,
-        currentNodeId: nodeId,
-      }));
-
-      let inputData: Record<string, unknown> | null = null;
-      const upstreamEdge = edges.find((edge) => edge.target === nodeId);
-      if (blockUsesUpstreamInput(node.data.block) && upstreamEdge) {
-        inputData = resultsByNodeId.get(upstreamEdge.source)?.result ?? null;
-      }
-
-      // Per-node failure policy, which until now was editable but never read.
-      // On a physical machine "carry on regardless" is the dangerous default:
-      // a failed calibration followed by moves drives against a workspace the
-      // machine no longer knows. Retries come first, then the node's own
-      // failureMode decides whether the run continues.
-      const retryCount = Math.max(0, Math.trunc(node.data.settings?.retryCount ?? 0));
-      let result = await executeNode(nodeId, inputData);
-      for (let attempt = 0; attempt < retryCount && !result.ok; attempt += 1) {
-        result = await executeNode(nodeId, inputData);
-      }
-
-      resultsByNodeId.set(nodeId, result);
-      workflowResultsRef.current = resultsByNodeId;
-
-      if (!result.ok && (node.data.settings?.failureMode ?? "stop_flow") === "stop_flow") {
-        const attempts = retryCount > 0 ? ` after ${retryCount + 1} attempts` : "";
-        throw new Error(
-          `Stopped: "${node.data.block.displayName}" failed${attempts}. `
-          + (result.error ?? "The block reported failure.")
-          + " (This block's failure mode is Stop whole flow.)",
-        );
-      }
-
-      setWorkflowRunState((currentState) => ({
-        ...currentState,
-        completedNodeIds: currentState.completedNodeIds.includes(nodeId)
-          ? currentState.completedNodeIds
-          : [...currentState.completedNodeIds, nodeId],
-      }));
+    const report = step.report;
+    if (report && !report.ok && report.error) {
+      const failedNode = report.stopped_at ? nodeLookup.get(report.stopped_at) : undefined;
+      const name = failedNode?.data.block.displayName;
+      throw new Error(name ? `Stopped at "${name}". ${report.error}` : report.error);
     }
   }
 
@@ -3118,6 +3215,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     const hasEsp32FirmwareWork = fallbackBoardIdsToFlash.length > 0 || firmwarePlanItems.length > 0;
 
     setFunctionsError(null);
+    setWorkflowNotice(null);
     setSelectedNodeId(null);
     setOpenedNodeId(null);
     setWorkflowDrawer(null);
@@ -3149,7 +3247,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         phase: "running",
         flashingBoardId: null,
       }));
-      await runOrderedWorkflowNodes(orderedNodeIds, resultsByNodeId);
+      await runWorkflowThroughEngine(resultsByNodeId);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         setFunctionsError("Workflow stopped by E-Stop.");
@@ -3157,6 +3255,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         setFunctionsError(error instanceof Error ? error.message : "Workflow run failed.");
       }
     } finally {
+      // An E-Stop or a failed block leaves the engine run open; close it so the
+      // backend is not holding scheduling state for a run nobody is driving.
+      if (engineRunIdRef.current) {
+        const abandonedRunId = engineRunIdRef.current;
+        engineRunIdRef.current = null;
+        await endEngineRun(abandonedRunId, "Run ended by the editor.").catch(() => undefined);
+      }
       if (runSessionStarted) {
         try {
           await endRunSession();
@@ -3227,7 +3332,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     const orderedNodeIds: string[] = [];
     const traversalVisited = new Set<string>();
     for (const nodeId of rootNodeIds) {
-      collectRunAllOrder(nodeId, traversalVisited, orderedNodeIds);
+      collectReachableNodeIds(nodeId, traversalVisited, orderedNodeIds);
     }
 
     workflowResultsRef.current = new Map();
@@ -3308,6 +3413,23 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
               aria-label="Dismiss"
               className="workflow-error-banner__dismiss"
               onClick={() => setFunctionsError(null)}
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+
+        {workflowNotice ? (
+          <div
+            className={`workflow-error-banner workflow-error-banner--notice${functionsError ? " workflow-error-banner--stacked" : ""}`}
+            role="status"
+          >
+            <span className="workflow-error-banner__message">{workflowNotice}</span>
+            <button
+              aria-label="Dismiss"
+              className="workflow-error-banner__dismiss"
+              onClick={() => setWorkflowNotice(null)}
               type="button"
             >
               ×

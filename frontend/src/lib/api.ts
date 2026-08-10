@@ -330,3 +330,91 @@ export function endRunSession(): Promise<{ ok: boolean; watching: boolean }> {
     method: "POST",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Workflow engine
+//
+// The engine decides what runs next; the browser executes it. Control flow -
+// which branch an If takes, how many times a loop repeats, which blocks wait
+// for which - is worked out on the backend, where it is covered by tests,
+// rather than by walking the edge array here.
+
+export interface PlanProblem {
+  level: "error" | "warning";
+  message: string;
+  node_id: string | null;
+}
+
+export interface WorkflowPlanResponse {
+  ok: boolean;
+  node_count: number;
+  edge_count: number;
+  start_node_ids: string[];
+  join_node_ids: string[];
+  loop_back_edge_ids: string[];
+  unreachable_node_ids: string[];
+  problems: PlanProblem[];
+}
+
+export interface EngineDueNode {
+  node_id: string;
+  block_id: string;
+  display_name: string;
+  input: Record<string, unknown>;
+  iteration: number;
+}
+
+export interface EngineRunReport {
+  ok: boolean;
+  executed: string[];
+  results: Record<string, unknown>;
+  events: { kind: string; node_id: string | null; detail: string }[];
+  error: string | null;
+  stopped_at: string | null;
+}
+
+export interface EngineRunStep {
+  ok: boolean;
+  run_id?: string | null;
+  due: EngineDueNode[];
+  finished: boolean;
+  report?: EngineRunReport;
+  problems?: PlanProblem[];
+  error?: string | null;
+}
+
+export interface WorkflowGraphPayload {
+  nodes: unknown[];
+  edges: unknown[];
+}
+
+export function planWorkflowGraph(graph: WorkflowGraphPayload): Promise<WorkflowPlanResponse> {
+  return request<WorkflowPlanResponse>("/api/engine/plan", {
+    method: "POST",
+    body: JSON.stringify(graph),
+  });
+}
+
+export function startEngineRun(graph: WorkflowGraphPayload): Promise<EngineRunStep> {
+  return request<EngineRunStep>("/api/engine/runs", {
+    method: "POST",
+    body: JSON.stringify(graph),
+  });
+}
+
+export function submitEngineNodeResult(
+  runId: string,
+  payload: { node_id: string; ok: boolean; result: Record<string, unknown> | null; error: string | null },
+): Promise<EngineRunStep> {
+  return request<EngineRunStep>(`/api/engine/runs/${encodeURIComponent(runId)}/results`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function endEngineRun(runId: string, reason: string): Promise<EngineRunStep> {
+  return request<EngineRunStep>(`/api/engine/runs/${encodeURIComponent(runId)}/end`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}

@@ -190,6 +190,20 @@ body {
   animation: workflow-error-banner-in 180ms ease;
 }
 
+/* Same banner, lower stakes: the run is going ahead, but something about the
+   graph is worth knowing - usually a block nothing reaches. */
+.workflow-error-banner--notice {
+  top: 84px;
+  border-color: rgba(146, 94, 7, 0.28);
+  background: #fdf5e5;
+  color: #6d4a07;
+  box-shadow: 0 18px 44px rgba(109, 74, 7, 0.2);
+}
+
+.workflow-error-banner--notice.workflow-error-banner--stacked {
+  top: 148px;
+}
+
 .workflow-error-banner__message {
   flex: 1 1 auto;
   font-weight: 700;
