@@ -81,6 +81,20 @@ which is the **Z** board.
 unique** (`58d72d4c…` vs `8012ef3b…`). The boards never shared a factory
 serial; the duplication was purely the overwrite bug, now fixed.
 
+**Access door interlock added (Pi GPIO 13).** A switch on the access door
+gates *runs*, not all motion: a single block test with the door open still
+works, because that is how the machine gets brought up and the operator is
+standing there. Run all is refused, with a deliberate override for when it is
+needed. Enforced backend-side via a run session, which also watches the door
+for the run's duration and stops every actor through the safety controller if
+it opens. Kept separate from the E-Stop latch on purpose - verified on hardware
+that an E-Stop still latches while the door override is on. See section 4c.
+
+**All 14 blocks are implemented.** `dispense` was still the generated
+"not implemented" placeholder; it and the 7-syringe preset now share one input
+mapping. The `ttyUSB0` board references on the Pi-driven blocks are retired -
+see section 4c.
+
 **The suite is green on the Pi: 74/74.** It was 8 failing (1 failure,
 7 errors) purely from running on real hardware. See section 4a for what that
 uncovered — one of them was a genuine production bug and one was a unit test
@@ -423,6 +437,48 @@ this fix may still hold a wrong serial, so treat existing recorded serials as
 suspect until each board has been seen alone.
 
 8 tests added (`tests/test_identity_flash_path.py`), **82/82 pass**.
+
+
+### 4c. Access door, block audit and the ttyUSB0 cleanup (same session)
+
+**Access door.** `backend/app/services/access_door.py` reads GPIO 13 (closed
+switch = closed door, so the pin reads high when open - confirmed against the
+real switch). `GET /api/safety` now carries `access_door` and `run_allowed`;
+`POST /api/safety/access-door/override` toggles the override, which is not
+persisted. `POST /api/safety/run-session/start|end` is what a run calls: start
+is refused while the door blocks a run or the stop is latched, and it watches
+the door until end. The watch runs only during a run - polling it while idle
+would stop the machine every time someone reached in, which is exactly when
+block testing is wanted.
+
+**Skip ESP32 flashing is gone.** Flashing is decided by asking the board
+whether its firmware is already correct, so the manual toggle had no purpose;
+the toolbar slot is now the door override.
+
+**Firmware prep also runs for a single block test**, not just Run all, so a
+controller missing the routine a block calls gets flashed without having to run
+the whole workflow.
+
+**Handshake no longer resets the board.** Opening the port the ordinary way
+toggles DTR/RTS and reset the ESP32, forcing a 2 s boot wait per board per run.
+The port is now opened without asserting those lines and drained until quiet.
+Firmware prep for both controllers: ~15 s -> ~3.8 s. Note the trap found on the
+way: a *fixed short* settle reads the board's boot banner as the answer to
+`ID?`, which parses as "no identity" and reflashes a good controller. Drain
+until quiet, never for a fixed interval.
+
+**Block audit.** All 14 blocks implemented, none stubbed. Seven carried
+`builder_board_id: ttyUSB0` while the Hardware Map placed their hardware on
+`raspberry-pi`. Corrected; `calibrate_xy`'s blueprint moved to
+`functions/esp 32 code/retired-blueprints/` because a blueprint's workspace is
+what sets `builder_board_id`, so editing the generated manifest never stuck.
+
+**Controller ids are now stable.** The Hardware Map named boards after ports
+(`ttyUSB0`/`ttyUSB1`) while the firmware reported `controller-ykkl80` /
+`controller-x83xnc`, so preflight refused every flash as `wrong_controller`.
+The boards were renamed to the ids the firmware reports and each records its
+USB serial. Port-derived ids cannot work here - the ports renumbered twice in
+one session.
 
 ### Implemented but NEVER run against hardware
 
