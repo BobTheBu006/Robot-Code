@@ -307,7 +307,7 @@ point of Contract 1.
 
 ## 4. Where the work stands
 
-### Done and unit-tested (74 tests pass)
+### Done and unit-tested (162 tests pass)
 
 **Phase 1a — one safety authority.** `backend/app/core/safety.py`.
 A single `threading.Event` shared *by reference* with every motion driver, so a
@@ -480,6 +480,61 @@ The boards were renamed to the ids the firmware reports and each records its
 USB serial. Port-derived ids cannot work here - the ports renumbered twice in
 one session.
 
+### 4d. The run engine — the control-flow blocks now actually work
+
+**The headline: `if`, `if_else`, `while`, `for` and `loop_over` had never been
+implemented.** Every one returned `status: "simulated"` and handed the
+condition string back untouched. There was no condition evaluator anywhere in
+the codebase and no iteration counter. The browser's runner then walked the
+edge array depth-first and followed *every* outgoing edge regardless of which
+handle it came from — so `if` ran both branches, a loop body ran exactly once,
+a fan-in fired once per incoming branch, and error edges were taken during
+healthy runs. They looked like blocks that worked because nothing ever
+contradicted them.
+
+What now exists, all in `backend/app/engine/`:
+
+- **`plan.py`** — compiles the graph to a validated `ExecutionPlan` before
+  anything moves. Finds start nodes, join barriers, loop-back edges; rejects
+  cycles that are not loops and loops with no body; warns about blocks nothing
+  reaches and error paths that can never run.
+- **`conditions.py`** — evaluates the condition strings. An AST walk over a
+  small allowed grammar, **deliberately not `eval`**: a workflow file is data
+  that can be hand-edited or copied between machines, and on a box wired to
+  motors "open this workflow" must not mean "run this code". Calls, imports and
+  comprehensions are refused *by name* instead of quietly evaluating false. An
+  empty condition is false — that stops a `while` rather than spinning it.
+  Accepts `$in.x`, `$blocks.calibrate_z.calibrated`, `$run.iteration`, n8n-style
+  `{{ }}` wrapping, and JavaScript spellings (`true`/`null`).
+- **`scheduler.py`** — walks the plan. Edges are tri-state (waiting / live /
+  dead) and *dead propagates downstream*; that is what lets a join proceed when
+  a branch feeding it was never taken, and what stops it firing per-branch.
+  Loops are re-entrant scopes whose body edges reset each iteration, with a step
+  guard so a runaway loop ends. `PlanRunner` is steppable from outside.
+- **`journal.py`** — one append-only JSONL file per run: blocks, results,
+  decisions, outcome. Pruned to the newest 200. `run-journal/` is gitignored.
+
+**The split that matters:** the engine decides, the browser executes. Hardware
+resolution, firmware flashing and the safety interlocks already live in the
+frontend and work, so they stayed there. Only the decisions moved. The browser
+opens a run, is handed what is due, executes it, reports back, and is told what
+that made ready — `POST /api/engine/runs`, then `/results` per block.
+
+Two behaviours preserved on purpose: RESUME after an E-Stop still skips blocks
+that already finished (re-running a move is a physical action, not a wasted
+call), and retries stay in the browser since that is where execution happens.
+
+One deliberate behaviour change: **blocks nothing reaches no longer run.** The
+old walk treated every parentless block as a root and ran it, which is a
+surprising way to move a gantry. They now surface as a notice. `Test_1.json`
+has 12 such blocks; `active-workflow.json` has none.
+
+Not done: **resource locks.** Blocks that come due together are still executed
+one at a time. That is safe but not parallel — locks (`gantry.xy`, `z.left`,
+`syringe.head_b`, `controller:<id>:serial`, acquired in a fixed global order)
+are what would make overlapping a Z move and a dispense safe. The serialising
+loop in `runWorkflowThroughEngine` is commented with exactly this.
+
 ### Implemented but NEVER run against hardware
 
 Treat all of this as unverified:
@@ -497,8 +552,9 @@ Treat all of this as unverified:
 
 - **Phase 2b:** unify the ID namespaces, migrate workspaces and
   `hardware-map.json`, wire preflight into the flash path.
-- **Phase 3:** the run engine. This is the biggest remaining piece and closes 9
-  of the 20 listed defects, including "runs randomly".
+- ~~**Phase 3:** the run engine.~~ **Mostly done — see 4d.** Remaining:
+  resource locks for real parallelism, and SSE instead of the browser driving
+  the loop.
 - **Phase 4:** function packages and partial-hardware degradation.
 - **Phase 5:** frontend becomes a viewer over the run API.
 
@@ -595,7 +651,7 @@ Then wire `preflight_controller` into the run path so runs stop reflashing
 everything, and have `flash_firmware` write `generated_identity.h` (from
 `render_identity_header`) into the sketch before compiling.
 
-### Step 4 — Phase 3, the run engine
+### Step 4 — Phase 3, the run engine — **MOSTLY DONE, see section 4d**
 
 Design is in `BACKEND_ARCHITECTURE_V2.md` §5–§6 and §8. Summary: compile the
 graph to a validated `ExecutionPlan` before anything moves; a node is ready when
@@ -633,6 +689,25 @@ cd backend && ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
 Frontend `http://<pi>:5173`, backend `http://<pi>:8000`, API docs `/docs`.
+
+**Note:** run the suite with `ROBOT_GPIO_SIMULATE=1` on the Pi. It passes either
+way now, but without it the GPIO-backed tests drive real pins. Two tests
+(`test_gpio_backend`, `test_raspberry_gantry`) pin the flag *off* for
+themselves because they specifically exercise the executed path against an
+injected fake backend.
+
+**Checking a workflow without running it** — validates the graph, reports loops
+with no body, unreachable blocks, joins that cannot complete. Side-effect free:
+
+```bash
+curl -s -X POST localhost:8000/api/engine/plan \
+     -H 'Content-Type: application/json' \
+     --data-binary @workflows/active-workflow.json | python3 -m json.tool
+```
+
+**Reading back what a run did:** `GET /api/engine/runs/history`, then
+`GET /api/engine/runs/<run_id>/journal`. Files live in `run-journal/`
+(gitignored, newest 200 kept); `ROBOT_RUN_JOURNAL_DIR` relocates them.
 
 **Simulation on the Pi** (useful for testing preflight logic without unplugging
 the real boards):
