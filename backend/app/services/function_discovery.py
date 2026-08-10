@@ -20,10 +20,20 @@ from app.services.hardware_map import hardware_map_service
 class FunctionDiscoveryService:
     def __init__(self, functions_dir: Path) -> None:
         self._functions_dir = functions_dir
+        # handler path -> (source mtime, imported module)
+        self._handler_modules: dict[str, tuple[int, ModuleType]] = {}
 
-    def discover(self) -> FunctionDiscoveryResponse:
+    def sync_generated_functions(self) -> None:
+        """Regenerate function manifests from the ESP32 builder blueprints.
+
+        Split out of `discover` because it writes to disk (manifests, and
+        through them `hardware-map.json`). The frontend polls discovery after
+        every successful block run, so leaving the write inside it meant a
+        read-only-looking GET rewrote machine configuration on a timer.
+        """
         esp32_builder_service.sync_generated_functions()
 
+    def discover(self) -> FunctionDiscoveryResponse:
         discovered_functions: list[DiscoveredFunctionDefinition] = []
         errors: list[FunctionDiscoveryError] = []
 
@@ -117,7 +127,26 @@ class FunctionDiscoveryService:
         raise ValueError(f"Unknown function '{function_id}'.")
 
     def _load_handler_module(self, discovered_function: DiscoveredFunctionDefinition) -> ModuleType:
+        """Import a handler once and reuse it.
+
+        Re-importing per call gave every request a *fresh* module object, so
+        `cancel` operated on a different instance than the run it was meant to
+        abort - any module-level state the handler held (an open serial
+        session, a stop flag) was invisible to it. The cache is keyed on the
+        handler path and its mtime, so editing a handler still picks up the
+        new code without a backend restart.
+        """
         handler_path = Path(discovered_function.handler_path)
+        try:
+            mtime = handler_path.stat().st_mtime_ns
+        except OSError:
+            mtime = 0
+        cache_key = str(handler_path)
+
+        cached = self._handler_modules.get(cache_key)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+
         module_name = f"robot_function_{discovered_function.manifest.id}"
         spec = importlib.util.spec_from_file_location(module_name, handler_path)
 
@@ -126,6 +155,7 @@ class FunctionDiscoveryService:
 
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        self._handler_modules[cache_key] = (mtime, module)
         return module
 
     def test_function(
@@ -172,13 +202,25 @@ class FunctionDiscoveryService:
                 f"Function '{function_id}' returned {type(result).__name__}; expected dict or None."
             )
 
+        # A handler reports failure in-band by returning {"ok": false} (and
+        # usually a message/error). Hardcoding ok=True here made every such
+        # failure read as success to the caller, so a workflow kept running
+        # past a block that had actually failed.
+        payload = result or {}
+        handler_ok = payload.get("ok", True)
+        ok = bool(handler_ok) if isinstance(handler_ok, bool) else True
+        error = None
+        if not ok:
+            reported = payload.get("error") or payload.get("message")
+            error = str(reported) if reported else f"Function '{function_id}' reported failure."
+
         return FunctionTestResponse(
             function_id=function_id,
-            ok=True,
+            ok=ok,
             inputs=resolved_inputs,
             input_data=input_data,
-            result=result or {},
-            error=None,
+            result=payload,
+            error=error,
         )
 
     def cancel_function(

@@ -14,6 +14,18 @@ router = APIRouter(prefix="/api/functions", tags=["functions"])
 
 @router.get("", response_model=FunctionDiscoveryResponse)
 def get_functions() -> FunctionDiscoveryResponse:
+    """Read-only: never writes manifests or the Hardware Map.
+
+    Regenerating from the ESP32 blueprints now lives behind POST /sync, so
+    polling the catalog cannot rewrite machine configuration.
+    """
+    return function_discovery_service.discover()
+
+
+@router.post("/sync", response_model=FunctionDiscoveryResponse)
+def sync_functions() -> FunctionDiscoveryResponse:
+    """Regenerate function manifests from the ESP32 builder blueprints."""
+    function_discovery_service.sync_generated_functions()
     return function_discovery_service.discover()
 
 
