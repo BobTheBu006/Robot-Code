@@ -29,6 +29,7 @@ For future AI coding agents and maintainers:
 |-- firmware/
 |-- frontend/
 |-- functions/
+|-- hardware/
 |-- hardware-map.json
 `-- workflows/
 ```
