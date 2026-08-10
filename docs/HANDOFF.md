@@ -54,9 +54,32 @@ What made it work is the missing link described in section 4a — `flash_firmwar
 now actually writes `generated_identity.h`. Before, `render_identity_header`
 existed but nothing called it, so every board answered with an empty identity.
 
-Still unverified: the **syringe** controller (it was not connected during this
-session), and therefore the two-board case where a wrong-board flash is
-actually possible.
+**Both controllers now self-identify, with both plugged in at once.** The
+syringe controller was connected later in the same session and brought up:
+
+```
+/dev/ttyUSB0  serial 58d72d4c…  ->  controller-ykkl80  "Double Z axis and pumps"
+/dev/ttyUSB1  serial 8012ef3b…  ->  controller-x83xnc  "7 syringe pump controller"
+```
+
+Preflight returns `ok` for both (no reflash), and the wrong-board case was
+tested for real: aiming the syringe firmware at the Z board's port returns
+`wrong_controller` and refuses. **This is the defect that used to overwrite a
+working controller, now provably closed on hardware.** The syringe protocol
+still works after reflashing (`SPEED`, `SET HEAD PINS` answer normally).
+
+This required creating the workspace `esp32 controller-x83xnc`, which never
+existed — section 3 notes the syringe controller had no workspace at all, which
+is exactly why `plan_workflow_firmware` could not resolve it and downgraded it
+to "externally programmed". The syringe firmware only lived at
+`firmware/syringe-controller/`, outside any workspace. The syringe manifests
+(`dispense`, `prime_syringes`, `7_syringe_dispenser_slow_and_good`) now declare
+`builder_board_id: controller-x83xnc`; `dispense` previously claimed `ttyUSB1`,
+which is the **Z** board.
+
+**Section 2a is now confirmed with both boards present: the serials are
+unique** (`58d72d4c…` vs `8012ef3b…`). The boards never shared a factory
+serial; the duplication was purely the overwrite bug, now fixed.
 
 **The suite is green on the Pi: 74/74.** It was 8 failing (1 failure,
 7 errors) purely from running on real hardware. See section 4a for what that

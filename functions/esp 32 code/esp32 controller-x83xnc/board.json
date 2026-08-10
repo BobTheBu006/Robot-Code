@@ -1,0 +1,10 @@
+{
+  "board_id": "controller-x83xnc",
+  "display_name": "7 syringe pump controller",
+  "port": "/dev/ttyUSB1",
+  "description": "Seven syringe pump steppers (heads A-G)",
+  "hardware_id": "USB VID:PID=10C4:EA60 SER=8012ef3b06bdf01180d2157148e9de0f",
+  "serial_number": "8012ef3b06bdf01180d2157148e9de0f",
+  "firmware_entry_file": "firmware/main.ino",
+  "fqbn": "esp32:esp32:esp32"
+}

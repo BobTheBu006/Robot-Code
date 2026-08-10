@@ -148,6 +148,9 @@ class ControllerIdentity:
     protocol: int | None
     routines: tuple[str, ...]
     raw_reply: str
+    # Human-readable label the board reports. Absent on firmware built before
+    # names existed, which is not an error - it just cannot introduce itself.
+    name: str | None = None
 
     @classmethod
     def parse(cls, reply: str) -> "ControllerIdentity | None":
@@ -172,6 +175,7 @@ class ControllerIdentity:
         routines = payload.get("routines") or []
         return cls(
             controller_id=payload.get("controller_id") or None,
+            name=payload.get("name") or None,
             fingerprint=payload.get("fingerprint") or None,
             protocol=int(payload["protocol"]) if isinstance(payload.get("protocol"), int) else None,
             routines=tuple(str(routine) for routine in routines) if isinstance(routines, list) else (),

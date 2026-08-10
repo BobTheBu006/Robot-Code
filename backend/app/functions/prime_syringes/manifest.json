@@ -653,7 +653,7 @@
     }
   ],
   "firmware_requirements": [],
-  "builder_board_id": null,
+  "builder_board_id": "controller-x83xnc",
   "builder_source_path": null,
   "builder_workspace_path": null,
   "builder_firmware_entry_file": null,
