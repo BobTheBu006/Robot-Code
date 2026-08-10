@@ -106,8 +106,15 @@ def reset_gpio_backend_cache() -> None:
 def _load_rpi_gpio() -> tuple[Any | None, str | None]:
     try:
         gpio = importlib.import_module("RPi.GPIO")
-    except ImportError as exc:
-        return None, str(exc)
+    except Exception as exc:
+        # Not just ImportError: the rpi-lgpio shim executes real code at import
+        # time against whatever `lgpio` it finds, so a version skew between the
+        # two raises AttributeError (e.g. missing `lgpio.SET_PULL_NONE`) rather
+        # than failing to import. Letting that escape defeats the entire point
+        # of this loader, which is to fall back to a backend that does work -
+        # a pip upgrade on the Pi would take the gantry down instead of
+        # quietly switching to the lgpio adapter below.
+        return None, f"{type(exc).__name__}: {exc}"
 
     try:
         gpio.setwarnings(False)

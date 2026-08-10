@@ -1,3 +1,4 @@
+import os
 import sys
 import types
 import unittest
@@ -35,11 +36,29 @@ def _raspberry_xy_context() -> dict:
 
 
 class RaspberryGantryHandlerTests(unittest.TestCase):
+    """Routing tests: which controller a request is dispatched to.
+
+    These must never reach real GPIO. They were written on a machine with no
+    GPIO libraries, where the service quietly fell back to simulation; run on
+    the Pi they actually drive the gantry's pins and then fail on whatever the
+    real limit switches happen to read. Each test below therefore pins the
+    execution mode explicitly rather than depending on the host.
+    """
+
+    def setUp(self) -> None:
+        self._previous_simulate = os.environ.get("ROBOT_GPIO_SIMULATE")
+
     def tearDown(self) -> None:
         sys.modules.pop("RPi.GPIO", None)
         sys.modules.pop("RPi", None)
+        sys.modules.pop("lgpio", None)
+        if self._previous_simulate is None:
+            os.environ.pop("ROBOT_GPIO_SIMULATE", None)
+        else:
+            os.environ["ROBOT_GPIO_SIMULATE"] = self._previous_simulate
 
     def test_calibrate_xy_uses_raspberry_gpio_branch_when_xy_devices_are_on_pi(self) -> None:
+        os.environ["ROBOT_GPIO_SIMULATE"] = "1"
         result = planned_calibrate_xy_result(
             _raspberry_xy_context(),
             GantryXYCalibrationRequest(
@@ -60,6 +79,7 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         self.assertIsNone(result["tool_port"])
 
     def test_move_xy_uses_raspberry_gpio_branch_when_xy_devices_are_on_pi(self) -> None:
+        os.environ["ROBOT_GPIO_SIMULATE"] = "1"
         result = planned_move_xy_result(
             _raspberry_xy_context(),
             GantryXYMoveRequest(
@@ -99,6 +119,10 @@ class RaspberryGantryHandlerTests(unittest.TestCase):
         rpi_module.GPIO = gpio_module
         sys.modules["RPi"] = rpi_module
         sys.modules["RPi.GPIO"] = gpio_module
+        # Deny the lgpio fallback too: the point of this test is "no usable
+        # backend -> simulation". On the Pi lgpio really is installed, so
+        # without this the service would fall back to it and move the gantry.
+        sys.modules["lgpio"] = None
 
         result = planned_calibrate_xy_result(
             _raspberry_xy_context(),

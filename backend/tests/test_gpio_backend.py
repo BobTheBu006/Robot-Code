@@ -152,6 +152,14 @@ class GpioBackendLoaderTests(unittest.TestCase):
         self.assertIsInstance(backend, LgpioBackend)
 
     def test_reports_both_reasons_when_no_backend_is_available(self) -> None:
+        # Block both imports explicitly instead of relying on them being absent.
+        # On the Raspberry Pi this code actually runs on, RPi.GPIO and lgpio are
+        # both installed, so "no backend available" only happens if we force it
+        # (sys.modules[name] = None makes import raise ImportError).
+        sys.modules["RPi"] = None
+        sys.modules["RPi.GPIO"] = None
+        sys.modules["lgpio"] = None
+
         backend, reason = load_gpio_backend()
 
         self.assertIsNone(backend)
