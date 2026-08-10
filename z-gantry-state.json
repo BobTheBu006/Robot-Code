@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "calibrated": false,
-  "left_calibrated": false,
-  "right_calibrated": false,
-  "steps_per_cm": 1746.888888888889,
-  "limit_buffer_cm": 0.1,
+  "calibrated": true,
+  "left_calibrated": true,
+  "right_calibrated": true,
+  "steps_per_cm": 1805.2833333333333,
+  "limit_buffer_cm": 0.5,
   "left_track_length_cm": 60.0,
   "right_track_length_cm": 60.0,
-  "left_steps": 0,
+  "left_steps": 36106,
   "right_steps": 0
 }

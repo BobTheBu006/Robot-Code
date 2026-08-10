@@ -185,7 +185,21 @@ class HybridZAxisService:
 
     def _raise_if_stopped(self) -> None:
         if self._stop_requested.is_set():
-            raise HybridZAxisStoppedError("Z axis motion stopped by emergency stop.")
+            raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
+
+    def _blocked_reason(self) -> str:
+        """Explain the block in terms the operator can act on.
+
+        The stop flag is shared with the safety controller, so it stays set
+        while a physical fact is unconfirmed - long after the stop itself. Just
+        saying "stopped by emergency stop" then sends the operator looking for a
+        limit switch that is not pressed."""
+        try:
+            from app.core.safety import safety_controller
+
+            return safety_controller.blocked_reason()
+        except Exception:
+            return "Clear the emergency stop once the machine is safe."
 
     # ---- serial connection to the Z-axis ESP32 ----
     def _resolve_port(self, context: dict, requested_port: str | None) -> str:
@@ -346,7 +360,7 @@ class HybridZAxisService:
         if not completed:
             raise HybridZAxisError("Timed out waiting for the Z-axis ESP32 to finish a step burst.")
         if reply and "ERR STOP" in reply.upper():
-            raise HybridZAxisStoppedError("Z axis motion stopped by emergency stop.")
+            raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
         if not reply or "OK STEP Z" not in reply.upper():
             raise HybridZAxisError(f"ESP32 rejected a Z step command: {reply}")
         self._left_steps += left_delta
@@ -390,7 +404,7 @@ class HybridZAxisService:
                     serial_port.write(b"STOP\n")
                     serial_port.flush()
                     stop_sent = True
-                raise HybridZAxisStoppedError("Z axis motion stopped by emergency stop.")
+                raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
 
             if not stop_sent and self._limit_active(gpio, limit_pin):
                 serial_port.write(b"STOP\n")

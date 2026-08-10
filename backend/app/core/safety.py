@@ -144,12 +144,31 @@ class SafetyController:
     def is_blocked(self) -> bool:
         return self._motion_blocked.is_set()
 
+    def blocked_reason(self) -> str:
+        """Why motion is blocked, in terms the operator can act on.
+
+        "Stopped by emergency stop" is useless when the stop is long over and
+        the real blocker is an unconfirmed physical fact - the operator is left
+        hunting a limit switch that is not pressed. Name the facts and the way
+        out instead.
+        """
+        outstanding = self.unconfirmed_facts()
+        if not outstanding:
+            return (
+                "An emergency stop is engaged. Clear it with Rearm once the machine is safe."
+            )
+
+        questions = "; ".join(fact.suggested_question or fact.label for fact in outstanding)
+        return (
+            f"The emergency stop cannot clear until {len(outstanding)} physical fact(s) are "
+            f"confirmed: {questions} "
+            "Answer with POST /api/safety/confirm-physical-state, then POST /api/safety/rearm. "
+            "This is asked because the machine will not guess what is physically on it."
+        )
+
     def raise_if_blocked(self, action: str = "Motion") -> None:
         if self._motion_blocked.is_set():
-            raise MotionBlockedError(
-                f"{action} is blocked by an engaged emergency stop. "
-                "Clear it from the operator UI once the machine is safe."
-            )
+            raise MotionBlockedError(f"{action} is blocked. {self.blocked_reason()}")
 
     @property
     def generation(self) -> int:

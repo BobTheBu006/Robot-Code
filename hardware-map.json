@@ -2,9 +2,9 @@
   "version": 1,
   "boards": [
     {
-      "id": "controller-x83xnc",
+      "id": "ttyUSB1",
       "label": "7 syringe pump controller",
-      "usb_port": "/dev/ttyUSB0",
+      "usb_port": "/dev/ttyUSB1",
       "enabled": false,
       "notes": null,
       "dynamic": false,
@@ -13,9 +13,9 @@
       "expected_device_label": null
     },
     {
-      "id": "ttyUSB1",
+      "id": "ttyUSB0",
       "label": "Double Z axis and pumps",
-      "usb_port": "/dev/ttyUSB1",
+      "usb_port": "/dev/ttyUSB0",
       "enabled": true,
       "notes": null,
       "dynamic": false,
@@ -202,7 +202,7 @@
     },
     {
       "id": "syringe-head-a",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head A",
       "kind": "stepper_motor",
       "enabled": false,
@@ -258,7 +258,7 @@
     },
     {
       "id": "syringe-head-b",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head B",
       "kind": "stepper_motor",
       "enabled": false,
@@ -314,7 +314,7 @@
     },
     {
       "id": "syringe-head-c",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head C",
       "kind": "stepper_motor",
       "enabled": false,
@@ -370,7 +370,7 @@
     },
     {
       "id": "syringe-head-d",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head D",
       "kind": "stepper_motor",
       "enabled": false,
@@ -426,7 +426,7 @@
     },
     {
       "id": "syringe-head-e",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head E",
       "kind": "stepper_motor",
       "enabled": false,
@@ -482,7 +482,7 @@
     },
     {
       "id": "syringe-head-f",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head F",
       "kind": "stepper_motor",
       "enabled": false,
@@ -538,7 +538,7 @@
     },
     {
       "id": "syringe-head-g",
-      "board_id": "controller-x83xnc",
+      "board_id": "ttyUSB1",
       "name": "Syringe Head G",
       "kind": "stepper_motor",
       "enabled": false,
@@ -615,7 +615,7 @@
     },
     {
       "id": "z-left-motor",
-      "board_id": "ttyUSB1",
+      "board_id": "ttyUSB0",
       "name": "Z Left Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -671,7 +671,7 @@
     },
     {
       "id": "z-right-motor",
-      "board_id": "ttyUSB1",
+      "board_id": "ttyUSB0",
       "name": "Z Right Motor",
       "kind": "stepper_motor",
       "enabled": true,
@@ -1140,7 +1140,7 @@
       "y": -5.4
     },
     {
-      "node_id": "controller-x83xnc",
+      "node_id": "ttyUSB1",
       "x": 27.41,
       "y": 1192.7
     },
@@ -1180,14 +1180,14 @@
       "y": 1668.7
     },
     {
-      "node_id": "ttyUSB1",
+      "node_id": "ttyUSB0",
       "x": 722.0,
       "y": 432.0
     },
     {
       "node_id": "z-left-motor",
-      "x": 1178.0,
-      "y": 513.0
+      "x": 1260.0,
+      "y": 515.0
     },
     {
       "node_id": "z-right-motor",
@@ -1195,5 +1195,5 @@
       "y": 727.0
     }
   ],
-  "updated_at": "2026-08-07T19:24:41.910729Z"
+  "updated_at": "2026-08-10T08:58:53.547035Z"
 }
