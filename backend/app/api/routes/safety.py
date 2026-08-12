@@ -18,6 +18,7 @@ from app.models.safety import (
     SafetyStopRequest,
     SafetyStopResponse,
 )
+from app.services.motor_power import motor_power_service
 from app.services.access_door import access_door_sensor
 from app.services.physical_state import PhysicalStateError, physical_state_store
 
@@ -105,7 +106,11 @@ def start_run_session() -> dict:
 def end_run_session() -> dict:
     """Stop watching the door. Safe to call when no run is in progress."""
     access_door_sensor.stop_watching()
-    return {"ok": True, "watching": False}
+    # The run is over, so there is no next block to keep the drivers warm for.
+    # Cutting power here rather than waiting out the linger timer means the
+    # motors are cold the moment a workflow finishes.
+    motor_power_service.power_down_now()
+    return {"ok": True, "watching": False, "motors": motor_power_service.snapshot()}
 
 
 @router.post("/stop", response_model=SafetyStopResponse)

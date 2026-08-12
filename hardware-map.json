@@ -51,11 +51,11 @@
           "notes": null
         },
         {
-          "id": "x-enable",
+          "id": "x-axis-motor-enable",
           "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
+          "gpio": "25",
+          "function_input_key": "gantry_enable_pin",
+          "notes": "Shared enable for CoreXY A and B drivers. Pi GPIO defaults pull-down at boot, so motors stay off until software asserts it."
         },
         {
           "id": "x-ms1",
@@ -107,11 +107,11 @@
           "notes": null
         },
         {
-          "id": "y-enable",
+          "id": "y-axis-motor-enable",
           "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
+          "gpio": "25",
+          "function_input_key": "gantry_enable_pin",
+          "notes": "Shared enable for CoreXY A and B drivers. Pi GPIO defaults pull-down at boot, so motors stay off until software asserts it."
         },
         {
           "id": "y-ms1",
@@ -646,11 +646,11 @@
           "notes": null
         },
         {
-          "id": "pin-4-mxvucv",
+          "id": "z-left-motor-ms1",
           "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "pin-5-7u80fj",
@@ -702,11 +702,11 @@
           "notes": null
         },
         {
-          "id": "pin-4-6tvb4v",
+          "id": "z-right-motor-ms1",
           "signal": "micro_step_1",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": null
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "pin-5-ns7et7",
@@ -808,6 +808,286 @@
         }
       ],
       "notes": null
+    },
+    {
+      "id": "peristaltic-pump-1",
+      "board_id": "controller-ykkl80",
+      "name": "Peristaltic Pump 1",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-1-dir",
+          "signal": "direction",
+          "gpio": "13",
+          "function_input_key": "pump_1_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-1-step",
+          "signal": "step",
+          "gpio": "14",
+          "function_input_key": "pump_1_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-1-ms1",
+          "signal": "micro_step_1",
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+        },
+        {
+          "id": "peristaltic-pump-1-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-1-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-1-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        }
+      ],
+      "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
+    },
+    {
+      "id": "peristaltic-pump-2",
+      "board_id": "controller-ykkl80",
+      "name": "Peristaltic Pump 2",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-2-dir",
+          "signal": "direction",
+          "gpio": "27",
+          "function_input_key": "pump_2_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-2-step",
+          "signal": "step",
+          "gpio": "26",
+          "function_input_key": "pump_2_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-2-ms1",
+          "signal": "micro_step_1",
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+        },
+        {
+          "id": "peristaltic-pump-2-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-2-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-2-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        }
+      ],
+      "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
+    },
+    {
+      "id": "peristaltic-pump-3",
+      "board_id": "controller-ykkl80",
+      "name": "Peristaltic Pump 3",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-3-dir",
+          "signal": "direction",
+          "gpio": "25",
+          "function_input_key": "pump_3_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-3-step",
+          "signal": "step",
+          "gpio": "33",
+          "function_input_key": "pump_3_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-3-ms1",
+          "signal": "micro_step_1",
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+        },
+        {
+          "id": "peristaltic-pump-3-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-3-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-3-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        }
+      ],
+      "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
+    },
+    {
+      "id": "peristaltic-pump-4",
+      "board_id": "controller-ykkl80",
+      "name": "Peristaltic Pump 4",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-4-dir",
+          "signal": "direction",
+          "gpio": "22",
+          "function_input_key": "pump_4_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-4-step",
+          "signal": "step",
+          "gpio": "23",
+          "function_input_key": "pump_4_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-4-ms1",
+          "signal": "micro_step_1",
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+        },
+        {
+          "id": "peristaltic-pump-4-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-4-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-4-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        }
+      ],
+      "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
+    },
+    {
+      "id": "peristaltic-pump-5",
+      "board_id": "controller-ykkl80",
+      "name": "Peristaltic Pump 5",
+      "kind": "stepper_motor",
+      "enabled": true,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-5-dir",
+          "signal": "direction",
+          "gpio": "4",
+          "function_input_key": "pump_5_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-5-step",
+          "signal": "step",
+          "gpio": "16",
+          "function_input_key": "pump_5_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-5-ms1",
+          "signal": "micro_step_1",
+          "gpio": "17",
+          "function_input_key": "motor_enable_pin",
+          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+        },
+        {
+          "id": "peristaltic-pump-5-ms2",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-5-ms3",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Tie to GND."
+        },
+        {
+          "id": "peristaltic-pump-5-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        }
+      ],
+      "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
     }
   ],
   "groups": [],

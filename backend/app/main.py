@@ -18,6 +18,7 @@ from app.api.routes.robot import router as robot_router
 from app.api.routes.safety import router as safety_router
 from app.api.routes.syringe import router as syringe_router
 from app.api.routes.workflows import router as workflows_router
+from app.services.motor_power import register_safety_hooks
 from app.core.config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, APP_NAME, APP_VERSION
 
 app = FastAPI(
@@ -46,3 +47,6 @@ app.include_router(functions_router)
 app.include_router(syringe_router)
 app.include_router(workflows_router)
 app.include_router(engine_router)
+
+# Motor drivers power down when an E-Stop finishes halting everything.
+register_safety_hooks()

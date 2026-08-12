@@ -28,6 +28,7 @@ from app.models.gantry import (
 )
 from app.core.safety import PRIORITY_FLAG, CallableActor, safety_controller
 from app.services.gpio_backend import load_gpio_backend
+from app.services.motor_power import GANTRY_XY_DOMAIN, motor_power_service, powered_motors
 
 RASPBERRY_BOARD_ID = "raspberry-pi"
 # A Y-max switch is optional: the gantry homes against Y-min, so a machine with
@@ -80,6 +81,9 @@ class _GPIOPinPlan:
     y_min_limit_pin: int
     # None when the machine has no Y-max switch; that end is then unguarded.
     y_max_limit_pin: int | None = None
+    # One line enabling both CoreXY drivers. None on a machine that has the
+    # drivers permanently enabled, which is what this was before.
+    enable_pin: int | None = None
 
     def limit_pins(self) -> list[int]:
         pins = [self.x_min_limit_pin, self.x_max_limit_pin, self.y_min_limit_pin]
@@ -109,6 +113,33 @@ def _hardware_map_devices(context: dict) -> list[dict]:
 
     devices = hardware_map.get("devices")
     return devices if isinstance(devices, list) else []
+
+
+def _enable_pin_from_hardware_map(context: dict | None) -> int | None:
+    """Find the shared CoreXY driver-enable pin, if one is wired.
+
+    Read from the Hardware Map rather than from the request because two of the
+    gantry manifests are generated from ESP32 workspace blueprints - a new input
+    added to those manifests is overwritten the next time they regenerate. The
+    Hardware Map is the thing an operator actually edits, and it is already
+    passed to every gantry function, so resolving here means the enable line
+    works for all of them without a manifest change anywhere.
+    """
+    if context is None:
+        return None
+
+    for device in _hardware_map_devices(context):
+        if not isinstance(device, dict) or not _device_is_on_raspberry_pi(device):
+            continue
+        for pin in device.get("pins") or []:
+            if not isinstance(pin, dict):
+                continue
+            if pin.get("function_input_key") != "gantry_enable_pin":
+                continue
+            gpio = str(pin.get("gpio") or "").strip()
+            if gpio.lstrip("-").isdigit() and int(gpio) >= 0:
+                return int(gpio)
+    return None
 
 
 class RaspberryGantryConfigError(RuntimeError):
@@ -1094,6 +1125,13 @@ class RaspberryGantryGPIOService:
             x_max_limit_pin=request.x_max_limit_pin,
             y_min_limit_pin=request.y_min_limit_pin,
             y_max_limit_pin=y_max_limit_pin,
+            # The request wins if it names a pin (a deliberate override);
+            # otherwise take whatever the Hardware Map says is wired.
+            enable_pin=(
+                requested
+                if (requested := getattr(request, "gantry_enable_pin", -1)) >= 0
+                else _enable_pin_from_hardware_map(context)
+            ),
         )
 
     def _setup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:
@@ -1102,11 +1140,39 @@ class RaspberryGantryGPIOService:
         for pin in [pins.a_step_pin, pins.a_dir_pin, pins.b_step_pin, pins.b_dir_pin]:
             gpio.setup(pin, gpio.OUT, initial=gpio.LOW)
 
+        if pins.enable_pin is not None:
+            # Claimed LOW: the drivers stay disabled until a move asks for them.
+            gpio.setup(pins.enable_pin, gpio.OUT, initial=gpio.LOW)
+            self._register_power_domain(gpio, pins.enable_pin)
+            # Setup and cleanup bracket every GPIO operation this service does,
+            # in matching try/finally pairs, so holding power across that span
+            # covers each move without threading it through five call sites.
+            # Cost is one settle delay per sequence: the release only starts a
+            # linger timer, so the next block finds the drivers already live.
+            motor_power_service.acquire(GANTRY_XY_DOMAIN)
+
         pull = gpio.PUD_UP if _bool_env("ROBOT_GPIO_LIMIT_ACTIVE_LOW", True) else gpio.PUD_DOWN
         for pin in pins.limit_pins():
             gpio.setup(pin, gpio.IN, pull_up_down=pull)
 
+    def _register_power_domain(self, gpio: Any, enable_pin: int) -> None:
+        """Teach the power service how to switch the CoreXY drivers.
+
+        Registered here rather than at import because the pin comes from the
+        Hardware Map and is only known once a move resolves its inputs.
+        """
+        def apply(on: bool) -> None:
+            gpio.output(enable_pin, gpio.HIGH if on else gpio.LOW)
+
+        motor_power_service.register(
+            GANTRY_XY_DOMAIN,
+            f"CoreXY A and B drivers (Pi GPIO {enable_pin})",
+            apply,
+        )
+
     def _cleanup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:
+        if pins.enable_pin is not None:
+            motor_power_service.release(GANTRY_XY_DOMAIN)
         gpio.cleanup(
             [
                 pins.a_step_pin,
@@ -1114,6 +1180,7 @@ class RaspberryGantryGPIOService:
                 pins.b_step_pin,
                 pins.b_dir_pin,
                 *pins.limit_pins(),
+                *([pins.enable_pin] if pins.enable_pin is not None else []),
             ]
         )
 

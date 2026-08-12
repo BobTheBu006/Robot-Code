@@ -54,6 +54,9 @@ class GantryXYMoveRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     z_left_min_limit_pin: int = Field(default=12, ge=0)
     z_left_max_limit_pin: int = Field(default=13, ge=0)
     z_right_min_limit_pin: int = Field(default=12, ge=0)
@@ -84,6 +87,8 @@ class GantryXYMoveRequest(BaseModel):
         if self.y_enable_pin >= 0:
             assigned_pins["y_enable_pin"] = self.y_enable_pin
 
+        if self.gantry_enable_pin >= 0:
+            assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -146,6 +151,9 @@ class GantryXYCalibrationRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -213,6 +221,9 @@ class GantryGotoXYRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -236,6 +247,8 @@ class GantryGotoXYRequest(BaseModel):
 
         # The firmware enforces the calibrated 0..track-length workspace; here we
         # only reject negative targets and pin conflicts.
+        if self.gantry_enable_pin >= 0:
+            assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -286,6 +299,9 @@ class GantryCircleXYRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
@@ -309,6 +325,8 @@ class GantryCircleXYRequest(BaseModel):
 
         # The firmware validates that the whole circle fits inside the
         # calibrated workspace; here we only reject pin conflicts.
+        if self.gantry_enable_pin >= 0:
+            assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -512,6 +530,8 @@ class GantryRepeatabilityTestRequest(BaseModel):
             "x_max_limit_pin": self.x_max_limit_pin,
             "y_min_limit_pin": self.y_min_limit_pin,
         }
+        if self.gantry_enable_pin >= 0:
+            assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -584,6 +604,9 @@ class ToolChangeRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     z_left_min_limit_pin: int = Field(default=12, ge=0)
     z_left_max_limit_pin: int = Field(default=13, ge=0)
     z_right_min_limit_pin: int = Field(default=14, ge=0)
@@ -639,6 +662,9 @@ class GantryTestMotorRequest(BaseModel):
     x_max_limit_pin: int = Field(default=22, ge=0)
     y_min_limit_pin: int = Field(default=23, ge=0)
     y_max_limit_pin: int = Field(default=-1, ge=-1)
+    # Shared enable for both CoreXY drivers. -1 means no enable line is
+    # wired and the drivers are always live, which is how this ran before.
+    gantry_enable_pin: int = Field(default=-1, ge=-1)
     baud_rate: int | None = Field(default=None, gt=0)
 
 
