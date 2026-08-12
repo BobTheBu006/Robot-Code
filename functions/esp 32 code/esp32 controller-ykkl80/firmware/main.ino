@@ -1585,6 +1585,204 @@ bool handleCalibrateZCommand(const String &cmd) {
   return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// Peristaltic pumps and the shared driver-enable line
+//
+// Five pump drivers sit on this board alongside the two Z axes. Every driver
+// here - Z included - shares one enable line: MS1, with MS2/MS3 low, which puts
+// a TB67S109 into standby when it goes low. Idle steppers otherwise hold full
+// current and cook for no reason.
+//
+// The host owns the policy (when to enable, how long to wait, when to drop
+// power); this only obeys. That keeps the "do not power down between blocks"
+// logic in one place on the Pi, where the workflow is known.
+// ---------------------------------------------------------------------------
+
+struct PumpChannel {
+  int stepPin;
+  int dirPin;
+  long currentSteps;
+};
+
+// -1 until the host configures them; commands refuse rather than pulse an
+// unconfigured pin, which on an ESP32 could be anything at all.
+PumpChannel pumps[5] = {
+  {-1, -1, 0}, {-1, -1, 0}, {-1, -1, 0}, {-1, -1, 0}, {-1, -1, 0}
+};
+const int PUMP_COUNT = 5;
+
+int motorEnablePin = -1;
+bool motorsEnabled = false;
+
+bool applyMotorEnable(bool on) {
+  if (motorEnablePin < 0) {
+    return false;
+  }
+  digitalWrite(motorEnablePin, on ? HIGH : LOW);
+  motorsEnabled = on;
+  return true;
+}
+
+bool handleSetMotorEnablePinCommand(const String &cmd) {
+  int pin = -1;
+  if (sscanf(cmd.c_str(), "SET MOTOR ENABLE PIN %d", &pin) != 1) {
+    return false;
+  }
+  if (pin < 0) {
+    Serial.println("ERR MOTOR ENABLE PIN");
+    return true;
+  }
+
+  motorEnablePin = pin;
+  pinMode(motorEnablePin, OUTPUT);
+  // Come up disabled: the host asks for power when it wants it, and a reset
+  // mid-run must not leave seven drivers energised.
+  digitalWrite(motorEnablePin, LOW);
+  motorsEnabled = false;
+  Serial.print("OK MOTOR ENABLE PIN ");
+  Serial.println(motorEnablePin);
+  return true;
+}
+
+bool handleMotorEnableCommand(const String &cmd) {
+  int on = -1;
+  if (sscanf(cmd.c_str(), "MOTOR ENABLE %d", &on) != 1) {
+    return false;
+  }
+  if (!applyMotorEnable(on != 0)) {
+    Serial.println("ERR MOTOR ENABLE PIN NOT SET");
+    return true;
+  }
+  Serial.print("OK MOTOR ENABLE ");
+  Serial.println(motorsEnabled ? 1 : 0);
+  return true;
+}
+
+bool handleSetPumpPinsCommand(const String &cmd) {
+  int d[PUMP_COUNT];
+  int s[PUMP_COUNT];
+  int parsed = sscanf(
+    cmd.c_str(), "SET PUMP PINS %d %d %d %d %d %d %d %d %d %d",
+    &d[0], &s[0], &d[1], &s[1], &d[2], &s[2], &d[3], &s[3], &d[4], &s[4]
+  );
+  if (parsed != PUMP_COUNT * 2) {
+    return false;
+  }
+
+  for (int i = 0; i < PUMP_COUNT; i++) {
+    pumps[i].dirPin = d[i];
+    pumps[i].stepPin = s[i];
+    if (d[i] >= 0) {
+      pinMode(d[i], OUTPUT);
+      digitalWrite(d[i], LOW);
+    }
+    if (s[i] >= 0) {
+      pinMode(s[i], OUTPUT);
+      digitalWrite(s[i], LOW);
+    }
+  }
+
+  Serial.println("OK PUMP PINS");
+  return true;
+}
+
+// Run any subset of the pumps at once, each with its own step count and speed.
+// A time-based schedule rather than a shared step loop: the pumps feed
+// different reagents and routinely want different rates, and interleaving on
+// due-time keeps them independent without a timer peripheral each.
+bool handlePumpRunCommand(const String &cmd) {
+  long steps[PUMP_COUNT];
+  int rpm[PUMP_COUNT];
+  int parsed = sscanf(
+    cmd.c_str(), "PUMP RUN %ld %d %ld %d %ld %d %ld %d %ld %d",
+    &steps[0], &rpm[0], &steps[1], &rpm[1], &steps[2], &rpm[2],
+    &steps[3], &rpm[3], &steps[4], &rpm[4]
+  );
+  if (parsed != PUMP_COUNT * 2) {
+    return false;
+  }
+
+  unsigned long interval[PUMP_COUNT];
+  unsigned long nextDue[PUMP_COUNT];
+  long remaining[PUMP_COUNT];
+  long done[PUMP_COUNT];
+  bool anyActive = false;
+
+  unsigned long now = micros();
+  for (int i = 0; i < PUMP_COUNT; i++) {
+    done[i] = 0;
+    remaining[i] = steps[i] < 0 ? -steps[i] : steps[i];
+    if (pumps[i].stepPin < 0 || pumps[i].dirPin < 0) {
+      remaining[i] = 0;
+    }
+    if (remaining[i] > 0) {
+      digitalWrite(pumps[i].dirPin, steps[i] >= 0 ? HIGH : LOW);
+      interval[i] = stepIntervalMicrosForRPM(rpm[i] > 0 ? rpm[i] : 60);
+      nextDue[i] = now;
+      anyActive = true;
+    } else {
+      interval[i] = 0;
+      nextDue[i] = 0;
+    }
+  }
+
+  if (!anyActive) {
+    Serial.println("OK PUMP RUN 0 0 0 0 0");
+    return true;
+  }
+
+  if (motorEnablePin >= 0 && !motorsEnabled) {
+    Serial.println("ERR PUMP MOTORS DISABLED");
+    return true;
+  }
+
+  // Direction pins need a moment before the first pulse, same as the axes.
+  delayMicroseconds(20);
+
+  bool stopRequested = false;
+  while (!stopRequested) {
+    bool active = false;
+    now = micros();
+
+    for (int i = 0; i < PUMP_COUNT; i++) {
+      if (remaining[i] <= 0) {
+        continue;
+      }
+      active = true;
+      // Unsigned subtraction, so this stays correct across micros() rollover.
+      if ((long)(now - nextDue[i]) < 0) {
+        continue;
+      }
+
+      digitalWrite(pumps[i].stepPin, HIGH);
+      delayMicroseconds(STEP_PULSE_WIDTH_US);
+      digitalWrite(pumps[i].stepPin, LOW);
+
+      pumps[i].currentSteps += steps[i] >= 0 ? 1 : -1;
+      remaining[i]--;
+      done[i]++;
+      nextDue[i] += interval[i];
+    }
+
+    if (!active) {
+      break;
+    }
+
+    stopRequested = consumeStopCommandIfPresent();
+  }
+
+  Serial.print(stopRequested ? "OK STOP PUMP RUN " : "OK PUMP RUN ");
+  for (int i = 0; i < PUMP_COUNT; i++) {
+    Serial.print(done[i]);
+    if (i < PUMP_COUNT - 1) {
+      Serial.print(" ");
+    }
+  }
+  Serial.println();
+  return true;
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -1635,6 +1833,14 @@ void loop() {
   else if (handleMoveZCommand(cmd)) {
   }
   else if (handleCalibrateZCommand(cmd)) {
+  }
+  else if (handleSetMotorEnablePinCommand(cmd)) {
+  }
+  else if (handleMotorEnableCommand(cmd)) {
+  }
+  else if (handleSetPumpPinsCommand(cmd)) {
+  }
+  else if (handlePumpRunCommand(cmd)) {
   }
   else {
     Serial.println("ERR UNKNOWN CMD");

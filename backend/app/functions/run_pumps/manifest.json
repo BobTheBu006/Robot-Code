@@ -1,0 +1,507 @@
+{
+  "schema_version": 1,
+  "id": "run_pumps",
+  "display_name": "Run Peristaltic Pumps",
+  "category": "Robot Actions",
+  "description": "Dispenses a volume through any of the 5 peristaltic pumps. Pumps with a non-zero volume run at the same time, each at its own speed. Volumes come from each pump's mL-per-200-steps calibration in the Hardware Map.",
+  "version": "0.1.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "Selected ESP32",
+      "type": "file/path",
+      "description": "Controller running the Z-axis and pump firmware.",
+      "required": true,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0",
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [],
+      "hidden": true,
+      "resolvedFrom": "hardware_map"
+    },
+    {
+      "key": "pump_1_ml",
+      "label": "Pump 1 Volume (mL)",
+      "type": "number",
+      "description": "Millilitres for pump 1. 0 leaves it idle. Negative draws back instead of dispensing.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_2_ml",
+      "label": "Pump 2 Volume (mL)",
+      "type": "number",
+      "description": "Millilitres for pump 2. 0 leaves it idle. Negative draws back instead of dispensing.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_3_ml",
+      "label": "Pump 3 Volume (mL)",
+      "type": "number",
+      "description": "Millilitres for pump 3. 0 leaves it idle. Negative draws back instead of dispensing.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_4_ml",
+      "label": "Pump 4 Volume (mL)",
+      "type": "number",
+      "description": "Millilitres for pump 4. 0 leaves it idle. Negative draws back instead of dispensing.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_5_ml",
+      "label": "Pump 5 Volume (mL)",
+      "type": "number",
+      "description": "Millilitres for pump 5. 0 leaves it idle. Negative draws back instead of dispensing.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_1_speed_rpm",
+      "label": "Pump 1 Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed for pump 1. Only used when its volume is not zero.",
+      "required": false,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 600,
+      "options": []
+    },
+    {
+      "key": "pump_2_speed_rpm",
+      "label": "Pump 2 Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed for pump 2. Only used when its volume is not zero.",
+      "required": false,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 600,
+      "options": []
+    },
+    {
+      "key": "pump_3_speed_rpm",
+      "label": "Pump 3 Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed for pump 3. Only used when its volume is not zero.",
+      "required": false,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 600,
+      "options": []
+    },
+    {
+      "key": "pump_4_speed_rpm",
+      "label": "Pump 4 Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed for pump 4. Only used when its volume is not zero.",
+      "required": false,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 600,
+      "options": []
+    },
+    {
+      "key": "pump_5_speed_rpm",
+      "label": "Pump 5 Speed (RPM)",
+      "type": "number",
+      "description": "Motor speed for pump 5. Only used when its volume is not zero.",
+      "required": false,
+      "default": 60.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 600,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "pump_1_dir_pin",
+      "label": "Pump 1 Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 1 direction.",
+      "required": false,
+      "default": 13.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_1_step_pin",
+      "label": "Pump 1 Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 1 step.",
+      "required": false,
+      "default": 14.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_2_dir_pin",
+      "label": "Pump 2 Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 2 direction.",
+      "required": false,
+      "default": 27.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_2_step_pin",
+      "label": "Pump 2 Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 2 step.",
+      "required": false,
+      "default": 26.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_3_dir_pin",
+      "label": "Pump 3 Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 3 direction.",
+      "required": false,
+      "default": 25.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_3_step_pin",
+      "label": "Pump 3 Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 3 step.",
+      "required": false,
+      "default": 33.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_4_dir_pin",
+      "label": "Pump 4 Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 4 direction.",
+      "required": false,
+      "default": 22.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_4_step_pin",
+      "label": "Pump 4 Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 4 step.",
+      "required": false,
+      "default": 23.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_5_dir_pin",
+      "label": "Pump 5 Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 5 direction.",
+      "required": false,
+      "default": 4.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "pump_5_step_pin",
+      "label": "Pump 5 Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO pin for pump 5 step.",
+      "required": false,
+      "default": 16.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "motor_enable_pin",
+      "label": "Motor Enable Pin",
+      "type": "number",
+      "description": "Shared driver-enable line for every motor on this board (MS1, with MS2/MS3 low). Held high only while motors are in use.",
+      "required": false,
+      "default": 17.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue once every pump has finished."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "peristaltic-pump-1",
+      "name": "Peristaltic Pump 1",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-1-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "pump_1_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-1-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "pump_1_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-1-ms1",
+          "signal": "micro_step_1",
+          "gpio": null,
+          "function_input_key": "motor_enable_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-peristaltic-pump-1",
+      "notes": null
+    },
+    {
+      "id": "peristaltic-pump-2",
+      "name": "Peristaltic Pump 2",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-2-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "pump_2_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-2-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "pump_2_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-2-ms1",
+          "signal": "micro_step_1",
+          "gpio": null,
+          "function_input_key": "motor_enable_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-peristaltic-pump-2",
+      "notes": null
+    },
+    {
+      "id": "peristaltic-pump-3",
+      "name": "Peristaltic Pump 3",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-3-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "pump_3_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-3-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "pump_3_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-3-ms1",
+          "signal": "micro_step_1",
+          "gpio": null,
+          "function_input_key": "motor_enable_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-peristaltic-pump-3",
+      "notes": null
+    },
+    {
+      "id": "peristaltic-pump-4",
+      "name": "Peristaltic Pump 4",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-4-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "pump_4_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-4-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "pump_4_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-4-ms1",
+          "signal": "micro_step_1",
+          "gpio": null,
+          "function_input_key": "motor_enable_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-peristaltic-pump-4",
+      "notes": null
+    },
+    {
+      "id": "peristaltic-pump-5",
+      "name": "Peristaltic Pump 5",
+      "kind": "stepper_motor",
+      "board_id": "controller-ykkl80",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": 1.0,
+      "pins": [
+        {
+          "id": "peristaltic-pump-5-dir",
+          "signal": "direction",
+          "gpio": null,
+          "function_input_key": "pump_5_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-5-step",
+          "signal": "step",
+          "gpio": null,
+          "function_input_key": "pump_5_step_pin",
+          "notes": null
+        },
+        {
+          "id": "peristaltic-pump-5-ms1",
+          "signal": "micro_step_1",
+          "gpio": null,
+          "function_input_key": "motor_enable_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-peristaltic-pump-5",
+      "notes": null
+    }
+  ],
+  "firmware_requirements": [
+    {
+      "routine_id": "run_pumps",
+      "controller_role": "builder_board",
+      "source": "firmware/main.ino",
+      "protocol": "Serial commands: SET MOTOR ENABLE PIN <pin>, MOTOR ENABLE <0|1>, SET PUMP PINS <d1 s1 ... d5 s5>, PUMP RUN <steps1 rpm1 ... steps5 rpm5>. Pumps are interleaved on due-time so each runs at its own rate; replies OK PUMP RUN <done1..done5>.",
+      "entry_point": "run_pumps",
+      "required_device_ids": [
+        "peristaltic-pump-1",
+        "peristaltic-pump-2",
+        "peristaltic-pump-3",
+        "peristaltic-pump-4",
+        "peristaltic-pump-5"
+      ],
+      "description": "Firmware routine required by the Run Peristaltic Pumps block."
+    }
+  ],
+  "builder_board_id": "controller-ykkl80",
+  "builder_source_path": null,
+  "builder_workspace_path": null,
+  "builder_firmware_entry_file": null,
+  "builder_base_function_id": null
+}
