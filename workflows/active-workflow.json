@@ -35,9 +35,9 @@
           "retryCount": 0
         },
         "isActive": true,
-        "runCount": 42,
+        "runCount": 44,
         "benchmarkDurationMs": 19,
-        "lastDurationMs": 1
+        "lastDurationMs": 0
       },
       "measured": {
         "width": 210,
@@ -49,8 +49,8 @@
       "id": "calibrate_xy-jm4o7",
       "type": "workflowBlock",
       "position": {
-        "x": 482.41392601259963,
-        "y": 79.23473356434656
+        "x": 366.86440147986303,
+        "y": -131.16887827138268
       },
       "data": {
         "block": {
@@ -528,7 +528,7 @@
           "y_track_length_cm": 54.3,
           "x_start_clear_cm": 0,
           "x_calibration_y_cm": 2.6,
-          "limit_buffer_cm": 0.1,
+          "limit_buffer_cm": 0,
           "x_end_clear_cm": 2,
           "speed_rpm": 100,
           "trapezoidal_speed": true,
@@ -547,10 +547,10 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": false,
-        "runCount": 57,
-        "benchmarkDurationMs": 30839,
-        "lastDurationMs": 100221
+        "isActive": true,
+        "runCount": 60,
+        "benchmarkDurationMs": 33116,
+        "lastDurationMs": 66882
       },
       "measured": {
         "width": 210,
@@ -602,7 +602,7 @@
               "placeholder": null,
               "advanced": false,
               "min": 0,
-              "max": 105.3,
+              "max": 105.5,
               "options": []
             },
             {
@@ -615,7 +615,7 @@
               "placeholder": null,
               "advanced": false,
               "min": 0,
-              "max": 54.1,
+              "max": 54.3,
               "options": []
             },
             {
@@ -975,8 +975,8 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
-          "x_cm": 10,
-          "y_cm": 0,
+          "x_cm": 0,
+          "y_cm": 32.5,
           "speed_rpm": 100,
           "trapezoidal_speed": true,
           "acceleration_rpm_per_s": 150,
@@ -993,16 +993,16 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": false,
-        "runCount": 20,
-        "benchmarkDurationMs": 3860,
-        "lastDurationMs": 127
+        "isActive": true,
+        "runCount": 22,
+        "benchmarkDurationMs": 3580,
+        "lastDurationMs": 88
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": false,
+      "selected": true,
       "dragging": false
     },
     {
@@ -1591,7 +1591,7 @@
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
           "toolhead_index": 4,
-          "approach_speed_rpm": 400,
+          "approach_speed_rpm": 100,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -1621,10 +1621,10 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": false,
-        "runCount": 1,
-        "benchmarkDurationMs": 8204,
-        "lastDurationMs": 8204
+        "isActive": true,
+        "runCount": 16,
+        "benchmarkDurationMs": 8151,
+        "lastDurationMs": 4876
       },
       "measured": {
         "width": 210,
@@ -2205,7 +2205,7 @@
         },
         "parameters": {
           "tool_port": "/dev/ttyUSB0",
-          "approach_speed_rpm": 400,
+          "approach_speed_rpm": 100,
           "x_step_pin": 16,
           "x_dir_pin": 17,
           "y_step_pin": 18,
@@ -2235,15 +2235,16 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": false,
-        "runCount": 1,
-        "benchmarkDurationMs": 5152,
-        "lastDurationMs": 5152
+        "isActive": true,
+        "runCount": 14,
+        "benchmarkDurationMs": 5882,
+        "lastDurationMs": 4920
       },
       "measured": {
         "width": 210,
         "height": 120
-      }
+      },
+      "selected": false
     },
     {
       "id": "test_gantry_repeatability-iexaf",
@@ -3213,9 +3214,9 @@
           "z_left_track_length_cm": 60,
           "z_right_track_length_cm": 60,
           "limit_buffer_cm": 0.5,
-          "speed_rpm": 260,
+          "speed_rpm": 250,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 780,
+          "acceleration_rpm_per_s": 750,
           "steps_per_cm_estimate": 2000,
           "z_left_step_pin": 32,
           "z_left_dir_pin": 33,
@@ -3231,9 +3232,9 @@
           "retryCount": 0
         },
         "isActive": false,
-        "runCount": 4,
-        "benchmarkDurationMs": 93793,
-        "lastDurationMs": 102726
+        "runCount": 25,
+        "benchmarkDurationMs": 38123,
+        "lastDurationMs": 34505
       },
       "measured": {
         "width": 210,
@@ -3724,9 +3725,9 @@
           "tool_port": "/dev/ttyUSB0",
           "z_left_cm": 10,
           "z_right_cm": 10,
-          "speed_rpm": 360,
+          "speed_rpm": 250,
           "trapezoidal_speed": true,
-          "acceleration_rpm_per_s": 900,
+          "acceleration_rpm_per_s": 625,
           "on_the_fly_calibration": true,
           "calibration_max_diff_steps": 5,
           "z_left_step_pin": 32,
@@ -3743,9 +3744,9 @@
           "retryCount": 0
         },
         "isActive": false,
-        "runCount": 8,
-        "benchmarkDurationMs": 11088,
-        "lastDurationMs": 16428
+        "runCount": 10,
+        "benchmarkDurationMs": 9149,
+        "lastDurationMs": 2718
       },
       "measured": {
         "width": 210,
@@ -4603,7 +4604,7 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
+        "isActive": false,
         "runCount": 2,
         "benchmarkDurationMs": 10149,
         "lastDurationMs": 11595
@@ -5376,16 +5377,16 @@
           "failureMode": "stop_flow",
           "retryCount": 0
         },
-        "isActive": true,
-        "runCount": 1,
-        "benchmarkDurationMs": 101143,
-        "lastDurationMs": 101143
+        "isActive": false,
+        "runCount": 2,
+        "benchmarkDurationMs": 101103,
+        "lastDurationMs": 101063
       },
       "measured": {
         "width": 210,
         "height": 120
       },
-      "selected": true
+      "selected": false
     }
   ],
   "edges": [

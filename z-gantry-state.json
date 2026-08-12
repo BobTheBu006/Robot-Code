@@ -3,10 +3,10 @@
   "calibrated": true,
   "left_calibrated": true,
   "right_calibrated": true,
-  "steps_per_cm": 1804.7,
+  "steps_per_cm": 1785.8,
   "limit_buffer_cm": 0.5,
-  "left_track_length_cm": 60.0,
-  "right_track_length_cm": 59.6908073363994,
-  "left_steps": 18047,
-  "right_steps": 72188
+  "left_track_length_cm": 60.00000000000001,
+  "right_track_length_cm": 60.0,
+  "left_steps": 17889,
+  "right_steps": 106255
 }
