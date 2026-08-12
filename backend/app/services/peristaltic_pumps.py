@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.services.hybrid_z_axis import HybridZAxisError, hybrid_z_axis_service
+from app.services.hybrid_z_axis import hybrid_z_axis_service
 from app.services.motor_power import Z_PUMP_DOMAIN, motor_power_service
 
 PUMP_COUNT = 5
@@ -83,10 +83,11 @@ class PeristalticPumpService:
         service = hybrid_z_axis_service
         port = service._resolve_port(context, tool_port)
 
-        # The enable line covers every driver on this board, so it is the same
-        # power domain the Z axes use. Registering here as well as there means
-        # whichever runs first teaches the service how to switch it.
-        self._register_power_domain(context, port, enable_pin)
+        # The enable line covers every driver on this board, so this is the
+        # same power domain the Z axes use - registered by the service that
+        # owns the serial port rather than duplicated here.
+        if enable_pin >= 0:
+            service.register_power_domain(port, enable_pin)
 
         # Acquire pays the settle delay only if the drivers were actually off,
         # and release just starts the linger timer, so a workflow that pumps in
@@ -169,33 +170,5 @@ class PeristalticPumpService:
             if len(values) == PUMP_COUNT:
                 return values
         return [0] * PUMP_COUNT
-
-    # ---- power ----
-
-    def _register_power_domain(self, context: dict, port: str, enable_pin: int) -> None:
-        service = hybrid_z_axis_service
-
-        def apply(on: bool) -> None:
-            # Driven over serial: the enable line is an ESP32 pin, so the Pi
-            # cannot toggle it directly the way it can for the CoreXY drivers.
-            with service._lock:
-                serial_port = service._open_serial(port, 115200)
-                service._send(
-                    serial_port, f"SET MOTOR ENABLE PIN {enable_pin}",
-                    terminal_prefixes=("OK", "ERR"), deadline_seconds=5.0,
-                )
-                reply, completed = service._send(
-                    serial_port, f"MOTOR ENABLE {1 if on else 0}",
-                    terminal_prefixes=("OK", "ERR"), deadline_seconds=5.0,
-                )
-            if not completed or not reply or "OK" not in reply.upper():
-                raise HybridZAxisError(f"The controller did not acknowledge MOTOR ENABLE: {reply}")
-
-        motor_power_service.register(
-            Z_PUMP_DOMAIN,
-            f"Z axes and 5 peristaltic pumps (ESP32 GPIO {enable_pin})",
-            apply,
-        )
-
 
 peristaltic_pump_service = PeristalticPumpService()

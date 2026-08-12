@@ -22,6 +22,7 @@ from typing import Any
 from app.core.safety import PRIORITY_SERIAL, CallableActor, safety_controller
 from app.models.gantry import GantryZCalibrationRequest, GantryZMoveRequest
 from app.services.gpio_backend import load_gpio_backend
+from app.services.motor_power import Z_PUMP_DOMAIN, motor_power_service, powered_motors
 
 STATE_VERSION = 1
 DEFAULT_STEPS_PER_CM = 100.0
@@ -70,6 +71,16 @@ class _ZPinPlan:
 
     def limit_pins(self) -> list[int]:
         return [self.left_min_limit_pin, self.left_max_limit_pin, self.right_min_limit_pin, self.right_max_limit_pin]
+
+
+class _NullPowerHold:
+    """Stand-in for a board with no enable line wired."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return None
 
 
 class HybridZAxisService:
@@ -527,6 +538,68 @@ class HybridZAxisService:
         )
 
     # ---- public API ----
+
+    # ---- shared driver-enable line (GPIO 17 on this board) ----
+
+    def enable_pin_from_hardware_map(self, context: dict | None) -> int | None:
+        """Find the shared driver-enable pin for this board.
+
+        Read from the Hardware Map rather than a manifest input so it applies
+        to every function on this controller - Z moves, calibration and the
+        pumps - without each manifest having to declare it.
+        """
+        if context is None:
+            return None
+        hardware_map = context.get("hardware_map")
+        devices = hardware_map.get("devices") if isinstance(hardware_map, dict) else None
+        for device in devices or []:
+            if not isinstance(device, dict) or device.get("board_id") != "controller-ykkl80":
+                continue
+            for pin in device.get("pins") or []:
+                if isinstance(pin, dict) and pin.get("function_input_key") == "motor_enable_pin":
+                    gpio = str(pin.get("gpio") or "").strip()
+                    if gpio.lstrip("-").isdigit() and int(gpio) >= 0:
+                        return int(gpio)
+        return None
+
+    def register_power_domain(self, port: str, enable_pin: int) -> None:
+        """Teach the power service to switch this board's drivers over serial.
+
+        The enable line is an ESP32 pin, so unlike the CoreXY drivers the Pi
+        cannot toggle it directly - it has to be asked for down the same serial
+        connection everything else on this board uses.
+        """
+        def apply(on: bool) -> None:
+            serial_port = self._open_serial(port, 115200)
+            self._send(
+                serial_port, f"SET MOTOR ENABLE PIN {enable_pin}",
+                terminal_prefixes=("OK", "ERR"), deadline_seconds=5.0,
+            )
+            reply, completed = self._send(
+                serial_port, f"MOTOR ENABLE {1 if on else 0}",
+                terminal_prefixes=("OK", "ERR"), deadline_seconds=5.0,
+            )
+            if not completed or not reply or "OK" not in reply.upper():
+                raise HybridZAxisError(f"The controller did not acknowledge MOTOR ENABLE: {reply}")
+
+        motor_power_service.register(
+            Z_PUMP_DOMAIN,
+            f"Z axes and peristaltic pumps (ESP32 GPIO {enable_pin})",
+            apply,
+        )
+
+    def _hold_power(self, context: dict, port: str):
+        """Power the drivers for the duration of a move, if an enable is wired.
+
+        Returns something usable with `with`. On a board with no enable line
+        this is a no-op, which is how it behaved before the line existed.
+        """
+        enable_pin = self.enable_pin_from_hardware_map(context)
+        if enable_pin is None:
+            return _NullPowerHold()
+        self.register_power_domain(port, enable_pin)
+        return powered_motors(Z_PUMP_DOMAIN)
+
     def calibrate_z(self, context: dict, request: GantryZCalibrationRequest) -> dict:
         self._raise_if_stopped()
         pins = self._pins_from_request(request)
@@ -538,7 +611,10 @@ class HybridZAxisService:
 
         sides = ("left", "right") if request.axes == "both" else (request.axes,)
 
-        with self._lock:
+        # Power the drivers before probing, and let go afterwards. Release only
+        # starts the linger timer, so a calibration followed by a move does not
+        # power-cycle in between.
+        with self._hold_power(context, port), self._lock:
             self._invalidate_calibration(sides)
             self._setup_limit_gpio(gpio, pins)
             try:
@@ -677,7 +753,7 @@ class HybridZAxisService:
         if gpio is None:
             raise HybridZAxisError(f"Compatible Raspberry Pi GPIO backend is not available: {gpio_error}")
 
-        with self._lock:
+        with self._hold_power(context, port), self._lock:
             self._setup_limit_gpio(gpio, pins)
             try:
                 self._assert_limits_clear(gpio, pins)
