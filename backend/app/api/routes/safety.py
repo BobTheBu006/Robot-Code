@@ -169,21 +169,74 @@ def get_motor_power() -> dict:
 
 
 @router.post("/motor-power/enable-test")
-def motor_power_enable_test(seconds: float = 5.0) -> dict:
-    """Assert the Z/pump enable line, hold it, then drop it. No stepping.
+def motor_power_enable_test(domain: str = "z", seconds: float = 5.0) -> dict:
+    """Assert a driver enable line, hold it, then drop it. Sends no steps.
 
-    Diagnostic for exactly one question: does the enable line actually reach
-    the drivers? It sends the same commands a real move sends, so a failure
-    here is the same failure a move would hit - but nothing turns, so it is
-    safe to run with the machine powered and someone holding a multimeter on
-    the pin.
+    Diagnostic for exactly one question: does the enable line reach the
+    drivers, the right way round? It drives the same line a real move drives,
+    so a failure here is the failure a move would hit - but nothing turns, so
+    it is safe to run with the machine powered and someone watching the motors.
+
+    `domain` selects "z" (the Z/pump ESP32, GPIO 4, enabled high) or "gantry"
+    (the CoreXY TB6600s on Pi GPIO, enabled LOW - energising a TB6600's opto
+    disables it).
     """
     import time
 
     from app.services.hardware_map import hardware_map_service
-    from app.services.hybrid_z_axis import hybrid_z_axis_service
 
     context = {"hardware_map": hardware_map_service.load_map().model_dump(mode="json")}
+    steps: list[str] = []
+    hold = max(0.0, min(float(seconds), 30.0))
+
+    if domain == "gantry":
+        from app.services.gpio_backend import load_gpio_backend
+        from app.services.motor_power import GANTRY_XY_DOMAIN
+        from app.services.raspberry_gantry import (
+            _enable_pin_from_hardware_map,
+            raspberry_gantry_gpio_service,
+        )
+
+        enable_pin = _enable_pin_from_hardware_map(context)
+        if enable_pin is None:
+            return {"ok": False, "error": "No CoreXY enable pin is recorded in the Hardware Map."}
+
+        gpio, gpio_error = load_gpio_backend()
+        if gpio is None:
+            return {"ok": False, "error": f"No usable GPIO backend: {gpio_error}"}
+
+        try:
+            gpio.setwarnings(False)
+            gpio.setmode(gpio.BCM)
+            # Claim it already disabled, so this cannot energise the drivers
+            # merely by taking the pin.
+            raspberry_gantry_gpio_service._register_power_domain(gpio, enable_pin)
+            domain_state = motor_power_service.snapshot()["domains"]
+            active_low = next((d["active_low"] for d in domain_state if d["domain_id"] == GANTRY_XY_DOMAIN), None)
+            gpio.setup(enable_pin, gpio.OUT, initial=gpio.HIGH if active_low else gpio.LOW)
+            steps.append(
+                f"claimed Pi GPIO {enable_pin} as an output, disabled "
+                f"({'HIGH' if active_low else 'LOW'} = off for these drivers)"
+            )
+
+            motor_power_service.acquire(GANTRY_XY_DOMAIN)
+            steps.append(
+                f"enabled - GPIO {enable_pin} driven {'LOW' if active_low else 'HIGH'}; "
+                "the CoreXY motors should be holding now"
+            )
+            time.sleep(hold)
+
+            motor_power_service.power_down_now(GANTRY_XY_DOMAIN)
+            steps.append("disabled - the motors should be free to turn by hand again")
+            return {"ok": True, "domain": "gantry", "enable_pin": enable_pin,
+                    "active_low": active_low, "steps": steps}
+        except Exception as exc:
+            motor_power_service.power_down_now(GANTRY_XY_DOMAIN)
+            return {"ok": False, "domain": "gantry", "enable_pin": enable_pin,
+                    "steps": steps, "error": f"{type(exc).__name__}: {exc}"}
+
+    from app.services.hybrid_z_axis import hybrid_z_axis_service
+
     enable_pin = hybrid_z_axis_service.enable_pin_from_hardware_map(context)
     if enable_pin is None:
         return {"ok": False, "error": "No enable pin is recorded for this board in the Hardware Map."}
@@ -193,7 +246,6 @@ def motor_power_enable_test(seconds: float = 5.0) -> dict:
     except Exception as exc:
         return {"ok": False, "error": f"Could not resolve the controller port: {exc}"}
 
-    steps: list[str] = []
     try:
         hybrid_z_axis_service.register_power_domain(port, enable_pin)
         steps.append(f"registered enable on GPIO {enable_pin} via {port}")
@@ -201,12 +253,12 @@ def motor_power_enable_test(seconds: float = 5.0) -> dict:
         motor_power_service.acquire(Z_PUMP_DOMAIN)
         steps.append(f"MOTOR ENABLE 1 acknowledged - GPIO {enable_pin} should now read HIGH")
 
-        time.sleep(max(0.0, min(float(seconds), 30.0)))
+        time.sleep(hold)
 
         motor_power_service.power_down_now(Z_PUMP_DOMAIN)
         steps.append(f"MOTOR ENABLE 0 acknowledged - GPIO {enable_pin} back LOW")
-        return {"ok": True, "enable_pin": enable_pin, "port": port, "steps": steps}
+        return {"ok": True, "domain": "z", "enable_pin": enable_pin, "port": port, "steps": steps}
     except Exception as exc:
         motor_power_service.power_down_now(Z_PUMP_DOMAIN)
-        return {"ok": False, "enable_pin": enable_pin, "port": port,
+        return {"ok": False, "domain": "z", "enable_pin": enable_pin, "port": port,
                 "steps": steps, "error": f"{type(exc).__name__}: {exc}"}
