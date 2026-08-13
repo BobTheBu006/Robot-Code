@@ -45,6 +45,10 @@ OPTIONAL_XY_DEVICE_IDS = {
 }
 XY_DEVICE_IDS = REQUIRED_XY_DEVICE_IDS | OPTIONAL_XY_DEVICE_IDS
 
+# How long the CoreXY drivers stay energised after a move finishes. Holding
+# position matters more here than saving the current: belts back-drive.
+GANTRY_IDLE_HOLD_SECONDS = 300.0
+
 DEFAULT_STEPS_PER_CM = 100.0
 # STEP pulse width. Drivers only need ~1-2us; the width also floors the step
 # interval (interval >= 2x pulse), which caps the step rate at 5000/s - a
@@ -198,6 +202,18 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if raw_value is None:
         return default
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError:
+        # A typo in an environment variable must not change how long the
+        # motors hold; fall back to the considered default.
+        return default
 
 
 class GantryStoppedError(RuntimeError):
@@ -1191,12 +1207,24 @@ class RaspberryGantryGPIOService:
             energised = (not on) if active_low else on
             gpio.output(enable_pin, gpio.HIGH if energised else gpio.LOW)
 
+        # Five minutes, not the three seconds the Z/pump board uses. A CoreXY
+        # head is held in place by belt tension and nothing else - drop the
+        # current and it can be pushed, or pulled by a drag chain, and the
+        # tracked position quietly stops matching reality. The Z screws are
+        # self-locking so they can afford to power down promptly; this cannot.
+        #
+        # Long enough to cover the gaps between blocks and between runs, short
+        # enough that a machine left alone eventually goes cold.
+        linger_seconds = _float_env("ROBOT_GPIO_GANTRY_LINGER_SECONDS", GANTRY_IDLE_HOLD_SECONDS)
+
         motor_power_service.register(
             GANTRY_XY_DOMAIN,
             f"CoreXY A and B drivers (Pi GPIO {enable_pin}, "
-            f"{'active low' if active_low else 'active high'})",
+            f"{'active low' if active_low else 'active high'}, "
+            f"holds {linger_seconds:g}s after a move)",
             apply,
             active_low=active_low,
+            linger_seconds=linger_seconds,
         )
 
     def _cleanup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:

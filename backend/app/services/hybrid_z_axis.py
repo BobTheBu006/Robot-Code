@@ -367,15 +367,78 @@ class HybridZAxisService:
         steps_per_second = max(1.0, rpm * steps_per_rotation / 60.0)
         deadline = max(3.0, (max_steps / steps_per_second) * 2.0 + 2.0)
         command = f"STEP Z {left_delta} {right_delta} {int(rpm)} {1 if trapezoidal else 0} {int(acceleration_rpm_per_s)}"
-        reply, completed = self._send(serial_port, command, terminal_prefixes=("OK STEP Z", "ERR "), deadline_seconds=deadline)
+        # "OK STOP STEP Z" has to be listed too: an aborted burst answers with
+        # that, and it does not start with "OK STEP Z", so without it the reply
+        # was never recognised as terminal and the move timed out instead.
+        reply, completed = self._send(
+            serial_port, command,
+            terminal_prefixes=("OK STOP STEP Z", "OK STEP Z", "ERR "),
+            deadline_seconds=deadline,
+        )
         if not completed:
             raise HybridZAxisError("Timed out waiting for the Z-axis ESP32 to finish a step burst.")
-        if reply and "ERR STOP" in reply.upper():
+        upper = (reply or "").upper()
+        if "ERR STOP" in upper:
             raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
-        if not reply or "OK STEP Z" not in reply.upper():
+        if "STEP Z" not in upper or "OK" not in upper:
             raise HybridZAxisError(f"ESP32 rejected a Z step command: {reply}")
-        self._left_steps += left_delta
-        self._right_steps += right_delta
+
+        # Adopt what the firmware says actually happened, not what was asked
+        # for. Every pulse it issued was counted, so after an abort the position
+        # is still exactly known - and an emergency stop must not cost the
+        # calibration. Falls back to the commanded delta only when the reply
+        # cannot be read, which is the best guess available at that point.
+        done_left, done_right = self._parse_step_done(reply, left_delta, right_delta)
+        self._left_steps += done_left
+        self._right_steps += done_right
+
+        if "OK STOP STEP Z" in upper:
+            self._save_state()
+            raise HybridZAxisStoppedError(
+                f"Z axis motion stopped after {abs(done_left)} left / {abs(done_right)} right steps. "
+                f"{self._blocked_reason()}"
+            )
+
+    def _assert_sides_calibrated(self, delta_left: int, delta_right: int) -> None:
+        """Refuse to drive a side whose position was never measured.
+
+        Track lengths and the step counter default to plausible-looking
+        numbers, so an uncalibrated axis will happily accept a target and drive
+        against a workspace it has no knowledge of - into a hard stop, or short
+        of one. This is the difference between "calibrated to 60 cm" and "never
+        homed, assuming 60 cm", which the range check alone cannot tell apart.
+
+        Only the sides actually being moved are checked. Commanding a side to
+        the position it already holds is how a caller moves one axis while
+        leaving the other alone, and that needs no calibration because it needs
+        no motion.
+        """
+        uncalibrated = [
+            side
+            for side, delta, calibrated in (
+                ("left", delta_left, self._left_calibrated),
+                ("right", delta_right, self._right_calibrated),
+            )
+            if delta != 0 and not calibrated
+        ]
+        if uncalibrated:
+            sides = " and ".join(uncalibrated)
+            raise HybridZAxisError(
+                f"The Z {sides} axis has not been calibrated, so its position is unknown and a "
+                f"move could drive into a limit. Run Calibrate Z Axis first."
+            )
+
+    def _parse_step_done(self, reply: str | None, left_delta: int, right_delta: int) -> tuple[int, int]:
+        """Read the signed step counts out of an OK [STOP] STEP Z reply."""
+        for line in reversed((reply or "").splitlines()):
+            if "STEP Z" not in line.upper():
+                continue
+            tail = line.upper().split("STEP Z", 1)[1].split()
+            try:
+                return int(tail[0]), int(tail[1])
+            except (IndexError, ValueError):
+                continue
+        return left_delta, right_delta
 
     def _seek_switch(
         self, serial_port, gpio: Any, side: str, direction: int, limit_pin: int,
@@ -764,6 +827,8 @@ class HybridZAxisService:
                 target_right_steps = round(request.z_right_cm * self._steps_per_cm)
                 delta_left = target_left_steps - self._left_steps
                 delta_right = target_right_steps - self._right_steps
+
+                self._assert_sides_calibrated(delta_left, delta_right)
 
                 self._send_step(
                     serial_port, delta_left, delta_right, request.speed_rpm,
