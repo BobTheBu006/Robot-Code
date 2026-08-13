@@ -55,7 +55,7 @@
           "signal": "enable",
           "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active HIGH on these boards, measured: HIGH energises, LOW releases. That is the opposite of the usual TB6600 datasheet convention, so do not 'correct' it. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: energising a TB6600's opto DISABLES it, so the pin is pulled low to run the motors. Confirmed by releasing the pin - it falls to the pull-down and the motors energise. Note GPIO 10 is SPI0 MOSI, so enabling SPI would claim it."
         },
         {
           "id": "x-ms1",
@@ -111,7 +111,7 @@
           "signal": "enable",
           "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active HIGH on these boards, measured: HIGH energises, LOW releases. That is the opposite of the usual TB6600 datasheet convention, so do not 'correct' it. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: energising a TB6600's opto DISABLES it, so the pin is pulled low to run the motors. Confirmed by releasing the pin - it falls to the pull-down and the motors energise. Note GPIO 10 is SPI0 MOSI, so enabling SPI would claim it."
         },
         {
           "id": "y-ms1",

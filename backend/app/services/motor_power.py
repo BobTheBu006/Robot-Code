@@ -200,6 +200,12 @@ class MotorPowerService:
                 except Exception as exc:
                     # Never raise out of a stop path; record it and move on so
                     # one stuck domain cannot block the rest from powering off.
+                    # Clear `powered` regardless: the line's real state is now
+                    # unknown, and claiming it is still on makes the next
+                    # acquire() a no-op, which silently runs the next move with
+                    # the drivers off. Re-asserting an already-on line is
+                    # harmless; skipping an assert is not.
+                    domain.powered = False
                     domain.last_error = f"{type(exc).__name__}: {exc}"
 
     # ---- internals ----
@@ -219,10 +225,13 @@ class MotorPowerService:
                 return
             try:
                 domain.apply(False)
-                domain.powered = False
                 domain.last_error = None
             except Exception as exc:
                 domain.last_error = f"{type(exc).__name__}: {exc}"
+            # Same reasoning as power_down_now: whether or not the line could be
+            # driven, this domain is no longer held, so the next acquire must
+            # actually assert it rather than assume.
+            domain.powered = False
             domain.release_at = None
             domain._timer = None
 

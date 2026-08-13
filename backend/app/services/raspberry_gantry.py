@@ -1144,7 +1144,7 @@ class RaspberryGantryGPIOService:
             # Claim it in whichever state means "disabled" for these drivers, so
             # nothing is energised until a move actually asks for it.
             disabled_level = (
-                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", False) else gpio.LOW
+                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True) else gpio.LOW
             )
             gpio.setup(pins.enable_pin, gpio.OUT, initial=disabled_level)
             self._register_power_domain(gpio, pins.enable_pin)
@@ -1165,13 +1165,19 @@ class RaspberryGantryGPIOService:
         Registered here rather than at import because the pin comes from the
         Hardware Map and is only known once a move resolves its inputs.
 
-        Driven HIGH to enable, measured on this machine: with ENA+ on this pin
-        and ENA- at GND, energising the opto is what makes these drivers hold.
-        The datasheet convention for a TB6600 is the opposite - ENABLE
-        disables, and a disconnected ENABLE runs - but these particular boards
-        do not behave that way, and the machine is the authority. Flipping
-        polarity does not fail loudly: the gantry goes slack exactly while it
-        is meant to be moving, and holds while idle.
+        Driven LOW to enable, which is the standard TB6600 behaviour: ENA is an
+        opto that *disables* the driver when energised, so a de-energised ENA
+        is what makes one run. Confirmed on this machine by releasing the pin -
+        it falls to the internal pull-down, the opto goes dark, and the motors
+        energise.
+
+        This was briefly flipped to active-high on the strength of an E-Stop
+        appearing to switch the motors on. That reading was an artefact of two
+        bugs below this line, not polarity: the enable pin was being released
+        at the end of every move, so the power-down threw instead of driving
+        anything and the pin simply sat at its pull-down - enabled. Do not
+        re-flip this without driving the pin directly and watching the motors,
+        with no move in progress.
 
         Wiring: ENA- to GND with PUL-/DIR-, ENA+ to this pin on both drivers.
         ENA is an opto LED, not a logic input, so it wants current rather than
@@ -1179,7 +1185,7 @@ class RaspberryGantryGPIOService:
         Z board's MS1 line. The pin idles low at boot, which on these boards
         means the drivers come up DISABLED, which is the safe direction.
         """
-        active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", False)
+        active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True)
 
         def apply(on: bool) -> None:
             energised = (not on) if active_low else on
@@ -1203,9 +1209,13 @@ class RaspberryGantryGPIOService:
                 pins.b_step_pin,
                 pins.b_dir_pin,
                 *pins.limit_pins(),
-                *([pins.enable_pin] if pins.enable_pin is not None else []),
             ]
         )
+        # The enable pin is deliberately NOT released here. The power service
+        # owns it across moves - that is what lets power linger between blocks
+        # instead of cycling. Releasing it reverted the pin to an input, so the
+        # linger timer's power-down then threw "channel has not been set up as
+        # an OUTPUT", and the domain was left believing it was still powered.
 
     def _steps_per_cm(self) -> float:
         return float(os.getenv("ROBOT_GPIO_XY_STEPS_PER_CM", DEFAULT_STEPS_PER_CM))
