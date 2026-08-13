@@ -139,16 +139,25 @@ class RehomeParkingTests(unittest.TestCase):
         self.service._limit_buffer_cm = 0.1
         self.moves: list[tuple] = []
 
-        # Stand in for the hardware: the probe reports how far it travelled and
-        # every subsequent move is recorded.
+        # Stand in for the hardware. The probe reports how far it travelled
+        # and leaves the switch closed, exactly as a real home does; the switch
+        # then releases once the carriage has been nudged off it.
+        self.switch_closed = True
+
+        def move(gpio, pins, a, b, rpm, **kwargs):
+            self.moves.append((a, b))
+            if a > 0:                    # backing off in +X releases it
+                self.switch_closed = False
+
         self.service._probe_axis = lambda *a, **k: -450
-        self.service._move_corexy_steps = lambda gpio, pins, a, b, rpm, **k: self.moves.append((a, b))
+        self.service._move_corexy_steps = move
+        self.service._limit_active = lambda gpio, pin: self.switch_closed
         self.service._setup_gpio = lambda gpio, pins: None
         self.service._cleanup_gpio = lambda gpio, pins: None
         self.service._save_state = lambda: None
         self.service._gpio_module = lambda: (object(), None)
         self.service._execution_mode = lambda: _Executed()
-        self.service._pins_from_request = lambda request, context=None: object()
+        self.service._pins_from_request = lambda request, context=None: _Pins()
 
     def _rehome(self):
         return self.service.rehome_x({}, _Request())
@@ -160,15 +169,37 @@ class RehomeParkingTests(unittest.TestCase):
         self.assertGreater(a_steps, 0, "moves in +X, away from the min switch")
         self.assertEqual(a_steps, b_steps, "CoreXY: equal A and B is pure X, so Y does not move")
 
-    def test_it_backs_off_by_one_buffer(self) -> None:
+    def test_it_backs_off_by_one_buffer_when_that_frees_the_switch(self) -> None:
         self._rehome()
         expected = round(0.1 * self.service._effective_steps_per_cm())
         self.assertEqual(self.moves[-1][0], expected)
 
-    def test_the_tracked_position_matches_where_it_parked(self) -> None:
-        # x_cm 0 is one buffer off the switch, so the step count has to say so.
+    def test_it_keeps_nudging_until_the_switch_actually_releases(self) -> None:
+        # A microswitch does not open the instant you leave it. Stopping while
+        # it is still closed is what made the next waypoint refuse to move.
+        released_after = 3
+        original = self.service._move_corexy_steps
+
+        def stubborn(gpio, pins, a, b, rpm, **kwargs):
+            original(gpio, pins, a, b, rpm, **kwargs)
+            self.switch_closed = len(self.moves) < released_after
+
+        self.service._move_corexy_steps = stubborn
+        self.service._limit_active = lambda gpio, pin: self.switch_closed
         self._rehome()
-        self.assertEqual(self.service._x_steps, self.moves[-1][0])
+        self.assertEqual(len(self.moves), released_after)
+
+    def test_a_switch_that_never_releases_is_reported(self) -> None:
+        self.service._limit_active = lambda gpio, pin: True
+        with self.assertRaises(RuntimeError) as caught:
+            self._rehome()
+        self.assertIn("still closed", str(caught.exception))
+
+    def test_the_tracked_position_matches_where_it_parked(self) -> None:
+        # Whatever it took to free the switch is where the carriage now is, and
+        # the step count has to say so rather than where it was aimed.
+        self._rehome()
+        self.assertEqual(self.service._x_steps, sum(a for a, _ in self.moves))
         self.assertEqual(self.service._x_cm, 0.0)
 
     def test_the_drift_is_the_difference_from_what_was_expected(self) -> None:
@@ -182,6 +213,13 @@ class RehomeParkingTests(unittest.TestCase):
             self._rehome()
 
 
+class _Pins:
+    x_min_limit_pin = 26
+    x_max_limit_pin = 20
+    y_min_limit_pin = 21
+    y_max_limit_pin = None
+
+
 class _Executed:
     simulated = False
     status = "gpio_executed"
@@ -193,6 +231,68 @@ class _Request:
     trapezoidal_speed = True
     acceleration_rpm_per_s = 300
     steps_per_rotation = 800
+
+
+class LimitEscapeTests(unittest.TestCase):
+    """A pressed limit must not trap the machine.
+
+    Refusing every move while a switch is closed rejects the one move that
+    would free it, so the operator has nothing to press and no way out. Driving
+    away from a closed switch is the recovery, so it is always allowed.
+    """
+
+    def setUp(self) -> None:
+        from app.services.raspberry_gantry import RaspberryGantryGPIOService
+
+        self.service = RaspberryGantryGPIOService()
+        self.service._x_cm = 0.0
+        self.service._y_cm = 10.0
+        self.pressed = {26}          # x_min
+        self.service._limit_active = lambda gpio, pin: pin in self.pressed
+
+    def _check(self, x_cm, y_cm):
+        self.service._assert_limits_clear(None, _Pins(), _Move(x_cm, y_cm))
+
+    def test_moving_away_from_a_pressed_switch_is_allowed(self) -> None:
+        self._check(5.0, 10.0)
+
+    def test_moving_further_into_it_is_refused(self) -> None:
+        self.service._x_cm = 5.0
+        with self.assertRaises(RuntimeError) as caught:
+            self._check(1.0, 10.0)
+        self.assertIn("x_min", str(caught.exception))
+
+    def test_the_message_says_how_to_recover(self) -> None:
+        self.service._x_cm = 5.0
+        with self.assertRaises(RuntimeError) as caught:
+            self._check(1.0, 10.0)
+        message = str(caught.exception)
+        self.assertIn("opposite direction", message)
+        self.assertIn("stuck", message, "and names the other explanation")
+
+    def test_another_axis_is_unaffected_by_a_pressed_x_switch(self) -> None:
+        self._check(0.0, 20.0)
+
+    def test_a_pressed_max_switch_blocks_only_the_increasing_direction(self) -> None:
+        self.pressed = {20}          # x_max
+        self.service._x_cm = 100.0
+        self._check(90.0, 10.0)      # away: allowed
+        with self.assertRaises(RuntimeError):
+            self._check(105.0, 10.0)
+
+    def test_with_no_target_to_reason_about_it_stays_conservative(self) -> None:
+        with self.assertRaises(RuntimeError):
+            self.service._assert_limits_clear(None, _Pins(), None)
+
+    def test_nothing_pressed_is_always_fine(self) -> None:
+        self.pressed = set()
+        self._check(0.0, 10.0)
+
+
+class _Move:
+    def __init__(self, x_cm: float, y_cm: float) -> None:
+        self.x_cm = x_cm
+        self.y_cm = y_cm
 
 
 if __name__ == "__main__":

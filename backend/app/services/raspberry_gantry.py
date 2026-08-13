@@ -54,6 +54,10 @@ GANTRY_IDLE_HOLD_SECONDS = 300.0
 # fails instead of grinding the length of the rail.
 _X_REHOME_MARGIN_CM = 5.0
 
+# How far a re-home will keep nudging before deciding the X min switch is not
+# going to release at all.
+_X_REHOME_RELEASE_CM = 1.0
+
 DEFAULT_STEPS_PER_CM = 100.0
 # STEP pulse width. Drivers only need ~1-2us; the width also floors the step
 # interval (interval >= 2x pulse), which caps the step rate at 5000/s - a
@@ -1521,16 +1525,29 @@ class RaspberryGantryGPIOService:
                     )
                 )
                 # The slow touch leaves the carriage resting on the switch,
-                # which is physical zero. Walk back off it by one buffer, the
-                # same as calibration does: a sequence must never continue with
-                # a limit pressed, and user X 0 is defined as one buffer off
-                # the min switch, not on it.
-                backoff_steps = max(1, round(self._limit_buffer_cm * steps_per_cm))
-                self._move_corexy_steps(
-                    gpio, pins, backoff_steps, backoff_steps, rpm,
-                    steps_per_rotation=steps_per_rotation,
-                    trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
-                )
+                # which is physical zero. Walk back off until the switch
+                # actually releases - a buffer's worth is the intent, but a
+                # microswitch does not open the instant you leave it, and
+                # stopping while it is still closed means the next waypoint
+                # refuses to move at all. Keep nudging, bounded, and record
+                # where it truly ended up rather than where it was aimed.
+                step = max(1, round(self._limit_buffer_cm * steps_per_cm))
+                backoff_steps = 0
+                limit = max(1, math.ceil(_X_REHOME_RELEASE_CM / max(self._limit_buffer_cm, 0.01)))
+                for _ in range(limit):
+                    self._move_corexy_steps(
+                        gpio, pins, step, step, rpm,
+                        steps_per_rotation=steps_per_rotation,
+                        trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                    )
+                    backoff_steps += step
+                    if not self._limit_active(gpio, pins.x_min_limit_pin):
+                        break
+                else:
+                    raise RuntimeError(
+                        f"The X min switch is still closed {backoff_steps / steps_per_cm:.2f} cm after "
+                        "backing off it. It may be stuck, mis-wired, or the carriage is jammed against it."
+                    )
                 self._x_steps = backoff_steps
                 self._x_cm = 0.0
                 # How far the belief was out: the probe had to travel this much
@@ -1689,6 +1706,14 @@ class RaspberryGantryGPIOService:
     def _assert_limits_clear(
         self, gpio: Any, pins: _GPIOPinPlan, request: GantryXYMoveRequest | None
     ) -> None:
+        """Refuse a move that would drive further into a switch already closed.
+
+        Deliberately not "refuse every move while any switch is closed". A
+        machine that cannot back off a tripped limit is stuck: every move is
+        rejected, including the one that would free it, and there is nothing an
+        operator can do from the UI to recover. Driving *away* from a closed
+        switch is the recovery action, so it is always allowed.
+        """
         active_limits = []
         if self._limit_active(gpio, pins.x_min_limit_pin):
             active_limits.append("x_min")
@@ -1699,14 +1724,38 @@ class RaspberryGantryGPIOService:
         if pins.y_max_limit_pin is not None and self._limit_active(gpio, pins.y_max_limit_pin):
             active_limits.append("y_max")
 
-        if active_limits:
-            raise RuntimeError(
-                "Limit switch active during gantry move; emergency stop required: "
-                + ", ".join(active_limits)
-            )
-
         if request is not None and (math.isnan(request.x_cm) or math.isnan(request.y_cm)):
             raise RuntimeError("Invalid gantry move target.")
+
+        if not active_limits:
+            return
+
+        deltas: dict[str, float | None] = {"x": None, "y": None}
+        if request is not None:
+            deltas["x"] = request.x_cm - self._x_cm
+            deltas["y"] = request.y_cm - self._y_cm
+
+        blocking = []
+        for name in active_limits:
+            axis, end = name.split("_")
+            delta = deltas[axis]
+            if delta is None:
+                # No target to reason about (a circle, a raw probe): stay
+                # conservative and refuse, as before.
+                blocking.append(name)
+            elif end == "min" and delta < 0:
+                blocking.append(name)
+            elif end == "max" and delta > 0:
+                blocking.append(name)
+
+        if blocking:
+            raise RuntimeError(
+                "This move would drive further into a limit switch that is already pressed ("
+                + ", ".join(blocking)
+                + "). Move away from that end first - a move in the opposite direction is allowed "
+                "even while the switch is closed. If nothing is touching the switch, it is stuck "
+                "or mis-wired."
+            )
 
     def _calibration_result(
         self,
