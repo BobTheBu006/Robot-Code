@@ -44,10 +44,23 @@ STATE_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
+class FactAnswer:
+    """One answer an operator can give, and the value it records."""
+
+    label: str
+    value: Any
+
+
+@dataclass(frozen=True)
 class FactDefinition:
     fact_id: str
     label: str
     question: str
+    # The answers worth offering. Defined here rather than in the UI because
+    # what "none" or "tool 3" means is machine knowledge, and an operator being
+    # asked to type a value into a free-text box while a tool may be dangling
+    # off the head is how the wrong answer gets recorded.
+    answers: tuple[FactAnswer, ...] = ()
     # Value adopted the very first time a fact is read on a machine with no
     # recorded history. Only safe values belong here: with nothing having moved
     # yet there is no interrupted change to be uncertain about, and refusing to
@@ -62,7 +75,11 @@ FACT_DEFINITIONS: dict[str, FactDefinition] = {
     "toolhead.held": FactDefinition(
         fact_id="toolhead.held",
         label="Tool held by the gantry",
-        question="Which toolhead is physically on the gantry right now? (a slot number, or none)",
+        question="Which toolhead is physically on the gantry right now?",
+        answers=(
+            FactAnswer(label="Nothing is on the head", value=None),
+            *(FactAnswer(label=f"Tool {index} is on the head", value=index) for index in range(1, 7)),
+        ),
         bootstrap_value=None,
         bootstrap_reason="No tool change has been performed since this machine's state was initialised.",
     ),
@@ -70,6 +87,10 @@ FACT_DEFINITIONS: dict[str, FactDefinition] = {
         fact_id="gantry.xy_calibrated",
         label="XY gantry calibration",
         question="Is the XY gantry still calibrated, or does it need re-homing before use?",
+        answers=(
+            FactAnswer(label="Still calibrated", value=True),
+            FactAnswer(label="Needs re-homing", value=False),
+        ),
         bootstrap_value=False,
         bootstrap_reason="The gantry has not been calibrated since this machine's state was initialised.",
     ),
@@ -77,6 +98,10 @@ FACT_DEFINITIONS: dict[str, FactDefinition] = {
         fact_id="z.position_known",
         label="Z axis position",
         question="Is the Z axis position still trustworthy, or does it need re-homing?",
+        answers=(
+            FactAnswer(label="Position is trustworthy", value=True),
+            FactAnswer(label="Needs re-homing", value=False),
+        ),
         bootstrap_value=False,
         bootstrap_reason="The Z axis has not been homed since this machine's state was initialised.",
     ),
@@ -351,6 +376,10 @@ class PhysicalStateStore:
                     reason=fact.reason or "A fault interrupted the last change to this value.",
                     suggested_question=(
                         definition.question if definition else f"What is the current value of {fact_id}?"
+                    ),
+                    answers=tuple(
+                        {"label": answer.label, "value": answer.value}
+                        for answer in (definition.answers if definition else ())
                     ),
                 )
             )

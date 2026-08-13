@@ -96,6 +96,7 @@ class UncertainFact:
     label: str
     reason: str
     suggested_question: str
+    answers: tuple = ()
 
 
 # A source returns the facts it currently cannot vouch for.
@@ -303,6 +304,7 @@ class SafetyController:
                         "label": fact.label,
                         "reason": fact.reason,
                         "question": fact.suggested_question,
+                        "answers": [dict(answer) for answer in fact.answers],
                     }
                     for fact in outstanding
                 ],
@@ -347,6 +349,7 @@ class SafetyController:
                     "label": fact.label,
                     "reason": fact.reason,
                     "question": fact.suggested_question,
+                        "answers": [dict(answer) for answer in fact.answers],
                 }
                 for fact in outstanding
             ],

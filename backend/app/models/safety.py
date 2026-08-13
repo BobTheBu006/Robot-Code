@@ -3,11 +3,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class UncertainFactAnswerModel(BaseModel):
+    label: str
+    value: Any = None
+
+
 class UncertainFactModel(BaseModel):
     fact_id: str
     label: str
     reason: str
     question: str
+    # What an operator may answer. The machine defines these, so the UI can ask
+    # a closed question instead of asking someone to type a value.
+    answers: list[UncertainFactAnswerModel] = Field(default_factory=list)
 
 
 class ActorStopReportModel(BaseModel):

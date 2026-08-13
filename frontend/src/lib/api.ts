@@ -431,3 +431,42 @@ export function endEngineRun(runId: string, reason: string): Promise<EngineRunSt
     body: JSON.stringify({ reason }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Physical state the machine cannot know by itself
+//
+// When a tool change is interrupted, the machine deliberately does not guess
+// whether the head came back empty - guessing wrong drives a loaded head into
+// the rack. It marks the fact uncertain and refuses to move until someone
+// looks at it and says. These are the two calls that let the UI ask.
+
+export interface UncertainFactAnswer {
+  label: string;
+  value: unknown;
+}
+
+export interface UncertainFact {
+  fact_id: string;
+  label: string;
+  reason: string;
+  question: string;
+  answers: UncertainFactAnswer[];
+}
+
+export interface SafetySnapshot {
+  state: string;
+  motion_blocked: boolean;
+  run_allowed: boolean;
+  requires_confirmation: UncertainFact[];
+}
+
+export function fetchSafetySnapshot(): Promise<SafetySnapshot> {
+  return request<SafetySnapshot>("/api/safety");
+}
+
+export function confirmPhysicalState(factId: string, value: unknown): Promise<SafetySnapshot> {
+  return request<SafetySnapshot>("/api/safety/confirm-physical-state", {
+    method: "POST",
+    body: JSON.stringify({ fact_id: factId, value, operator: "operator" }),
+  });
+}

@@ -38,11 +38,13 @@ import {
   saveEsp32CustomBlock,
   saveWorkflowToFile,
   testFunction,
+  fetchSafetySnapshot,
+  confirmPhysicalState,
   startEngineRun,
   submitEngineNodeResult,
   endEngineRun,
 } from "../../lib/api";
-import type { AccessDoorState, EngineDueNode, EngineRunStep } from "../../lib/api";
+import type { AccessDoorState, EngineDueNode, EngineRunStep, UncertainFact } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   WORKFLOW_BLOCK_MIME,
@@ -1046,6 +1048,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // Things the engine noticed about the graph that do not stop the run - most
   // often a block nothing reaches, which otherwise just silently never runs.
   const [workflowNotice, setWorkflowNotice] = useState<string | null>(null);
+  // Something only a person can answer - "is a tool on the head?" - raised when
+  // an interrupted change left the machine unable to know. Asked as a question
+  // rather than reported as an error, because an error tells an operator they
+  // are stuck while a question tells them how to get moving.
+  const [pendingConfirmations, setPendingConfirmations] = useState<UncertainFact[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [openedNodeId, setOpenedNodeId] = useState<string | null>(null);
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
@@ -2791,6 +2798,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       await runNodeTestRecursively(nodeId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Block test failed.";
+      // The machine may simply be waiting to be told something it cannot see.
+      void offerPhysicalStateConfirmation();
       updateTestState((currentState) => ({
         ...currentState,
         [nodeId]: {
@@ -3267,6 +3276,37 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // and report, and it works out what that made ready. Per-node failure policy
   // lives there too - a block set to "stop whole flow" ends the run, one set to
   // "separate path" continues down its error edge.
+  // A refusal that names uncertain physical state is not really an error: the
+  // machine is waiting to be told something it cannot see. Turn it into the
+  // question it actually is.
+  async function offerPhysicalStateConfirmation(): Promise<boolean> {
+    try {
+      const snapshot = await fetchSafetySnapshot();
+      if (snapshot.requires_confirmation.length === 0) {
+        return false;
+      }
+      setPendingConfirmations(snapshot.requires_confirmation);
+      return true;
+    } catch {
+      // If safety cannot be reached, leave the original error showing - it is
+      // more useful than a dialog we cannot populate.
+      return false;
+    }
+  }
+
+  async function answerPhysicalState(factId: string, value: unknown) {
+    try {
+      const snapshot = await confirmPhysicalState(factId, value);
+      setPendingConfirmations(snapshot.requires_confirmation);
+      if (snapshot.requires_confirmation.length === 0) {
+        setFunctionsError(null);
+      }
+    } catch (error) {
+      setFunctionsError(error instanceof Error ? error.message : "Could not record that.");
+      setPendingConfirmations([]);
+    }
+  }
+
   async function runWorkflowThroughEngine(resultsByNodeId: Map<string, FunctionTestResponse>) {
     // RESUME after an E-Stop replays the workflow with the results it already
     // has, and those blocks must not run a second time - re-running a move or
@@ -3382,6 +3422,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         setFunctionsError("Workflow stopped by E-Stop.");
       } else {
         setFunctionsError(error instanceof Error ? error.message : "Workflow run failed.");
+        void offerPhysicalStateConfirmation();
       }
     } finally {
       // An E-Stop or a failed block leaves the engine run open; close it so the
@@ -3546,6 +3587,46 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
             >
               ×
             </button>
+          </div>
+        ) : null}
+
+        {pendingConfirmations.length > 0 ? (
+          <div className="workflow-confirm__backdrop" role="presentation">
+            <div className="workflow-confirm" role="alertdialog" aria-modal="true"
+                 aria-labelledby="workflow-confirm-title">
+              <h2 className="workflow-confirm__title" id="workflow-confirm-title">
+                Confirm what is on the machine
+              </h2>
+              <p className="workflow-confirm__lead">
+                A change was interrupted, so the machine cannot be sure of its own state. It will not
+                move until someone looks and says.
+              </p>
+              {pendingConfirmations.map((fact) => (
+                <div className="workflow-confirm__fact" key={fact.fact_id}>
+                  <p className="workflow-confirm__question">{fact.question}</p>
+                  <p className="workflow-confirm__reason">{fact.reason}</p>
+                  <div className="workflow-confirm__answers">
+                    {fact.answers.map((answer) => (
+                      <button
+                        className="workflow-confirm__answer"
+                        key={answer.label}
+                        onClick={() => void answerPhysicalState(fact.fact_id, answer.value)}
+                        type="button"
+                      >
+                        {answer.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button
+                className="workflow-confirm__dismiss"
+                onClick={() => setPendingConfirmations([])}
+                type="button"
+              >
+                Not now
+              </button>
+            </div>
           </div>
         ) : null}
 
