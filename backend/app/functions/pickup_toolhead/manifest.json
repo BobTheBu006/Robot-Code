@@ -342,6 +342,19 @@
       "min": 0.0,
       "max": null,
       "options": []
+    },
+    {
+      "key": "verify_x_home",
+      "label": "Re-check X Home",
+      "type": "boolean",
+      "description": "Re-touch the X min switch at the clearance position before engaging the tool, and correct the tracked X position from it. Costs a short probe; recovers any steps X has lost since the last home. Y is not touched.",
+      "required": false,
+      "default": true,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
     }
   ],
   "outputs": [

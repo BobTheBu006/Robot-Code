@@ -44,8 +44,18 @@ class ToolheadPickupRequest(ToolheadRackGeometry):
     tool_port: str | None = None
     toolhead_index: int = Field(default=1, ge=1, le=TOOLHEAD_COUNT)
     approach_speed_rpm: int = Field(default=400, gt=0)
+    # On by default: the sequence already drives X to the rack, so the probe
+    # is nearly free, and a tool change is where lost steps actually cost
+    # something - the head misses its hooks.
+    verify_x_home: bool = True
+
 
 
 class ToolheadDropRequest(ToolheadRackGeometry):
     tool_port: str | None = None
     approach_speed_rpm: int = Field(default=400, gt=0)
+    # On by default: the sequence already drives X to the rack, so the probe
+    # is nearly free, and a tool change is where lost steps actually cost
+    # something - the head misses its hooks.
+    verify_x_home: bool = True
+

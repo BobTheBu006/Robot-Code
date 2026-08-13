@@ -68,6 +68,7 @@ def execute(context: dict, inputs: dict) -> dict:
             release_cm=request.release_cm,
             clearance_cm=request.clearance_cm,
             context=context,
+            verify_x_home=request.verify_x_home,
         )
         auto_dropped_index = held_index
 
@@ -79,6 +80,7 @@ def execute(context: dict, inputs: dict) -> dict:
         lift_cm=request.lift_cm,
         clearance_cm=request.clearance_cm,
         context=context,
+        verify_x_home=request.verify_x_home,
     )
 
     # Persist only after the sequence succeeds, so a position that the guard

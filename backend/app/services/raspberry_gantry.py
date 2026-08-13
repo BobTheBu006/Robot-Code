@@ -49,6 +49,11 @@ XY_DEVICE_IDS = REQUIRED_XY_DEVICE_IDS | OPTIONAL_XY_DEVICE_IDS
 # position matters more here than saving the current: belts back-drive.
 GANTRY_IDLE_HOLD_SECONDS = 300.0
 
+# How far past the believed X position a re-home will hunt for the switch.
+# Generous next to real step loss, tight enough that a genuinely lost carriage
+# fails instead of grinding the length of the rail.
+_X_REHOME_MARGIN_CM = 5.0
+
 DEFAULT_STEPS_PER_CM = 100.0
 # STEP pulse width. Drivers only need ~1-2us; the width also floors the step
 # interval (interval >= 2x pulse), which caps the step rate at 5000/s - a
@@ -1442,6 +1447,89 @@ class RaspberryGantryGPIOService:
             raise
 
         return stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin)
+
+    def rehome_x(self, context: dict, request: Any) -> dict:
+        """Re-touch the X min switch and correct the tracked X position.
+
+        For machines that lose the odd step. X = 0 is defined by the X min slow
+        touch during calibration, so touching it again re-establishes exactly
+        that reference without re-measuring the track or disturbing Y - which
+        matters, because a full calibration would throw away a good Y home and
+        cost a workspace traverse.
+
+        CoreXY moves both motors for an X move, but with A and B stepping
+        together the net Y displacement is zero, so Y is left where it was.
+
+        Returns how far the position was out, which is the number worth
+        watching: it is the accumulated step loss since the last home.
+        """
+        self._raise_if_stopped()
+        pins = self._pins_from_request(request, context)
+        execution = self._execution_mode()
+        steps_per_cm = self._effective_steps_per_cm()
+
+        if execution.simulated:
+            return {
+                "status": execution.status,
+                "message": "X re-home simulated; no GPIO backend available.",
+                "drift_steps": 0,
+                "drift_cm": 0.0,
+                "simulated": True,
+            }
+
+        if not self._calibrated:
+            raise RuntimeError(
+                "The gantry has not been calibrated, so there is no X reference to re-check. "
+                "Run Calibrate Gantry XY first."
+            )
+
+        gpio, _ = self._gpio_module()
+        if gpio is None:
+            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during X re-home.")
+
+        steps_per_rotation = int(getattr(request, "steps_per_rotation", 0)) or self._steps_per_rotation
+        rpm = float(getattr(request, "speed_rpm", 0) or 0) or 60.0
+        trapezoidal = bool(getattr(request, "trapezoidal_speed", True))
+        acceleration = float(getattr(request, "acceleration_rpm_per_s", 0) or 0) or 300.0
+
+        with self._lock:
+            self._setup_gpio(gpio, pins)
+            try:
+                expected_steps = self._x_steps
+                # Budget the probe on where X is believed to be plus a generous
+                # margin for accumulated loss. Bounded rather than the whole
+                # track: if the switch is not found within a few cm of where it
+                # should be, something is wrong and failing says so.
+                max_probe_steps = max(
+                    2 * steps_per_rotation,
+                    expected_steps + round(_X_REHOME_MARGIN_CM * steps_per_cm),
+                )
+                travelled = abs(
+                    self._probe_axis(
+                        gpio, pins, "x", -1, max_probe_steps, steps_per_rotation, rpm,
+                        trapezoidal, acceleration,
+                    )
+                )
+                # The slow touch defines X = 0, exactly as calibration does.
+                self._x_steps = 0
+                self._x_cm = 0.0
+                drift_steps = travelled - expected_steps
+                self._save_state()
+            finally:
+                self._cleanup_gpio(gpio, pins)
+
+        return {
+            "status": execution.status,
+            "message": (
+                f"X re-homed. Position was out by {drift_steps} steps "
+                f"({drift_steps / steps_per_cm:+.3f} cm)."
+            ),
+            "expected_steps": expected_steps,
+            "travelled_steps": travelled,
+            "drift_steps": drift_steps,
+            "drift_cm": round(drift_steps / steps_per_cm, 4),
+            "simulated": False,
+        }
 
     def _probe_axis(
         self,
