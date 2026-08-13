@@ -14,7 +14,7 @@ Each mechanical assembly uses the same export structure:
 
 ```text
 assembly-name/
-|-- source/  # Editable native CAD, such as F3D
+|-- source/  # Editable native CAD, such as F3D or F3Z
 |-- step/    # Neutral CAD exchange files
 `-- stl/     # Current print-ready parts
 ```
