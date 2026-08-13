@@ -1144,7 +1144,7 @@ class RaspberryGantryGPIOService:
             # Claim it in whichever state means "disabled" for these drivers, so
             # nothing is energised until a move actually asks for it.
             disabled_level = (
-                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True) else gpio.LOW
+                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", False) else gpio.LOW
             )
             gpio.setup(pins.enable_pin, gpio.OUT, initial=disabled_level)
             self._register_power_domain(gpio, pins.enable_pin)
@@ -1165,22 +1165,21 @@ class RaspberryGantryGPIOService:
         Registered here rather than at import because the pin comes from the
         Hardware Map and is only known once a move resolves its inputs.
 
-        These are TB6600s, whose opto-isolated ENABLE input *disables* the
-        driver when energised - a disconnected ENABLE is what makes one run. So
-        the line is pulled LOW to enable, the opposite of the TB67S109s on the
-        Z/pump board. Getting this backwards does not fail loudly: the gantry
-        simply refuses to move while the software reports it enabled.
+        Driven HIGH to enable, measured on this machine: with ENA+ on this pin
+        and ENA- at GND, energising the opto is what makes these drivers hold.
+        The datasheet convention for a TB6600 is the opposite - ENABLE
+        disables, and a disconnected ENABLE runs - but these particular boards
+        do not behave that way, and the machine is the authority. Flipping
+        polarity does not fail loudly: the gantry goes slack exactly while it
+        is meant to be moving, and holds while idle.
 
         Wiring: ENA- to GND with PUL-/DIR-, ENA+ to this pin on both drivers.
-        Note that ENA is an opto LED, not a logic input, so it needs current
-        rather than a voltage level - a weak (10k) pull-up does nothing here,
-        unlike on the Z board's MS1 line. The drivers therefore come up ENABLED
-        at boot, since the pin idles low. Sizing a pull-up to actually hold them
-        off would take roughly 330R to 3V3, which is only worth fitting if idle
-        heat during boot matters; the gantry is horizontal, so nothing moves
-        either way.
+        ENA is an opto LED, not a logic input, so it wants current rather than
+        a voltage level - a weak (10k) pull-up does nothing here, unlike on the
+        Z board's MS1 line. The pin idles low at boot, which on these boards
+        means the drivers come up DISABLED, which is the safe direction.
         """
-        active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True)
+        active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", False)
 
         def apply(on: bool) -> None:
             energised = (not on) if active_low else on

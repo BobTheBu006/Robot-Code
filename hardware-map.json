@@ -55,7 +55,7 @@
           "signal": "enable",
           "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: a TB6600 is disabled when its opto is energised. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active HIGH on these boards, measured: HIGH energises, LOW releases. That is the opposite of the usual TB6600 datasheet convention, so do not 'correct' it. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
         },
         {
           "id": "x-ms1",
@@ -111,7 +111,7 @@
           "signal": "enable",
           "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: a TB6600 is disabled when its opto is energised. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active HIGH on these boards, measured: HIGH energises, LOW releases. That is the opposite of the usual TB6600 datasheet convention, so do not 'correct' it. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
         },
         {
           "id": "y-ms1",
@@ -835,6 +835,13 @@
           "notes": null
         },
         {
+          "id": "peristaltic-pump-1-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        },
+        {
           "id": "peristaltic-pump-1-ms1",
           "signal": "micro_step_1",
           "gpio": "4",
@@ -854,13 +861,6 @@
           "gpio": "-",
           "function_input_key": null,
           "notes": "Tie to GND."
-        },
-        {
-          "id": "peristaltic-pump-1-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": "Hard-wired to GND on the carrier PCB."
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
@@ -891,6 +891,13 @@
           "notes": null
         },
         {
+          "id": "peristaltic-pump-2-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        },
+        {
           "id": "peristaltic-pump-2-ms1",
           "signal": "micro_step_1",
           "gpio": "4",
@@ -910,13 +917,6 @@
           "gpio": "-",
           "function_input_key": null,
           "notes": "Tie to GND."
-        },
-        {
-          "id": "peristaltic-pump-2-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": "Hard-wired to GND on the carrier PCB."
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
@@ -947,6 +947,13 @@
           "notes": null
         },
         {
+          "id": "peristaltic-pump-3-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        },
+        {
           "id": "peristaltic-pump-3-ms1",
           "signal": "micro_step_1",
           "gpio": "4",
@@ -966,13 +973,6 @@
           "gpio": "-",
           "function_input_key": null,
           "notes": "Tie to GND."
-        },
-        {
-          "id": "peristaltic-pump-3-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": "Hard-wired to GND on the carrier PCB."
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
@@ -1003,6 +1003,13 @@
           "notes": null
         },
         {
+          "id": "peristaltic-pump-4-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        },
+        {
           "id": "peristaltic-pump-4-ms1",
           "signal": "micro_step_1",
           "gpio": "4",
@@ -1022,13 +1029,6 @@
           "gpio": "-",
           "function_input_key": null,
           "notes": "Tie to GND."
-        },
-        {
-          "id": "peristaltic-pump-4-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": "Hard-wired to GND on the carrier PCB."
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
@@ -1059,6 +1059,13 @@
           "notes": null
         },
         {
+          "id": "peristaltic-pump-5-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": "Hard-wired to GND on the carrier PCB."
+        },
+        {
           "id": "peristaltic-pump-5-ms1",
           "signal": "micro_step_1",
           "gpio": "4",
@@ -1078,13 +1085,6 @@
           "gpio": "-",
           "function_input_key": null,
           "notes": "Tie to GND."
-        },
-        {
-          "id": "peristaltic-pump-5-enable",
-          "signal": "enable",
-          "gpio": "-",
-          "function_input_key": null,
-          "notes": "Hard-wired to GND on the carrier PCB."
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
@@ -1371,109 +1371,134 @@
     },
     {
       "node_id": "y-max-limit-switch",
-      "x": 1013.84,
-      "y": -558.34
+      "x": 521.84,
+      "y": -686.34
     },
     {
       "node_id": "x-axis-motor",
-      "x": 1013.84,
-      "y": -558.34
+      "x": 521.84,
+      "y": -686.34
     },
     {
       "node_id": "y-axis-motor",
-      "x": 1013.84,
-      "y": -448.34
+      "x": 521.84,
+      "y": -576.34
     },
     {
       "node_id": "x-min-limit-switch",
-      "x": 1013.84,
-      "y": -338.34
+      "x": 521.84,
+      "y": -466.34
     },
     {
       "node_id": "x-max-limit-switch",
-      "x": 1013.84,
-      "y": -228.34
+      "x": 521.84,
+      "y": -356.34
     },
     {
       "node_id": "y-min-limit-switch",
-      "x": 1013.84,
-      "y": -118.34
+      "x": 521.84,
+      "y": -246.34
     },
     {
       "node_id": "z-left-min-limit-switch",
-      "x": 1596.0,
-      "y": -332.0
+      "x": 1112.0,
+      "y": -390.0
     },
     {
       "node_id": "z-left-max-limit-switch",
-      "x": 1596.0,
-      "y": -222.0
+      "x": 1112.0,
+      "y": -280.0
     },
     {
       "node_id": "z-right-min-limit-switch",
-      "x": 1596.0,
-      "y": -112.0
+      "x": 1112.0,
+      "y": -170.0
     },
     {
       "node_id": "z-right-max-limit-switch",
-      "x": 1594.9,
-      "y": -5.4
+      "x": 1110.9,
+      "y": -63.4
     },
     {
-      "node_id": "ttyUSB1",
-      "x": 27.41,
-      "y": 1192.7
+      "node_id": "controller-x83xnc",
+      "x": 986.0,
+      "y": 936.0
     },
     {
       "node_id": "syringe-head-a",
-      "x": 727.41,
-      "y": 1008.7
+      "x": 1345.41,
+      "y": 960.7
     },
     {
       "node_id": "syringe-head-b",
-      "x": 727.41,
-      "y": 1118.7
+      "x": 1345.41,
+      "y": 1070.7
     },
     {
       "node_id": "syringe-head-c",
-      "x": 727.41,
-      "y": 1228.7
+      "x": 1345.41,
+      "y": 1180.7
     },
     {
       "node_id": "syringe-head-d",
-      "x": 727.41,
-      "y": 1338.7
+      "x": 1345.41,
+      "y": 1290.7
     },
     {
       "node_id": "syringe-head-e",
-      "x": 727.41,
-      "y": 1448.7
+      "x": 1345.41,
+      "y": 1400.7
     },
     {
       "node_id": "syringe-head-f",
-      "x": 727.41,
-      "y": 1558.7
+      "x": 1345.41,
+      "y": 1510.7
     },
     {
       "node_id": "syringe-head-g",
-      "x": 727.41,
-      "y": 1668.7
+      "x": 1345.41,
+      "y": 1620.7
     },
     {
-      "node_id": "ttyUSB0",
-      "x": 722.0,
-      "y": 432.0
+      "node_id": "controller-ykkl80",
+      "x": 950.0,
+      "y": 368.0
     },
     {
       "node_id": "z-left-motor",
-      "x": 1260.0,
-      "y": 515.0
+      "x": 1352.0,
+      "y": -103.0
     },
     {
       "node_id": "z-right-motor",
-      "x": 1230.0,
-      "y": 727.0
+      "x": 1356.0,
+      "y": -17.0
+    },
+    {
+      "node_id": "peristaltic-pump-1",
+      "x": 1372.0,
+      "y": 188.0
+    },
+    {
+      "node_id": "peristaltic-pump-2",
+      "x": 1372.0,
+      "y": 298.0
+    },
+    {
+      "node_id": "peristaltic-pump-3",
+      "x": 1372.0,
+      "y": 408.0
+    },
+    {
+      "node_id": "peristaltic-pump-4",
+      "x": 1372.0,
+      "y": 518.0
+    },
+    {
+      "node_id": "peristaltic-pump-5",
+      "x": 1372.0,
+      "y": 628.0
     }
   ],
-  "updated_at": "2026-08-10T09:53:29.562658Z"
+  "updated_at": "2026-08-13T16:25:53.607091Z"
 }
