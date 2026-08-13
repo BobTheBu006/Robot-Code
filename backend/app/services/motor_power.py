@@ -21,6 +21,12 @@ holds it forever. A timer is right in both cases without needing to predict.
 Domains, not individual motors: one GPIO enables every driver wired to it. On
 this machine that is all seven drivers on the Z/pump ESP32 sharing one line, and
 the two CoreXY drivers sharing another.
+
+Polarity is per domain, because the two boards genuinely disagree. The TB67S109
+drivers wake when their MS1 line goes high, while a TB6600's opto-isolated
+ENABLE input *disables* the driver when energised - leaving it disconnected is
+what makes a TB6600 run. Callers say "on" or "off" and the domain knows which
+voltage that means.
 """
 
 from __future__ import annotations
@@ -48,6 +54,8 @@ class PowerDomain:
     apply: Callable[[bool], None]
     settle_seconds: float = DEFAULT_SETTLE_SECONDS
     linger_seconds: float = DEFAULT_LINGER_SECONDS
+    # True when the driver is enabled by pulling its line LOW, as a TB6600 is.
+    active_low: bool = False
 
     powered: bool = False
     holders: int = 0
@@ -62,6 +70,7 @@ class PowerDomain:
             "powered": self.powered,
             "holders": self.holders,
             "lingering": self.powered and self.holders == 0,
+            "active_low": self.active_low,
             "last_error": self.last_error,
         }
 
@@ -81,6 +90,7 @@ class MotorPowerService:
         *,
         settle_seconds: float = DEFAULT_SETTLE_SECONDS,
         linger_seconds: float = DEFAULT_LINGER_SECONDS,
+        active_low: bool = False,
     ) -> PowerDomain:
         """Declare an enable line and how to drive it.
 
@@ -95,6 +105,7 @@ class MotorPowerService:
                 existing.description = description
                 existing.settle_seconds = settle_seconds
                 existing.linger_seconds = linger_seconds
+                existing.active_low = active_low
                 return existing
 
             domain = PowerDomain(
@@ -103,6 +114,7 @@ class MotorPowerService:
                 apply=apply,
                 settle_seconds=settle_seconds,
                 linger_seconds=linger_seconds,
+                active_low=active_low,
             )
             self._domains[domain_id] = domain
             return domain

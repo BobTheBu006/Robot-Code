@@ -191,6 +191,39 @@ class ReportingTests(unittest.TestCase):
         self.assertTrue(lingering["powered"])
         self.assertTrue(lingering["lingering"])
 
+class PolarityTests(unittest.TestCase):
+    """A TB6600 is disabled by energising its ENABLE opto, a TB67S109 enabled.
+
+    Getting this backwards does not fail loudly - the machine reports the
+    motors as powered and simply refuses to move - so it is pinned here.
+    """
+
+    def test_an_active_high_domain_drives_high_to_enable(self) -> None:
+        line = _Line()
+        service = MotorPowerService()
+        service.register("d", "TB67S109", line, settle_seconds=0.0, linger_seconds=60.0)
+        service.acquire("d")
+        self.assertEqual(line.state, True)
+        service.power_down_now()
+        self.assertEqual(line.state, False)
+
+    def test_an_active_low_domain_is_recorded_as_such(self) -> None:
+        line = _Line()
+        service = MotorPowerService()
+        service.register("d", "TB6600", line, settle_seconds=0.0, linger_seconds=60.0, active_low=True)
+        service.acquire("d")
+
+        domain = service.snapshot()["domains"][0]
+        self.assertTrue(domain["active_low"])
+        self.assertTrue(domain["powered"], "powered means enabled, whatever voltage that takes")
+
+    def test_re_registering_updates_the_polarity(self) -> None:
+        # A driver swapped for a different type must not keep the old polarity.
+        line = _Line()
+        service = MotorPowerService()
+        service.register("d", "first", line, settle_seconds=0.0)
+        service.register("d", "second", line, settle_seconds=0.0, active_low=True)
+        self.assertTrue(service.snapshot()["domains"][0]["active_low"])
 
 if __name__ == "__main__":
     unittest.main()

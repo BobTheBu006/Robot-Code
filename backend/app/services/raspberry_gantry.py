@@ -1141,8 +1141,12 @@ class RaspberryGantryGPIOService:
             gpio.setup(pin, gpio.OUT, initial=gpio.LOW)
 
         if pins.enable_pin is not None:
-            # Claimed LOW: the drivers stay disabled until a move asks for them.
-            gpio.setup(pins.enable_pin, gpio.OUT, initial=gpio.LOW)
+            # Claim it in whichever state means "disabled" for these drivers, so
+            # nothing is energised until a move actually asks for it.
+            disabled_level = (
+                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True) else gpio.LOW
+            )
+            gpio.setup(pins.enable_pin, gpio.OUT, initial=disabled_level)
             self._register_power_domain(gpio, pins.enable_pin)
             # Setup and cleanup bracket every GPIO operation this service does,
             # in matching try/finally pairs, so holding power across that span
@@ -1160,14 +1164,25 @@ class RaspberryGantryGPIOService:
 
         Registered here rather than at import because the pin comes from the
         Hardware Map and is only known once a move resolves its inputs.
+
+        These are TB6600s, whose opto-isolated ENABLE input *disables* the
+        driver when energised - a disconnected ENABLE is what makes one run. So
+        the line is pulled LOW to enable, the opposite of the TB67S109s on the
+        Z/pump board. Getting this backwards does not fail loudly: the gantry
+        simply refuses to move while the software reports it enabled.
         """
+        active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True)
+
         def apply(on: bool) -> None:
-            gpio.output(enable_pin, gpio.HIGH if on else gpio.LOW)
+            energised = (not on) if active_low else on
+            gpio.output(enable_pin, gpio.HIGH if energised else gpio.LOW)
 
         motor_power_service.register(
             GANTRY_XY_DOMAIN,
-            f"CoreXY A and B drivers (Pi GPIO {enable_pin})",
+            f"CoreXY A and B drivers (Pi GPIO {enable_pin}, "
+            f"{'active low' if active_low else 'active high'})",
             apply,
+            active_low=active_low,
         )
 
     def _cleanup_gpio(self, gpio: Any, pins: _GPIOPinPlan) -> None:
