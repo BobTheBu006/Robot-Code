@@ -53,9 +53,9 @@
         {
           "id": "x-axis-motor-enable",
           "signal": "enable",
-          "gpio": "25",
+          "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared enable for CoreXY A and B drivers. Pi GPIO defaults pull-down at boot, so motors stay off until software asserts it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: a TB6600 is disabled when its opto is energised. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
         },
         {
           "id": "x-ms1",
@@ -109,9 +109,9 @@
         {
           "id": "y-axis-motor-enable",
           "signal": "enable",
-          "gpio": "25",
+          "gpio": "10",
           "function_input_key": "gantry_enable_pin",
-          "notes": "Shared enable for CoreXY A and B drivers. Pi GPIO defaults pull-down at boot, so motors stay off until software asserts it."
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers. ENA- to GND with PUL-/DIR-, ENA+ here. Active LOW: a TB6600 is disabled when its opto is energised. Note GPIO 10 is SPI0 MOSI - enabling SPI would claim it."
         },
         {
           "id": "y-ms1",
