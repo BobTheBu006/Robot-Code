@@ -64,7 +64,9 @@ class EnableTests(unittest.TestCase):
         started = time.monotonic()
         service.acquire("d")
         self.assertLess(time.monotonic() - started, 0.05)
-        self.assertEqual(line.calls, [True], "power was never cycled")
+        # The line may be re-asserted (that is deliberate - see acquire), but it
+        # must never be switched off in between.
+        self.assertNotIn(False, line.calls, "power was never cut")
 
     def test_an_unknown_domain_is_ignored_rather_than_raising(self) -> None:
         # A machine without an enable line wired must still run.
@@ -87,13 +89,16 @@ class LingerTests(unittest.TestCase):
         self.assertEqual(line.state, True, "releasing must not cut power straight away")
 
     def test_consecutive_blocks_do_not_power_cycle_the_motors(self) -> None:
-        # The whole point: five moves in a row, one power-up.
+        # The whole point: five moves in a row without the drivers ever
+        # dropping out. The enable is re-asserted each time rather than trusted,
+        # so what matters is that nothing ever switched it off.
         line = _Line()
         service = _service(line, linger=5.0)
         for _ in range(5):
             service.acquire("d")
             service.release("d")
-        self.assertEqual(line.calls, [True])
+        self.assertNotIn(False, line.calls)
+        self.assertTrue(line.state)
 
     def test_power_drops_once_nothing_has_wanted_the_motors(self) -> None:
         line = _Line()
@@ -116,7 +121,8 @@ class LingerTests(unittest.TestCase):
         service.acquire("d")   # a block arrived before the timer fired
         time.sleep(0.3)        # past when it would have fired
 
-        self.assertEqual(line.calls, [True], "power must not drop while held")
+        self.assertNotIn(False, line.calls, "power must not drop while held")
+        self.assertTrue(line.state)
 
     def test_an_overlapping_hold_keeps_power_until_the_last_release(self) -> None:
         line = _Line()
@@ -224,6 +230,47 @@ class PolarityTests(unittest.TestCase):
         service.register("d", "first", line, settle_seconds=0.0)
         service.register("d", "second", line, settle_seconds=0.0, active_low=True)
         self.assertTrue(service.snapshot()["domains"][0]["active_low"])
+
+class ReassertTests(unittest.TestCase):
+    """The enable line is asserted on every acquire, not just the first.
+
+    Twice now a move has run with the drivers off while the service reported
+    them on: the GPIO was re-claimed at its disabled level by the driver's own
+    setup, and acquire trusted `powered` and skipped the write. The line is a
+    physical thing other code touches, so it gets written every time.
+    """
+
+    def test_the_line_is_written_again_on_a_second_acquire(self) -> None:
+        line = _Line()
+        service = _service(line, linger=60.0)
+        service.acquire("d")
+        service.release("d")
+        service.acquire("d")
+        self.assertEqual(line.calls.count(True), 2, "asserted again rather than assumed")
+
+    def test_a_line_disturbed_between_moves_is_put_back(self) -> None:
+        # Stand-in for the real failure: something else drove the pin to its
+        # disabled level while the domain still thought it was powered.
+        line = _Line()
+        service = _service(line, linger=60.0)
+        service.acquire("d")
+        service.release("d")
+        line.calls.append(False)      # a driver re-claimed the pin, disabled
+        service.acquire("d")
+        self.assertTrue(line.state, "the next move re-enabled it")
+
+    def test_is_powered_reports_the_hold(self) -> None:
+        line = _Line()
+        service = _service(line, linger=60.0)
+        self.assertFalse(service.is_powered("d"))
+        service.acquire("d")
+        self.assertTrue(service.is_powered("d"))
+        service.power_down_now()
+        self.assertFalse(service.is_powered("d"))
+
+    def test_is_powered_is_false_for_an_unknown_domain(self) -> None:
+        self.assertFalse(MotorPowerService().is_powered("nope"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1159,11 +1159,16 @@ class RaspberryGantryGPIOService:
         if pins.enable_pin is not None:
             # Claim it in whichever state means "disabled" for these drivers, so
             # nothing is energised until a move actually asks for it.
-            disabled_level = (
-                gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True) else gpio.LOW
-            )
-            gpio.setup(pins.enable_pin, gpio.OUT, initial=disabled_level)
             self._register_power_domain(gpio, pins.enable_pin)
+            # Claim it disabled only when it is not already held. Setup runs at
+            # the start of every move, and re-initialising a line that is
+            # mid-hold drops the drivers just as the next move begins - the
+            # second and later moves of a sequence then run unpowered.
+            if not motor_power_service.is_powered(GANTRY_XY_DOMAIN):
+                disabled_level = (
+                    gpio.HIGH if _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True) else gpio.LOW
+                )
+                gpio.setup(pins.enable_pin, gpio.OUT, initial=disabled_level)
             # Setup and cleanup bracket every GPIO operation this service does,
             # in matching try/finally pairs, so holding power across that span
             # covers each move without threading it through five call sites.

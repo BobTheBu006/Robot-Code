@@ -123,6 +123,16 @@ class MotorPowerService:
         with self._lock:
             return domain_id in self._domains
 
+    def is_powered(self, domain_id: str) -> bool:
+        """Whether this domain currently believes its drivers are energised.
+
+        Used by drivers that claim the enable GPIO themselves, so they can
+        avoid re-initialising a line that is mid-hold.
+        """
+        with self._lock:
+            domain = self._domains.get(domain_id)
+            return bool(domain and domain.powered)
+
     # ---- the pair callers use ----
 
     def acquire(self, domain_id: str, *, settle: bool = True) -> None:
@@ -139,20 +149,27 @@ class MotorPowerService:
             self._cancel_timer(domain)
             domain.holders += 1
             domain.release_at = None
+            was_powered = domain.powered
 
-            if domain.powered:
-                return
-
+            # Assert every time, even when this domain is already held. The
+            # line is a physical thing others touch: a driver re-claiming its
+            # GPIO, a controller reset, a stray write. Trusting `powered` and
+            # skipping the write is how a move ends up running with the drivers
+            # off while this reports them on. Re-asserting a line that is
+            # already correct costs one write and cannot hurt.
             try:
                 domain.apply(True)
                 domain.powered = True
                 domain.last_error = None
             except Exception as exc:  # a driver that cannot be enabled must be loud
                 domain.holders -= 1
+                domain.powered = False
                 domain.last_error = f"{type(exc).__name__}: {exc}"
                 raise
 
-            wait = domain.settle_seconds
+            # Only wait when the drivers were actually off. Back-to-back blocks
+            # find them live and start immediately.
+            wait = 0.0 if was_powered else domain.settle_seconds
 
         # Deliberately outside the lock: a one second sleep holding the lock
         # would serialise every other domain behind this one.
