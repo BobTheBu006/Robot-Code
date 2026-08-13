@@ -648,7 +648,7 @@
         {
           "id": "z-left-motor-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
           "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
@@ -704,7 +704,7 @@
         {
           "id": "z-right-motor-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
           "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
@@ -837,9 +837,9 @@
         {
           "id": "peristaltic-pump-1-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
-          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "peristaltic-pump-1-ms2",
@@ -893,9 +893,9 @@
         {
           "id": "peristaltic-pump-2-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
-          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "peristaltic-pump-2-ms2",
@@ -949,9 +949,9 @@
         {
           "id": "peristaltic-pump-3-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
-          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "peristaltic-pump-3-ms2",
@@ -1005,9 +1005,9 @@
         {
           "id": "peristaltic-pump-4-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
-          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "peristaltic-pump-4-ms2",
@@ -1047,7 +1047,7 @@
         {
           "id": "peristaltic-pump-5-dir",
           "signal": "direction",
-          "gpio": "4",
+          "gpio": "17",
           "function_input_key": "pump_5_dir_pin",
           "notes": null
         },
@@ -1061,9 +1061,9 @@
         {
           "id": "peristaltic-pump-5-ms1",
           "signal": "micro_step_1",
-          "gpio": "17",
+          "gpio": "4",
           "function_input_key": "motor_enable_pin",
-          "notes": "Shared MS1/enable line for all 5 pump drivers. 10k pull-down to GND."
+          "notes": "Shared MS1/enable for every driver on this board (2 Z + 5 pumps). 10k pull-down to GND. MS2/MS3 low = standby when this is low."
         },
         {
           "id": "peristaltic-pump-5-ms2",
