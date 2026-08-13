@@ -380,6 +380,59 @@ function normalizeWorkflowNodes(nodesToNormalize: WorkflowFlowNode[]): WorkflowF
   }));
 }
 
+// Placed blocks keep a copy of the block definition from the moment they were
+// dragged onto the canvas. That copy never used to be refreshed, so changing a
+// block's manifest left every workflow already using it running the old shape -
+// missing new inputs, missing new firmware requirements - and the only way out
+// was to delete the block and add it back. On a machine, that shows up as a
+// block that silently does not do the thing you just added to it.
+//
+// Definitions come from the catalog; only what the operator actually chose is
+// theirs to keep - parameter values, custom name, settings, position. New
+// inputs arrive with their defaults, and values for inputs that still exist are
+// preserved. Compound blocks are skipped: they are defined inside the workflow
+// itself rather than by a manifest, so the saved copy *is* the source.
+function refreshNodeBlockDefinitions(
+  nodesToRefresh: WorkflowFlowNode[],
+  catalog: WorkflowBlockDefinition[],
+): WorkflowFlowNode[] {
+  if (catalog.length === 0) {
+    return nodesToRefresh;
+  }
+
+  const latestById = new Map(catalog.map((block) => [block.id, block]));
+  let changed = false;
+
+  const refreshed = nodesToRefresh.map((node) => {
+    const placed = node.data.block;
+    if (placed.kind === "compound") {
+      return node;
+    }
+
+    const latest = latestById.get(placed.id);
+    // A block whose definition has gone (deleted custom block, renamed
+    // function) keeps what it has, so the existing broken-reference handling
+    // can show it rather than this quietly dropping it.
+    if (!latest || JSON.stringify(latest) === JSON.stringify(placed)) {
+      return node;
+    }
+
+    changed = true;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        block: latest,
+        parameters: mergeParametersForBlock(latest, node.data.parameters ?? {}),
+      },
+    };
+  });
+
+  // Returning the same array when nothing moved keeps this out of React's
+  // update loop - it runs on every catalog refresh, including after each run.
+  return changed ? refreshed : nodesToRefresh;
+}
+
 function mergeParametersForBlock(
   block: WorkflowBlockDefinition,
   currentParameters: Record<string, WorkflowParameterValue>,
@@ -1014,6 +1067,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     () => [...builtInBlocks, ...robotActionBlocks, ...compoundBlocks],
     [builtInBlocks, robotActionBlocks, compoundBlocks],
   );
+  // Whenever the catalog changes - first load, after a run reloads functions,
+  // after a manifest is regenerated - pull placed blocks back into line with it.
+  // This is what stops "I changed the block but my workflow still runs the old
+  // one", which previously needed a delete and re-add to clear.
+  useEffect(() => {
+    setNodes((currentNodes) => refreshNodeBlockDefinitions(currentNodes, availableBlocks));
+  }, [availableBlocks, setNodes]);
+
   const [editingCompoundNodeId, setEditingCompoundNodeId] = useState<string | null>(null);
   const [testStateByNodeId, setTestStateByNodeId] = useState<Record<string, NodeTestState>>({});
   const testStateByNodeIdRef = useRef<Record<string, NodeTestState>>({});
@@ -1258,7 +1319,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
           return;
         }
 
-        const parsedNodes = normalizeWorkflowNodes((savedWorkflow.workflow.nodes ?? []) as WorkflowFlowNode[]);
+        // Refresh against the catalog on the way in as well as in the effect
+        // above: whichever of the two finishes last has to be the one that
+        // reconciles, or a workflow loaded after the catalog settled keeps its
+        // stale block definitions.
+        const parsedNodes = refreshNodeBlockDefinitions(
+          normalizeWorkflowNodes((savedWorkflow.workflow.nodes ?? []) as WorkflowFlowNode[]),
+          availableBlocks,
+        );
         const parsedEdges = (savedWorkflow.workflow.edges ?? []) as Edge[];
         setNodes(parsedNodes);
         setEdges(parsedEdges);
@@ -2197,7 +2265,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   async function handleLoadSavedWorkflow() {
     try {
       const savedWorkflow = await fetchSavedWorkflow();
-      const parsedNodes = normalizeWorkflowNodes((savedWorkflow.workflow.nodes ?? []) as WorkflowFlowNode[]);
+      const parsedNodes = refreshNodeBlockDefinitions(
+        normalizeWorkflowNodes((savedWorkflow.workflow.nodes ?? []) as WorkflowFlowNode[]),
+        availableBlocks,
+      );
       const parsedEdges = (savedWorkflow.workflow.edges ?? []) as Edge[];
       savedWorkflowSnapshotRef.current = serializeWorkflowForDirtyCheck(parsedNodes, parsedEdges);
       setHasUnsavedChanges(false);

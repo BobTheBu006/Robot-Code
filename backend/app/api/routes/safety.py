@@ -18,7 +18,7 @@ from app.models.safety import (
     SafetyStopRequest,
     SafetyStopResponse,
 )
-from app.services.motor_power import motor_power_service
+from app.services.motor_power import Z_PUMP_DOMAIN, motor_power_service
 from app.services.access_door import access_door_sensor
 from app.services.physical_state import PhysicalStateError, physical_state_store
 
@@ -160,3 +160,53 @@ def confirm_physical_state(request: PhysicalStateConfirmRequest) -> SafetySnapsh
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return SafetySnapshot.model_validate(_snapshot_with_access_door())
+
+
+@router.get("/motor-power")
+def get_motor_power() -> dict:
+    """Which driver enable lines are powered right now."""
+    return motor_power_service.snapshot()
+
+
+@router.post("/motor-power/enable-test")
+def motor_power_enable_test(seconds: float = 5.0) -> dict:
+    """Assert the Z/pump enable line, hold it, then drop it. No stepping.
+
+    Diagnostic for exactly one question: does the enable line actually reach
+    the drivers? It sends the same commands a real move sends, so a failure
+    here is the same failure a move would hit - but nothing turns, so it is
+    safe to run with the machine powered and someone holding a multimeter on
+    the pin.
+    """
+    import time
+
+    from app.services.hardware_map import hardware_map_service
+    from app.services.hybrid_z_axis import hybrid_z_axis_service
+
+    context = {"hardware_map": hardware_map_service.load_map().model_dump(mode="json")}
+    enable_pin = hybrid_z_axis_service.enable_pin_from_hardware_map(context)
+    if enable_pin is None:
+        return {"ok": False, "error": "No enable pin is recorded for this board in the Hardware Map."}
+
+    try:
+        port = hybrid_z_axis_service._resolve_port(context, None)
+    except Exception as exc:
+        return {"ok": False, "error": f"Could not resolve the controller port: {exc}"}
+
+    steps: list[str] = []
+    try:
+        hybrid_z_axis_service.register_power_domain(port, enable_pin)
+        steps.append(f"registered enable on GPIO {enable_pin} via {port}")
+
+        motor_power_service.acquire(Z_PUMP_DOMAIN)
+        steps.append(f"MOTOR ENABLE 1 acknowledged - GPIO {enable_pin} should now read HIGH")
+
+        time.sleep(max(0.0, min(float(seconds), 30.0)))
+
+        motor_power_service.power_down_now(Z_PUMP_DOMAIN)
+        steps.append(f"MOTOR ENABLE 0 acknowledged - GPIO {enable_pin} back LOW")
+        return {"ok": True, "enable_pin": enable_pin, "port": port, "steps": steps}
+    except Exception as exc:
+        motor_power_service.power_down_now(Z_PUMP_DOMAIN)
+        return {"ok": False, "enable_pin": enable_pin, "port": port,
+                "steps": steps, "error": f"{type(exc).__name__}: {exc}"}
