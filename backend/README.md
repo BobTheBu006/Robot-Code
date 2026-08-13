@@ -2,7 +2,7 @@
 
 FastAPI backend for the local robot-control app.
 
-Read `../AGENTS.md`, `../docs/PROJECT_STATUS.md`, and `../docs/ARCHITECTURE_CONTRACTS.md` before changing function discovery, hardware map sync, workflow execution, or firmware flashing behavior.
+Read `../docs/ARCHITECTURE_CONTRACTS.md` and `../docs/BACKWARDS_COMPATIBILITY.md` before changing function discovery, hardware map sync, workflow execution, firmware flashing behavior, or persistent data contracts.
 
 ## Run locally
 
@@ -40,6 +40,24 @@ cd "C:\BOB\masters\Thesis\Robot Code\backend"
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
+
+## Run the tests
+
+Install the development requirements, then run the standard-library test suite:
+
+Raspberry Pi OS / Linux:
+
+```bash
+./.venv/bin/python -m pip install -r requirements-dev.txt
+./.venv/bin/python -m unittest discover -s tests -t .
+```
+
+Windows 11:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -t .
+```
 
 ## Endpoints
 

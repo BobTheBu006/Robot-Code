@@ -4,7 +4,7 @@ Vite + React + TypeScript dashboard for the local robot-control app.
 
 Requires Node.js 20+ with `npm` available on your `PATH`.
 
-Read `../AGENTS.md`, `../docs/PROJECT_STATUS.md`, and `../docs/ARCHITECTURE_CONTRACTS.md` before changing workflow, hardware map, or block behavior.
+Read `../docs/ARCHITECTURE_CONTRACTS.md` and `../docs/BACKWARDS_COMPATIBILITY.md` before changing workflow, hardware map, block behavior, or persistent data contracts.
 
 ## Run locally
 

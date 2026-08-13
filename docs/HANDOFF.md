@@ -746,8 +746,8 @@ curl -s localhost:8000/api/safety | python3 -m json.tool
   document; `BACKEND_ARCHITECTURE_V2.md` is how it gets implemented. Contract 10
   in particular (missing references stay visible, never silently deleted) is
   easy to violate during a migration.
-- **`docs/PROJECT_STATUS.md` and `AGENTS.md` are referenced by both READMEs but
-  do not exist.** Either write them or fix the references.
+- The backend and frontend READMEs point to the governing architecture and
+  backwards-compatibility contracts; keep those references current.
 - Saved workflows embed a **frozen copy of every block definition** in
   `node.data.block`, which is why `workflows/Test_1.json` is 820 KB and why
   stale definitions leak into runs. Phase 5 replaces this with `block_id` +

@@ -44,17 +44,22 @@ Prerequisites:
 
 ### Start Everything
 
+Clone the repository and enter its directory:
+
+```text
+git clone https://github.com/BobTheBu006/Robot-Code.git
+cd Robot-Code
+```
+
 On Windows 11:
 
 ```powershell
-cd "C:\BOB\masters\Thesis\Robot Code"
 start-all.bat
 ```
 
 On Raspberry Pi OS / Linux:
 
 ```bash
-cd "/home/robot/robot control/Robot-Code"
 ./start-all.sh
 ```
 
@@ -73,14 +78,12 @@ http://127.0.0.1:8000
 ### Start Backend Only
 
 ```powershell
-cd "C:\BOB\masters\Thesis\Robot Code"
 start-backend.bat
 ```
 
 ### Start Frontend Only
 
 ```powershell
-cd "C:\BOB\masters\Thesis\Robot Code"
 start-frontend.bat
 ```
 
