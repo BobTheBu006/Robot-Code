@@ -1170,6 +1170,15 @@ class RaspberryGantryGPIOService:
         the line is pulled LOW to enable, the opposite of the TB67S109s on the
         Z/pump board. Getting this backwards does not fail loudly: the gantry
         simply refuses to move while the software reports it enabled.
+
+        Wiring: ENA- to GND with PUL-/DIR-, ENA+ to this pin on both drivers.
+        Note that ENA is an opto LED, not a logic input, so it needs current
+        rather than a voltage level - a weak (10k) pull-up does nothing here,
+        unlike on the Z board's MS1 line. The drivers therefore come up ENABLED
+        at boot, since the pin idles low. Sizing a pull-up to actually hold them
+        off would take roughly 330R to 3V3, which is only worth fitting if idle
+        heat during boot matters; the gantry is horizontal, so nothing moves
+        either way.
         """
         active_low = _bool_env("ROBOT_GPIO_GANTRY_ENABLE_ACTIVE_LOW", True)
 
