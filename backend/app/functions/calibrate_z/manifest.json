@@ -66,7 +66,7 @@
       "type": "number",
       "description": "Expected physical travel of the right Z axis between its min and max limit switches.",
       "required": true,
-      "default": 60.0,
+      "default": 59.6908073363994,
       "placeholder": null,
       "advanced": false,
       "min": null,

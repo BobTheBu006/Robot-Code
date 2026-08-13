@@ -34,6 +34,12 @@ _RANGE_DERIVED_INPUTS: dict[str, dict[str, str]] = {
     "move_gantry_circle": {"center_x_cm": "x", "center_y_cm": "y"},
 }
 
+# The Z axes get the same treatment, but per side: the two lead screws are
+# calibrated independently and do not necessarily measure the same length.
+_Z_RANGE_DERIVED_INPUTS: dict[str, dict[str, str]] = {
+    "move_z": {"z_left_cm": "left", "z_right_cm": "right"},
+}
+
 # Both tool-change blocks describe the same physical rack, so an edit to a tool
 # position on either one has to land on both.
 _TOOLHEAD_FUNCTION_IDS = ("pickup_toolhead", "drop_toolhead")
@@ -180,6 +186,77 @@ class WorkspaceDefaultsService:
                 "changed": changed,
             }
 
+
+    def apply_z_track_lengths(
+        self,
+        left_track_length_cm: float,
+        right_track_length_cm: float,
+        limit_buffer_cm: float,
+    ) -> dict:
+        """Adopt a Z calibration as the new defaults and allowed ranges.
+
+        The mirror of apply_track_lengths for the Z axes: what an operator
+        measured during calibration becomes what the next block offers, so a
+        corrected track length does not have to be retyped into every Move Z
+        block - and a block cannot offer a target the machine cannot reach.
+
+        Per side, unlike XY: the two screws are calibrated independently.
+        """
+        with self._lock:
+            changed: list[str] = []
+            usable = {
+                "left": usable_max_cm(left_track_length_cm, limit_buffer_cm),
+                "right": usable_max_cm(right_track_length_cm, limit_buffer_cm),
+            }
+
+            # What was measured becomes the starting point for the next
+            # calibration, the same way the XY block adopts its track lengths.
+            calibrate_path = self._app_functions_dir / "calibrate_z" / "manifest.json"
+            if calibrate_path.exists():
+                manifest = self._read_json(calibrate_path)
+                wanted = {
+                    "z_left_track_length_cm": float(left_track_length_cm),
+                    "z_right_track_length_cm": float(right_track_length_cm),
+                    "limit_buffer_cm": float(limit_buffer_cm),
+                }
+                manifest_changed = False
+                for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]:
+                    key = definition.get("key")
+                    if key in wanted and definition.get("default") != wanted[key]:
+                        definition["default"] = wanted[key]
+                        manifest_changed = True
+                        changed.append(f"calibrate_z.{key} default -> {wanted[key]}")
+                if manifest_changed:
+                    self._write_json_atomic(calibrate_path, manifest)
+
+            for function_id, input_sides in _Z_RANGE_DERIVED_INPUTS.items():
+                manifest_path = self._app_functions_dir / function_id / "manifest.json"
+                if not manifest_path.exists():
+                    continue
+                manifest = self._read_json(manifest_path)
+                manifest_changed = False
+                for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]:
+                    side = input_sides.get(definition.get("key"))
+                    if side is None:
+                        continue
+                    if definition.get("min") != 0.0:
+                        definition["min"] = 0.0
+                        manifest_changed = True
+                    if definition.get("max") != usable[side]:
+                        definition["max"] = usable[side]
+                        manifest_changed = True
+                        changed.append(f"{function_id}.{definition['key']} max -> {usable[side]}")
+                if manifest_changed:
+                    self._write_json_atomic(manifest_path, manifest)
+
+            return {
+                "z_left_track_length_cm": float(left_track_length_cm),
+                "z_right_track_length_cm": float(right_track_length_cm),
+                "usable_left_max_cm": usable["left"],
+                "usable_right_max_cm": usable["right"],
+                "buffer_cm": float(limit_buffer_cm),
+                "changed": changed,
+            }
 
     def current_toolhead_positions(self) -> dict[int, tuple[float, float]]:
         """Tool positions as currently stored on the Pick Up Toolhead block."""

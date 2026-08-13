@@ -30,8 +30,8 @@
       "default": 0.0,
       "placeholder": null,
       "advanced": false,
-      "min": null,
-      "max": null,
+      "min": 0.0,
+      "max": 59.0,
       "options": []
     },
     {
@@ -43,8 +43,8 @@
       "default": 0.0,
       "placeholder": null,
       "advanced": false,
-      "min": null,
-      "max": null,
+      "min": 0.0,
+      "max": 58.691,
       "options": []
     },
     {
