@@ -1215,7 +1215,17 @@ class RaspberryGantryGPIOService:
 
         def apply(on: bool) -> None:
             energised = (not on) if active_low else on
-            gpio.output(enable_pin, gpio.HIGH if energised else gpio.LOW)
+            level = gpio.HIGH if energised else gpio.LOW
+            # Claim the pin here rather than assuming a move already did. The
+            # power service outlives any single move - it holds the line for
+            # minutes afterwards - so by the time a linger timer fires, or the
+            # next move starts, nothing guarantees the channel is still set up
+            # in this session. Writing to an unclaimed channel raises, which
+            # previously surfaced as a calibration failing with "the GPIO
+            # channel has not been set up as an OUTPUT". setup() is idempotent
+            # and takes the level with it, so there is no glitch.
+            gpio.setup(enable_pin, gpio.OUT, initial=level)
+            gpio.output(enable_pin, level)
 
         # Five minutes, not the three seconds the Z/pump board uses. A CoreXY
         # head is held in place by belt tension and nothing else - drop the
@@ -1510,9 +1520,21 @@ class RaspberryGantryGPIOService:
                         trapezoidal, acceleration,
                     )
                 )
-                # The slow touch defines X = 0, exactly as calibration does.
-                self._x_steps = 0
+                # The slow touch leaves the carriage resting on the switch,
+                # which is physical zero. Walk back off it by one buffer, the
+                # same as calibration does: a sequence must never continue with
+                # a limit pressed, and user X 0 is defined as one buffer off
+                # the min switch, not on it.
+                backoff_steps = max(1, round(self._limit_buffer_cm * steps_per_cm))
+                self._move_corexy_steps(
+                    gpio, pins, backoff_steps, backoff_steps, rpm,
+                    steps_per_rotation=steps_per_rotation,
+                    trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
+                )
+                self._x_steps = backoff_steps
                 self._x_cm = 0.0
+                # How far the belief was out: the probe had to travel this much
+                # further (or less) than the tracked position said it would.
                 drift_steps = travelled - expected_steps
                 self._save_state()
             finally:

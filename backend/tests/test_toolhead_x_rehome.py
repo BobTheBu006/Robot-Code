@@ -121,5 +121,79 @@ class WaypointShapeTests(unittest.TestCase):
         self.assertEqual(waypoints[0][0], 2.0)
 
 
+class RehomeParkingTests(unittest.TestCase):
+    """Where the carriage is left after a re-home.
+
+    Both of these were shipped broken. The probe leaves the carriage resting on
+    the X min switch, and the next move in the tool-change sequence then
+    aborted with "limit switch active during gantry move". User X 0 is also one
+    buffer off that switch, not on it, so recording zero physical steps put the
+    tracked position out by a buffer as well.
+    """
+
+    def setUp(self) -> None:
+        from app.services.raspberry_gantry import RaspberryGantryGPIOService
+
+        self.service = RaspberryGantryGPIOService()
+        self.service._calibrated = True
+        self.service._limit_buffer_cm = 0.1
+        self.moves: list[tuple] = []
+
+        # Stand in for the hardware: the probe reports how far it travelled and
+        # every subsequent move is recorded.
+        self.service._probe_axis = lambda *a, **k: -450
+        self.service._move_corexy_steps = lambda gpio, pins, a, b, rpm, **k: self.moves.append((a, b))
+        self.service._setup_gpio = lambda gpio, pins: None
+        self.service._cleanup_gpio = lambda gpio, pins: None
+        self.service._save_state = lambda: None
+        self.service._gpio_module = lambda: (object(), None)
+        self.service._execution_mode = lambda: _Executed()
+        self.service._pins_from_request = lambda request, context=None: object()
+
+    def _rehome(self):
+        return self.service.rehome_x({}, _Request())
+
+    def test_the_carriage_is_walked_off_the_switch(self) -> None:
+        self._rehome()
+        self.assertTrue(self.moves, "a back-off move must follow the probe")
+        a_steps, b_steps = self.moves[-1]
+        self.assertGreater(a_steps, 0, "moves in +X, away from the min switch")
+        self.assertEqual(a_steps, b_steps, "CoreXY: equal A and B is pure X, so Y does not move")
+
+    def test_it_backs_off_by_one_buffer(self) -> None:
+        self._rehome()
+        expected = round(0.1 * self.service._effective_steps_per_cm())
+        self.assertEqual(self.moves[-1][0], expected)
+
+    def test_the_tracked_position_matches_where_it_parked(self) -> None:
+        # x_cm 0 is one buffer off the switch, so the step count has to say so.
+        self._rehome()
+        self.assertEqual(self.service._x_steps, self.moves[-1][0])
+        self.assertEqual(self.service._x_cm, 0.0)
+
+    def test_the_drift_is_the_difference_from_what_was_expected(self) -> None:
+        self.service._x_steps = 400          # believed 400 steps from the switch
+        result = self._rehome()              # probe actually travelled 450
+        self.assertEqual(result["drift_steps"], 50)
+
+    def test_an_uncalibrated_gantry_refuses(self) -> None:
+        self.service._calibrated = False
+        with self.assertRaises(RuntimeError):
+            self._rehome()
+
+
+class _Executed:
+    simulated = False
+    status = "gpio_executed"
+    message = ""
+
+
+class _Request:
+    speed_rpm = 100
+    trapezoidal_speed = True
+    acceleration_rpm_per_s = 300
+    steps_per_rotation = 800
+
+
 if __name__ == "__main__":
     unittest.main()
