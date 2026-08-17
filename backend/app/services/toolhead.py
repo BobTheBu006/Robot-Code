@@ -88,8 +88,10 @@ def _assert_waypoints_reachable(action: str, position: ToolheadPosition, waypoin
             )
         elif usable_y_max is not None and y_cm > usable_y_max:
             problems.append(f"({x_cm:g}, {y_cm:g}) is above the usable Y max of {usable_y_max:g} cm")
-        if x_cm < 0.0:
-            problems.append(f"({x_cm:g}, {y_cm:g}) is below X = 0")
+        if x_cm < TOOLHEAD_MIN_X_CM:
+            problems.append(
+                f"({x_cm:g}, {y_cm:g}) is below the minimum X of {TOOLHEAD_MIN_X_CM:g} cm"
+            )
         elif usable_x_max is not None and x_cm > usable_x_max:
             problems.append(f"({x_cm:g}, {y_cm:g}) is above the usable X max of {usable_x_max:g} cm")
 

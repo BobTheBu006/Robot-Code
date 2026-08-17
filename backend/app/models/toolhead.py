@@ -3,6 +3,13 @@ from pydantic import BaseModel, Field
 from app.services.toolhead import TOOLHEAD_COUNT
 
 
+# Tool slots may sit slightly below the homed X reference: X 0 is one limit
+# buffer off the min switch, and a rack mounted right at the end of the rail
+# can need the head to come in under that. Bounded rather than open so a typo
+# cannot aim the carriage at the far side of the switch.
+TOOLHEAD_MIN_X_CM = -2.0
+
+
 class ToolheadRackGeometry(BaseModel):
     """Physical layout of the tool rack and the tool-change motion.
 
@@ -12,17 +19,17 @@ class ToolheadRackGeometry(BaseModel):
     a successful tool change.
     """
 
-    tool_1_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_1_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_1_y_cm: float = Field(default=2.7, ge=0.0)
-    tool_2_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_2_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_2_y_cm: float = Field(default=12.7, ge=0.0)
-    tool_3_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_3_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_3_y_cm: float = Field(default=22.7, ge=0.0)
-    tool_4_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_4_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_4_y_cm: float = Field(default=32.7, ge=0.0)
-    tool_5_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_5_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_5_y_cm: float = Field(default=42.7, ge=0.0)
-    tool_6_x_cm: float = Field(default=0.0, ge=0.0)
+    tool_6_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_6_y_cm: float = Field(default=52.7, ge=0.0)
 
     clearance_cm: float = Field(default=2.0, gt=0.0)

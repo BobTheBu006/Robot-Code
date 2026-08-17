@@ -12,6 +12,12 @@ GANTRY_WORKSPACE_X_CM = 115.0
 GANTRY_WORKSPACE_Y_CM = 60.0
 GANTRY_WORKSPACE_Z_CM = 60.0
 
+# X 0 is one limit buffer off the min switch, so a tool rack mounted right at
+# the end of the rail can need the head to come in under that. Bounded so a
+# typo cannot aim the carriage at the far side of the switch; the limit switch
+# stops the move regardless, this just refuses the intent early.
+GANTRY_MIN_X_CM = -2.0
+
 
 def _validate_distinct_pins(assignments: dict[str, int], message_prefix: str) -> None:
     pins_to_labels: dict[int, list[str]] = {}
@@ -93,8 +99,8 @@ class GantryXYMoveRequest(BaseModel):
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
         )
-        if not 0.0 <= self.x_cm <= GANTRY_WORKSPACE_X_CM:
-            raise ValueError(f"x_cm must be between 0 and {GANTRY_WORKSPACE_X_CM} cm.")
+        if not GANTRY_MIN_X_CM <= self.x_cm <= GANTRY_WORKSPACE_X_CM:
+            raise ValueError(f"x_cm must be between {GANTRY_MIN_X_CM} and {GANTRY_WORKSPACE_X_CM} cm.")
         if not 0.0 <= self.y_cm <= GANTRY_WORKSPACE_Y_CM:
             raise ValueError(f"y_cm must be between 0 and {GANTRY_WORKSPACE_Y_CM} cm.")
         if not 0.0 <= self.z_cm <= GANTRY_WORKSPACE_Z_CM:

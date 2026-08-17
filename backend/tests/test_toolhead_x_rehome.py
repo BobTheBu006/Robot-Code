@@ -139,17 +139,21 @@ class RehomeParkingTests(unittest.TestCase):
         self.service._limit_buffer_cm = 0.1
         self.moves: list[tuple] = []
 
-        # Stand in for the hardware. The probe reports how far it travelled
-        # and leaves the switch closed, exactly as a real home does; the switch
-        # then releases once the carriage has been nudged off it.
-        self.switch_closed = True
+        # Stand in for the hardware. The approach toward the switch closes it
+        # after 450 steps; nudging back in +X frees it again.
+        self.switch_closed = False
+        self.probe_travel = -450
 
         def move(gpio, pins, a, b, rpm, **kwargs):
             self.moves.append((a, b))
-            if a > 0:                    # backing off in +X releases it
-                self.switch_closed = False
+            if a < 0:                    # the slow approach toward X min
+                self.service._last_a_steps = self.probe_travel
+                self.service._last_b_steps = self.probe_travel
+                self.switch_closed = True
+                return kwargs.get("stop_limit_pin") is not None
+            self.switch_closed = False   # backing off releases it
+            return False
 
-        self.service._probe_axis = lambda *a, **k: -450
         self.service._move_corexy_steps = move
         self.service._limit_active = lambda gpio, pin: self.switch_closed
         self.service._setup_gpio = lambda gpio, pins: None
@@ -161,6 +165,14 @@ class RehomeParkingTests(unittest.TestCase):
 
     def _rehome(self):
         return self.service.rehome_x({}, _Request())
+
+    def test_the_switch_is_approached_once_not_three_times(self) -> None:
+        # Calibration needs a fast sweep plus a slow re-touch because it starts
+        # from an unknown position. Here the carriage is already parked a couple
+        # of centimetres away, so the extra passes only cost the operator time.
+        self._rehome()
+        approaches = [a for a, _ in self.moves if a < 0]
+        self.assertEqual(len(approaches), 1)
 
     def test_the_carriage_is_walked_off_the_switch(self) -> None:
         self._rehome()
@@ -177,30 +189,61 @@ class RehomeParkingTests(unittest.TestCase):
     def test_it_keeps_nudging_until_the_switch_actually_releases(self) -> None:
         # A microswitch does not open the instant you leave it. Stopping while
         # it is still closed is what made the next waypoint refuse to move.
-        released_after = 3
         original = self.service._move_corexy_steps
+        nudges = {"count": 0}
 
         def stubborn(gpio, pins, a, b, rpm, **kwargs):
-            original(gpio, pins, a, b, rpm, **kwargs)
-            self.switch_closed = len(self.moves) < released_after
+            hit = original(gpio, pins, a, b, rpm, **kwargs)
+            if a > 0:
+                nudges["count"] += 1
+                self.switch_closed = nudges["count"] < 3
+            return hit
 
         self.service._move_corexy_steps = stubborn
-        self.service._limit_active = lambda gpio, pin: self.switch_closed
         self._rehome()
-        self.assertEqual(len(self.moves), released_after)
+        self.assertEqual(nudges["count"], 3)
 
     def test_a_switch_that_never_releases_is_reported(self) -> None:
-        self.service._limit_active = lambda gpio, pin: True
+        original = self.service._move_corexy_steps
+
+        def stuck(gpio, pins, a, b, rpm, **kwargs):
+            hit = original(gpio, pins, a, b, rpm, **kwargs)
+            self.switch_closed = True
+            return hit
+
+        self.service._move_corexy_steps = stuck
         with self.assertRaises(RuntimeError) as caught:
             self._rehome()
         self.assertIn("still closed", str(caught.exception))
+
+    def test_never_reaching_the_switch_is_reported(self) -> None:
+        self.service._move_corexy_steps = lambda gpio, pins, a, b, rpm, **k: False
+        with self.assertRaises(RuntimeError) as caught:
+            self._rehome()
+        self.assertIn("not reached", str(caught.exception))
 
     def test_the_tracked_position_matches_where_it_parked(self) -> None:
         # Whatever it took to free the switch is where the carriage now is, and
         # the step count has to say so rather than where it was aimed.
         self._rehome()
-        self.assertEqual(self.service._x_steps, sum(a for a, _ in self.moves))
-        self.assertEqual(self.service._x_cm, 0.0)
+        backed_off = sum(a for a, _ in self.moves if a > 0)
+        self.assertEqual(self.service._x_steps, backed_off)
+
+    def test_extra_nudges_are_reflected_in_the_recorded_cm(self) -> None:
+        # Pinning x_cm to 0 however far it actually nudged would bake that
+        # travel into every position afterwards.
+        original = self.service._move_corexy_steps
+
+        def stubborn(gpio, pins, a, b, rpm, **kwargs):
+            hit = original(gpio, pins, a, b, rpm, **kwargs)
+            if a > 0:
+                self.switch_closed = sum(1 for s, _ in self.moves if s > 0) < 4
+            return hit
+
+        self.service._move_corexy_steps = stubborn
+        self._rehome()
+        expected = self.service._x_steps / self.service._effective_steps_per_cm() - 0.1
+        self.assertAlmostEqual(self.service._x_cm, max(0.0, expected), places=4)
 
     def test_the_drift_is_the_difference_from_what_was_expected(self) -> None:
         self.service._x_steps = 400          # believed 400 steps from the switch

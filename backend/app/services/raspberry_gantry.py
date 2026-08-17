@@ -17,6 +17,7 @@ GANTRY_STATE_VERSION = 2
 XY_SLOW_HOMING_RPM = 10.0
 
 from app.models.gantry import (
+    GANTRY_MIN_X_CM,
     GANTRY_WORKSPACE_X_CM,
     GANTRY_WORKSPACE_Y_CM,
     GantryCircleXYRequest,
@@ -1082,8 +1083,10 @@ class RaspberryGantryGPIOService:
         # exactly as the firmware enforces.
         usable_x_max = self._x_track_length_cm - 2.0 * self._limit_buffer_cm
         usable_y_max = self._y_track_length_cm - 2.0 * self._limit_buffer_cm
-        if not 0.0 <= request.x_cm <= usable_x_max:
-            raise RuntimeError(f"x_cm must be between 0 and the usable X maximum of {usable_x_max:g} cm.")
+        if not GANTRY_MIN_X_CM <= request.x_cm <= usable_x_max:
+            raise RuntimeError(
+                f"x_cm must be between {GANTRY_MIN_X_CM:g} and the usable X maximum of {usable_x_max:g} cm."
+            )
         if not 0.0 <= request.y_cm <= usable_y_max:
             raise RuntimeError(f"y_cm must be between 0 and the usable Y maximum of {usable_y_max:g} cm.")
 
@@ -1518,12 +1521,25 @@ class RaspberryGantryGPIOService:
                     2 * steps_per_rotation,
                     expected_steps + round(_X_REHOME_MARGIN_CM * steps_per_cm),
                 )
-                travelled = abs(
-                    self._probe_axis(
-                        gpio, pins, "x", -1, max_probe_steps, steps_per_rotation, rpm,
-                        trapezoidal, acceleration,
-                    )
+                # One slow touch, not the three-pass home calibration uses.
+                # Calibration starts from an unknown position, so it needs a
+                # fast sweep to find the switch and a slow re-touch to place it
+                # accurately. Here the carriage is already parked a couple of
+                # centimetres away and the approach is slow from the outset, so
+                # the extra passes buy nothing and cost the operator a wait on
+                # every single tool change.
+                hit = self._move_corexy_steps(
+                    gpio, pins, -max_probe_steps, -max_probe_steps, XY_SLOW_HOMING_RPM,
+                    stop_limit_pin=pins.x_min_limit_pin,
+                    steps_per_rotation=steps_per_rotation,
+                    trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
                 )
+                if not hit:
+                    raise RuntimeError(
+                        "The X min switch was not reached while re-checking home. The carriage may "
+                        "be further from home than expected, or the switch is not responding."
+                    )
+                travelled = abs((self._last_a_steps + self._last_b_steps) // 2)
                 # The slow touch leaves the carriage resting on the switch,
                 # which is physical zero. Walk back off until the switch
                 # actually releases - a buffer's worth is the intent, but a
@@ -1548,8 +1564,12 @@ class RaspberryGantryGPIOService:
                         f"The X min switch is still closed {backoff_steps / steps_per_cm:.2f} cm after "
                         "backing off it. It may be stuck, mis-wired, or the carriage is jammed against it."
                     )
+                # Record where the carriage genuinely ended up. Freeing the
+                # switch can take more than one nudge, and pinning x_cm to 0
+                # regardless would quietly bake that extra travel into every
+                # position afterwards.
                 self._x_steps = backoff_steps
-                self._x_cm = 0.0
+                self._x_cm = max(0.0, backoff_steps / steps_per_cm - self._limit_buffer_cm)
                 # How far the belief was out: the probe had to travel this much
                 # further (or less) than the tracked position said it would.
                 drift_steps = travelled - expected_steps
