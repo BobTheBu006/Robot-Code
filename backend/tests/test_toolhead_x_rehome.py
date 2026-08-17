@@ -26,17 +26,22 @@ class _Recorder:
 
     def __init__(self) -> None:
         self.events: list[tuple] = []
+        self.speeds: list[tuple] = []
+        self.probe_rpm: list[float | None] = []
 
     def goto(self, base_inputs, x_cm, y_cm, speed_rpm, context=None):
         self.events.append(("move", x_cm, y_cm))
+        self.speeds.append((x_cm, y_cm, speed_rpm))
         return {"x_cm": x_cm, "y_cm": y_cm, "speed_rpm": speed_rpm, "move_reply": "ok"}
 
-    def rehome_x(self, context, request):
+    def rehome_x(self, context, request, approach_rpm=None):
         self.events.append(("rehome_x",))
+        self.probe_rpm.append(approach_rpm)
         return {"drift_steps": 12, "drift_cm": 0.03, "message": "X re-homed."}
 
-    def rehome_y(self, context, request):
+    def rehome_y(self, context, request, approach_rpm=None):
         self.events.append(("rehome_y",))
+        self.probe_rpm.append(approach_rpm)
         return {"drift_steps": 4, "drift_cm": 0.01, "message": "Y re-homed."}
 
 
@@ -126,6 +131,53 @@ class SequenceTests(unittest.TestCase):
         kinds = [e[0] for e in self.recorder.events]
         self.assertNotIn("rehome_x", kinds)
         self.assertNotIn("rehome_y", kinds)
+
+
+class SpeedTests(unittest.TestCase):
+    """Three distinct speeds, because they are doing three different jobs."""
+
+    def setUp(self) -> None:
+        self.recorder = _Recorder()
+        self.service = ToolheadService()
+        self.service._goto = self.recorder.goto
+        self._real_x = toolhead_module.raspberry_gantry_gpio_service.rehome_x
+        self._real_y = toolhead_module.raspberry_gantry_gpio_service.rehome_y
+        self._real_on_pi = toolhead_module.xy_hardware_is_on_raspberry_pi
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome_x
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self.recorder.rehome_y
+        toolhead_module.xy_hardware_is_on_raspberry_pi = lambda context: True
+
+    def tearDown(self) -> None:
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self._real_x
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self._real_y
+        toolhead_module.xy_hardware_is_on_raspberry_pi = self._real_on_pi
+
+    def _run(self, **kwargs):
+        return self.service.run_sequence(
+            {}, [(2.0, 30.0), (0.0, 30.0), (0.0, 28.3)], approach_speed_rpm=400,
+            context={"hardware_map": {}}, verify_x_home=True, **kwargs,
+        )
+
+    def test_the_rack_hop_uses_its_own_speed(self) -> None:
+        self._run(rack_approach_speed_rpm=120)
+        by_target = {(x, y): rpm for x, y, rpm in self.recorder.speeds}
+        self.assertEqual(by_target[(2.0, 2.7)], 400, "getting to the rack")
+        self.assertEqual(by_target[(2.0, 30.0)], 120, "crossing to the tool's Y")
+
+    def test_engagement_stays_slow_regardless(self) -> None:
+        self._run(rack_approach_speed_rpm=900)
+        by_target = {(x, y): rpm for x, y, rpm in self.recorder.speeds}
+        self.assertEqual(by_target[(0.0, 30.0)], 50, "engaging is fixed and slow")
+
+    def test_the_probe_speed_reaches_both_homes(self) -> None:
+        self._run(home_speed_rpm=35)
+        self.assertEqual(self.recorder.probe_rpm, [35, 35])
+
+    def test_omitting_them_falls_back_to_the_approach_speed(self) -> None:
+        self._run()
+        by_target = {(x, y): rpm for x, y, rpm in self.recorder.speeds}
+        self.assertEqual(by_target[(2.0, 30.0)], 400)
+        self.assertEqual(self.recorder.probe_rpm, [None, None])
 
 
 class WaypointShapeTests(unittest.TestCase):

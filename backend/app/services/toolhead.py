@@ -224,6 +224,8 @@ class ToolheadService:
         approach_speed_rpm: int,
         context: dict | None = None,
         verify_x_home: bool = False,
+        rack_approach_speed_rpm: int | None = None,
+        home_speed_rpm: float | None = None,
     ) -> list[dict]:
         """Run a tool-change sequence: first waypoint at the approach speed,
         every subsequent waypoint at the fixed engage speed.
@@ -243,17 +245,23 @@ class ToolheadService:
         # tool's own Y is what the rest of the sequence aims at - correcting it
         # after moving there would be too late. Doing it at the clearance X
         # keeps the head clear of the hooks throughout.
+        # Getting to the rack is one speed; crossing to the tool's own Y once
+        # the head is already there is another. They are separate because the
+        # second move ends where the engage begins, so it is worth being able
+        # to slow it without slowing the whole approach.
+        rack_speed = int(rack_approach_speed_rpm or 0) or approach_speed_rpm
+
         if verify_x_home and waypoints:
             clearance_x = waypoints[0][0]
             moves.append(
                 self._goto(base_inputs, clearance_x, Y_HOME_APPROACH_CM, approach_speed_rpm, context=context)
             )
-            rehome_y = self._rehome_axis("y", base_inputs, context)
+            rehome_y = self._rehome_axis("y", base_inputs, context, home_speed_rpm)
             if rehome_y is not None:
                 moves.append(rehome_y)
 
         for step, (x_cm, y_cm) in enumerate(waypoints):
-            speed_rpm = approach_speed_rpm if step == 0 else ENGAGE_RPM
+            speed_rpm = rack_speed if step == 0 else ENGAGE_RPM
             moves.append(self._goto(base_inputs, x_cm, y_cm, speed_rpm, context=context))
 
             # After the clearance approach, with the tool not yet engaged, is
@@ -261,13 +269,15 @@ class ToolheadService:
             # the hooks and nothing is being carried into them. By now Y is
             # already homed and sitting at the tool's own Y.
             if verify_x_home and step == 0:
-                rehome = self._rehome_axis("x", base_inputs, context)
+                rehome = self._rehome_axis("x", base_inputs, context, home_speed_rpm)
                 if rehome is not None:
                     moves.append(rehome)
 
         return moves
 
-    def _rehome_axis(self, axis: str, base_inputs: dict, context: dict | None) -> dict | None:
+    def _rehome_axis(
+        self, axis: str, base_inputs: dict, context: dict | None, home_speed_rpm: float | None = None
+    ) -> dict | None:
         """Re-touch one axis mid-sequence. Only on the Pi-driven gantry.
 
         The ESP32 gantry path has no equivalent single-axis probe, so this is
@@ -281,7 +291,9 @@ class ToolheadService:
             {**base_inputs, "x_cm": 0.0, "y_cm": 0.0, "speed_rpm": ENGAGE_RPM}
         )
         service = raspberry_gantry_gpio_service
-        result = (service.rehome_x if axis == "x" else service.rehome_y)(context, request)
+        result = (service.rehome_x if axis == "x" else service.rehome_y)(
+            context, request, home_speed_rpm
+        )
         return {
             "action": f"verify_{axis}_home",
             "axis": axis,
@@ -301,6 +313,8 @@ class ToolheadService:
         clearance_cm: float,
         context: dict | None = None,
         verify_x_home: bool = False,
+        rack_approach_speed_rpm: int | None = None,
+        home_speed_rpm: float | None = None,
     ) -> list[dict]:
         waypoints = self.drop_waypoints(position, dip_depth_cm, lift_cm, release_cm, clearance_cm)
         _assert_waypoints_reachable("be dropped", position, waypoints)
@@ -311,7 +325,8 @@ class ToolheadService:
         # what let the next pick-up drive a loaded head into the rack.
         toolhead_state_store.begin_change(position.index, f"dropping toolhead {position.index}")
         moves = self.run_sequence(
-            base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home
+            base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home,
+            rack_approach_speed_rpm=rack_approach_speed_rpm, home_speed_rpm=home_speed_rpm,
         )
         toolhead_state_store.commit_change(None)
         return moves
@@ -326,6 +341,8 @@ class ToolheadService:
         clearance_cm: float,
         context: dict | None = None,
         verify_x_home: bool = False,
+        rack_approach_speed_rpm: int | None = None,
+        home_speed_rpm: float | None = None,
     ) -> list[dict]:
         waypoints = self.pickup_waypoints(position, dip_depth_cm, lift_cm, clearance_cm)
         _assert_waypoints_reachable("be picked up", position, waypoints)
@@ -335,7 +352,8 @@ class ToolheadService:
         # value an interrupted sequence leaves behind.
         toolhead_state_store.begin_change(position.index, f"picking up toolhead {position.index}")
         moves = self.run_sequence(
-            base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home
+            base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home,
+            rack_approach_speed_rpm=rack_approach_speed_rpm, home_speed_rpm=home_speed_rpm,
         )
         toolhead_state_store.commit_change(position.index)
         return moves

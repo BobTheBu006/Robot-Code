@@ -45,6 +45,13 @@ class ToolheadPickupRequest(ToolheadRackGeometry):
     tool_port: str | None = None
     toolhead_index: int = Field(default=1, ge=1, le=TOOLHEAD_COUNT)
     approach_speed_rpm: int = Field(default=400, gt=0)
+    # Speed for the hop from the rack clearance across to the tool's own Y.
+    # Separate from approach_speed_rpm because this move ends where engagement
+    # begins, so it is worth slowing without slowing the whole approach.
+    rack_approach_speed_rpm: int = Field(default=200, gt=0)
+    # Speed of the re-home probes. Slow enough to stop on the switch without
+    # overshooting, fast enough not to make every tool change a wait.
+    home_speed_rpm: float = Field(default=20.0, gt=0)
     # On by default: the sequence already drives X to the rack, so the probe
     # is nearly free, and a tool change is where lost steps actually cost
     # something - the head misses its hooks.
@@ -55,6 +62,13 @@ class ToolheadPickupRequest(ToolheadRackGeometry):
 class ToolheadDropRequest(ToolheadRackGeometry):
     tool_port: str | None = None
     approach_speed_rpm: int = Field(default=400, gt=0)
+    # Speed for the hop from the rack clearance across to the tool's own Y.
+    # Separate from approach_speed_rpm because this move ends where engagement
+    # begins, so it is worth slowing without slowing the whole approach.
+    rack_approach_speed_rpm: int = Field(default=200, gt=0)
+    # Speed of the re-home probes. Slow enough to stop on the switch without
+    # overshooting, fast enough not to make every tool change a wait.
+    home_speed_rpm: float = Field(default=20.0, gt=0)
     # On by default: the sequence already drives X to the rack, so the probe
     # is nearly free, and a tool change is where lost steps actually cost
     # something - the head misses its hooks.

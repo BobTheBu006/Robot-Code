@@ -1470,15 +1470,17 @@ class RaspberryGantryGPIOService:
 
         return stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin)
 
-    def rehome_x(self, context: dict, request: Any) -> dict:
+    def rehome_x(self, context: dict, request: Any, approach_rpm: float | None = None) -> dict:
         """Re-touch the X min switch and correct the tracked X position."""
-        return self._rehome_axis(context, request, "x")
+        return self._rehome_axis(context, request, "x", approach_rpm)
 
-    def rehome_y(self, context: dict, request: Any) -> dict:
+    def rehome_y(self, context: dict, request: Any, approach_rpm: float | None = None) -> dict:
         """Re-touch the Y min switch and correct the tracked Y position."""
-        return self._rehome_axis(context, request, "y")
+        return self._rehome_axis(context, request, "y", approach_rpm)
 
-    def _rehome_axis(self, context: dict, request: Any, axis: str) -> dict:
+    def _rehome_axis(
+        self, context: dict, request: Any, axis: str, approach_rpm: float | None = None
+    ) -> dict:
         """Re-touch one axis against its min switch and correct its position.
 
         For machines that lose the odd step. Coordinate 0 on an axis is defined
@@ -1556,8 +1558,13 @@ class RaspberryGantryGPIOService:
                 # the extra passes buy nothing and cost the operator a wait on
                 # every single tool change.
                 approach_a, approach_b = cartesian(-max_probe_steps)
+                # Slow enough to stop on the switch without overshooting, fast
+                # enough not to make every tool change a wait. Tunable per block
+                # because the right value depends on the machine's mass and how
+                # much its bearings are dragging.
+                probe_rpm = float(approach_rpm or 0) or _REHOME_APPROACH_RPM
                 hit = self._move_corexy_steps(
-                    gpio, pins, approach_a, approach_b, _REHOME_APPROACH_RPM,
+                    gpio, pins, approach_a, approach_b, probe_rpm,
                     stop_limit_pin=limit_pin,
                     steps_per_rotation=steps_per_rotation,
                     trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,

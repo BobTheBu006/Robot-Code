@@ -67,6 +67,8 @@ def execute(context: dict, inputs: dict) -> dict:
         clearance_cm=request.clearance_cm,
         context=context,
         verify_x_home=request.verify_x_home,
+        rack_approach_speed_rpm=request.rack_approach_speed_rpm,
+        home_speed_rpm=request.home_speed_rpm,
     )
 
     # Persist only after the sequence succeeds, so a position that the guard

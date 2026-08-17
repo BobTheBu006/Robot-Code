@@ -342,6 +342,32 @@
       "min": null,
       "max": null,
       "options": []
+    },
+    {
+      "key": "rack_approach_speed_rpm",
+      "label": "Rack Approach Speed (RPM)",
+      "type": "number",
+      "description": "Speed for the move across to the tool's Y once the head is at the rack. Separate from the main approach speed because this move ends where engagement begins.",
+      "required": false,
+      "default": 200.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 2000,
+      "options": []
+    },
+    {
+      "key": "home_speed_rpm",
+      "label": "Home Probe Speed (RPM)",
+      "type": "number",
+      "description": "Speed of the X and Y re-home probes during a tool change. Slow enough to stop on the switch without overshooting, fast enough not to make every tool change a wait.",
+      "required": false,
+      "default": 20.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 200,
+      "options": []
     }
   ],
   "outputs": [
