@@ -38,6 +38,11 @@ TOOLHEAD_COUNT = 6
 # this module, not the other way round.
 TOOLHEAD_MIN_X_CM = -2.0
 
+# Where the head sits while Y is re-homed: out at the clearance X, and down by
+# the near end of the rack so the Y probe is short. Homing from the far end
+# would traverse the whole axis past every slot on the way.
+Y_HOME_APPROACH_CM = 2.7
+
 # Rack as measured. These seed the block defaults; the exact position of each
 # slot is editable per toolhead and an edit is written back as the new default.
 DEFAULT_TOOLHEAD_POSITIONS: dict[int, tuple[float, float]] = {
@@ -232,23 +237,38 @@ class ToolheadService:
         a mounted tool through the rack.
         """
         moves: list[dict] = []
+
+        # Home Y before anything else, out at the clearance offset and down by
+        # the near end of the rack. Y is homed first and separately because the
+        # tool's own Y is what the rest of the sequence aims at - correcting it
+        # after moving there would be too late. Doing it at the clearance X
+        # keeps the head clear of the hooks throughout.
+        if verify_x_home and waypoints:
+            clearance_x = waypoints[0][0]
+            moves.append(
+                self._goto(base_inputs, clearance_x, Y_HOME_APPROACH_CM, approach_speed_rpm, context=context)
+            )
+            rehome_y = self._rehome_axis("y", base_inputs, context)
+            if rehome_y is not None:
+                moves.append(rehome_y)
+
         for step, (x_cm, y_cm) in enumerate(waypoints):
             speed_rpm = approach_speed_rpm if step == 0 else ENGAGE_RPM
             moves.append(self._goto(base_inputs, x_cm, y_cm, speed_rpm, context=context))
 
             # After the clearance approach, with the tool not yet engaged, is
-            # the only point in the sequence where an X probe is safe: the
-            # carriage is clear of the hooks and nothing is being carried into
-            # them.
+            # the only point where an X probe is safe: the carriage is clear of
+            # the hooks and nothing is being carried into them. By now Y is
+            # already homed and sitting at the tool's own Y.
             if verify_x_home and step == 0:
-                rehome = self._rehome_x(base_inputs, context)
+                rehome = self._rehome_axis("x", base_inputs, context)
                 if rehome is not None:
                     moves.append(rehome)
 
         return moves
 
-    def _rehome_x(self, base_inputs: dict, context: dict | None) -> dict | None:
-        """Re-touch X min mid-sequence. Only on the Pi-driven gantry.
+    def _rehome_axis(self, axis: str, base_inputs: dict, context: dict | None) -> dict | None:
+        """Re-touch one axis mid-sequence. Only on the Pi-driven gantry.
 
         The ESP32 gantry path has no equivalent single-axis probe, so this is
         skipped there rather than faked - a tool change that silently did not
@@ -260,9 +280,11 @@ class ToolheadService:
         request = GantryXYMoveRequest.model_validate(
             {**base_inputs, "x_cm": 0.0, "y_cm": 0.0, "speed_rpm": ENGAGE_RPM}
         )
-        result = raspberry_gantry_gpio_service.rehome_x(context, request)
+        service = raspberry_gantry_gpio_service
+        result = (service.rehome_x if axis == "x" else service.rehome_y)(context, request)
         return {
-            "action": "verify_x_home",
+            "action": f"verify_{axis}_home",
+            "axis": axis,
             "drift_steps": result.get("drift_steps"),
             "drift_cm": result.get("drift_cm"),
             "move_reply": result.get("message"),

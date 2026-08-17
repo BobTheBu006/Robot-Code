@@ -50,14 +50,19 @@ XY_DEVICE_IDS = REQUIRED_XY_DEVICE_IDS | OPTIONAL_XY_DEVICE_IDS
 # position matters more here than saving the current: belts back-drive.
 GANTRY_IDLE_HOLD_SECONDS = 300.0
 
-# How far past the believed X position a re-home will hunt for the switch.
+# How far past the believed position a re-home will hunt for the switch.
 # Generous next to real step loss, tight enough that a genuinely lost carriage
 # fails instead of grinding the length of the rail.
-_X_REHOME_MARGIN_CM = 5.0
+_REHOME_MARGIN_CM = 5.0
 
-# How far a re-home will keep nudging before deciding the X min switch is not
+# How far a re-home will keep nudging before deciding a min switch is not
 # going to release at all.
-_X_REHOME_RELEASE_CM = 1.0
+_REHOME_RELEASE_CM = 1.0
+
+# Twice the calibration re-touch speed. Calibration creeps because it is
+# measuring the track; a tool-change re-home only has to find a switch it is
+# already parked beside, and the operator waits through this on every change.
+_REHOME_APPROACH_RPM = XY_SLOW_HOMING_RPM * 2.0
 
 DEFAULT_STEPS_PER_CM = 100.0
 # STEP pulse width. Drivers only need ~1-2us; the width also floors the step
@@ -1466,16 +1471,26 @@ class RaspberryGantryGPIOService:
         return stop_limit_pin is not None and self._limit_active(gpio, stop_limit_pin)
 
     def rehome_x(self, context: dict, request: Any) -> dict:
-        """Re-touch the X min switch and correct the tracked X position.
+        """Re-touch the X min switch and correct the tracked X position."""
+        return self._rehome_axis(context, request, "x")
 
-        For machines that lose the odd step. X = 0 is defined by the X min slow
-        touch during calibration, so touching it again re-establishes exactly
-        that reference without re-measuring the track or disturbing Y - which
-        matters, because a full calibration would throw away a good Y home and
+    def rehome_y(self, context: dict, request: Any) -> dict:
+        """Re-touch the Y min switch and correct the tracked Y position."""
+        return self._rehome_axis(context, request, "y")
+
+    def _rehome_axis(self, context: dict, request: Any, axis: str) -> dict:
+        """Re-touch one axis against its min switch and correct its position.
+
+        For machines that lose the odd step. Coordinate 0 on an axis is defined
+        by its min slow touch during calibration, so touching it again
+        re-establishes exactly that reference without re-measuring the track or
+        disturbing the other axis - which matters, because a full calibration
+        would throw away a good home on the axis that was still correct and
         cost a workspace traverse.
 
-        CoreXY moves both motors for an X move, but with A and B stepping
-        together the net Y displacement is zero, so Y is left where it was.
+        CoreXY moves both motors either way: stepping A and B together is pure
+        X, stepping them opposite is pure Y, so each axis can be homed without
+        the other moving.
 
         Returns how far the position was out, which is the number worth
         watching: it is the accumulated step loss since the last home.
@@ -1484,42 +1499,54 @@ class RaspberryGantryGPIOService:
         pins = self._pins_from_request(request, context)
         execution = self._execution_mode()
         steps_per_cm = self._effective_steps_per_cm()
+        label = axis.upper()
 
         if execution.simulated:
             return {
                 "status": execution.status,
-                "message": "X re-home simulated; no GPIO backend available.",
-                "drift_steps": 0,
-                "drift_cm": 0.0,
-                "simulated": True,
+                "message": f"{label} re-home simulated; no GPIO backend available.",
+                "axis": axis, "drift_steps": 0, "drift_cm": 0.0, "simulated": True,
             }
 
         if not self._calibrated:
             raise RuntimeError(
-                "The gantry has not been calibrated, so there is no X reference to re-check. "
+                f"The gantry has not been calibrated, so there is no {label} reference to re-check. "
                 "Run Calibrate Gantry XY first."
             )
 
         gpio, _ = self._gpio_module()
         if gpio is None:
-            raise RuntimeError("Compatible Raspberry Pi GPIO backend became unavailable during X re-home.")
+            raise RuntimeError(
+                f"Compatible Raspberry Pi GPIO backend became unavailable during {label} re-home."
+            )
 
         steps_per_rotation = int(getattr(request, "steps_per_rotation", 0)) or self._steps_per_rotation
         rpm = float(getattr(request, "speed_rpm", 0) or 0) or 60.0
         trapezoidal = bool(getattr(request, "trapezoidal_speed", True))
         acceleration = float(getattr(request, "acceleration_rpm_per_s", 0) or 0) or 300.0
 
+        limit_pin = pins.x_min_limit_pin if axis == "x" else pins.y_min_limit_pin
+
+        def cartesian(steps: int) -> tuple[int, int]:
+            # A and B together is X; A and B opposed is Y.
+            return (steps, steps) if axis == "x" else (steps, -steps)
+
+        def travelled_along_axis() -> int:
+            if axis == "x":
+                return abs((self._last_a_steps + self._last_b_steps) // 2)
+            return abs((self._last_a_steps - self._last_b_steps) // 2)
+
         with self._lock:
             self._setup_gpio(gpio, pins)
             try:
-                expected_steps = self._x_steps
-                # Budget the probe on where X is believed to be plus a generous
-                # margin for accumulated loss. Bounded rather than the whole
-                # track: if the switch is not found within a few cm of where it
-                # should be, something is wrong and failing says so.
+                expected_steps = self._x_steps if axis == "x" else self._y_steps
+                # Budget the probe on where the axis is believed to be plus a
+                # generous margin for accumulated loss. Bounded rather than the
+                # whole track: if the switch is not found within a few cm of
+                # where it should be, something is wrong and failing says so.
                 max_probe_steps = max(
                     2 * steps_per_rotation,
-                    expected_steps + round(_X_REHOME_MARGIN_CM * steps_per_cm),
+                    expected_steps + round(_REHOME_MARGIN_CM * steps_per_cm),
                 )
                 # One slow touch, not the three-pass home calibration uses.
                 # Calibration starts from an unknown position, so it needs a
@@ -1528,18 +1555,20 @@ class RaspberryGantryGPIOService:
                 # centimetres away and the approach is slow from the outset, so
                 # the extra passes buy nothing and cost the operator a wait on
                 # every single tool change.
+                approach_a, approach_b = cartesian(-max_probe_steps)
                 hit = self._move_corexy_steps(
-                    gpio, pins, -max_probe_steps, -max_probe_steps, XY_SLOW_HOMING_RPM,
-                    stop_limit_pin=pins.x_min_limit_pin,
+                    gpio, pins, approach_a, approach_b, _REHOME_APPROACH_RPM,
+                    stop_limit_pin=limit_pin,
                     steps_per_rotation=steps_per_rotation,
                     trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
                 )
                 if not hit:
                     raise RuntimeError(
-                        "The X min switch was not reached while re-checking home. The carriage may "
-                        "be further from home than expected, or the switch is not responding."
+                        f"The {label} min switch was not reached while re-checking home. The carriage "
+                        "may be further from home than expected, or the switch is not responding."
                     )
-                travelled = abs((self._last_a_steps + self._last_b_steps) // 2)
+                travelled = travelled_along_axis()
+
                 # The slow touch leaves the carriage resting on the switch,
                 # which is physical zero. Walk back off until the switch
                 # actually releases - a buffer's worth is the intent, but a
@@ -1549,29 +1578,34 @@ class RaspberryGantryGPIOService:
                 # where it truly ended up rather than where it was aimed.
                 step = max(1, round(self._limit_buffer_cm * steps_per_cm))
                 backoff_steps = 0
-                limit = max(1, math.ceil(_X_REHOME_RELEASE_CM / max(self._limit_buffer_cm, 0.01)))
+                limit = max(1, math.ceil(_REHOME_RELEASE_CM / max(self._limit_buffer_cm, 0.01)))
                 for _ in range(limit):
+                    back_a, back_b = cartesian(step)
                     self._move_corexy_steps(
-                        gpio, pins, step, step, rpm,
+                        gpio, pins, back_a, back_b, rpm,
                         steps_per_rotation=steps_per_rotation,
                         trapezoidal=trapezoidal, acceleration_rpm_per_s=acceleration,
                     )
                     backoff_steps += step
-                    if not self._limit_active(gpio, pins.x_min_limit_pin):
+                    if not self._limit_active(gpio, limit_pin):
                         break
                 else:
                     raise RuntimeError(
-                        f"The X min switch is still closed {backoff_steps / steps_per_cm:.2f} cm after "
-                        "backing off it. It may be stuck, mis-wired, or the carriage is jammed against it."
+                        f"The {label} min switch is still closed {backoff_steps / steps_per_cm:.2f} cm "
+                        "after backing off it. It may be stuck, mis-wired, or the carriage is jammed "
+                        "against it."
                     )
+
                 # Record where the carriage genuinely ended up. Freeing the
-                # switch can take more than one nudge, and pinning x_cm to 0
-                # regardless would quietly bake that extra travel into every
-                # position afterwards.
-                self._x_steps = backoff_steps
-                self._x_cm = max(0.0, backoff_steps / steps_per_cm - self._limit_buffer_cm)
-                # How far the belief was out: the probe had to travel this much
-                # further (or less) than the tracked position said it would.
+                # switch can take more than one nudge, and pinning the position
+                # to 0 regardless would quietly bake that extra travel into
+                # every position afterwards.
+                position_cm = max(0.0, backoff_steps / steps_per_cm - self._limit_buffer_cm)
+                if axis == "x":
+                    self._x_steps, self._x_cm = backoff_steps, position_cm
+                else:
+                    self._y_steps, self._y_cm = backoff_steps, position_cm
+                    self._y_known = True
                 drift_steps = travelled - expected_steps
                 self._save_state()
             finally:
@@ -1580,9 +1614,10 @@ class RaspberryGantryGPIOService:
         return {
             "status": execution.status,
             "message": (
-                f"X re-homed. Position was out by {drift_steps} steps "
+                f"{label} re-homed. Position was out by {drift_steps} steps "
                 f"({drift_steps / steps_per_cm:+.3f} cm)."
             ),
+            "axis": axis,
             "expected_steps": expected_steps,
             "travelled_steps": travelled,
             "drift_steps": drift_steps,

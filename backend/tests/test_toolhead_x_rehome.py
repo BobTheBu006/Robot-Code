@@ -31,9 +31,13 @@ class _Recorder:
         self.events.append(("move", x_cm, y_cm))
         return {"x_cm": x_cm, "y_cm": y_cm, "speed_rpm": speed_rpm, "move_reply": "ok"}
 
-    def rehome(self, context, request):
+    def rehome_x(self, context, request):
         self.events.append(("rehome_x",))
         return {"drift_steps": 12, "drift_cm": 0.03, "message": "X re-homed."}
+
+    def rehome_y(self, context, request):
+        self.events.append(("rehome_y",))
+        return {"drift_steps": 4, "drift_cm": 0.01, "message": "Y re-homed."}
 
 
 class _Position:
@@ -50,11 +54,14 @@ class SequenceTests(unittest.TestCase):
 
         self._real_rehome = toolhead_module.raspberry_gantry_gpio_service.rehome_x
         self._real_on_pi = toolhead_module.xy_hardware_is_on_raspberry_pi
-        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome
+        self._real_rehome_y = toolhead_module.raspberry_gantry_gpio_service.rehome_y
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome_x
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self.recorder.rehome_y
         toolhead_module.xy_hardware_is_on_raspberry_pi = lambda context: True
 
     def tearDown(self) -> None:
         toolhead_module.raspberry_gantry_gpio_service.rehome_x = self._real_rehome
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self._real_rehome_y
         toolhead_module.xy_hardware_is_on_raspberry_pi = self._real_on_pi
 
     def _run(self, waypoints, verify=True):
@@ -62,17 +69,29 @@ class SequenceTests(unittest.TestCase):
             {}, waypoints, approach_speed_rpm=400, context={"hardware_map": {}}, verify_x_home=verify
         )
 
-    def test_the_rehome_happens_after_the_clearance_approach(self) -> None:
-        # Not before: the carriage has to be at the clearance offset first.
+    def test_y_is_homed_first_at_the_near_end_of_the_rack(self) -> None:
+        # Y has to be corrected before the sequence aims at the tool's Y -
+        # fixing it afterwards would be too late. Done at the clearance X so
+        # the head stays clear of the hooks, and near the rack's low end so the
+        # probe is short rather than traversing past every slot.
         self._run([(2.0, 30.0), (0.0, 30.0), (0.0, 28.3)])
-        self.assertEqual(self.recorder.events[0], ("move", 2.0, 30.0))
-        self.assertEqual(self.recorder.events[1], ("rehome_x",))
+        self.assertEqual(self.recorder.events[0], ("move", 2.0, 2.7))
+        self.assertEqual(self.recorder.events[1], ("rehome_y",))
 
-    def test_the_rehome_happens_before_anything_engages(self) -> None:
+    def test_x_is_homed_at_the_clearance_offset_after_y(self) -> None:
+        self._run([(2.0, 30.0), (0.0, 30.0), (0.0, 28.3)])
+        kinds = [event[0] for event in self.recorder.events]
+        self.assertLess(kinds.index("rehome_y"), kinds.index("rehome_x"))
+        self.assertEqual(self.recorder.events[2], ("move", 2.0, 30.0))
+        self.assertEqual(self.recorder.events[3], ("rehome_x",))
+
+    def test_both_homes_happen_before_anything_engages(self) -> None:
         # Probing with the tool part way onto its hooks would drag it.
         self._run([(2.0, 30.0), (0.0, 30.0), (0.0, 28.3)])
         kinds = [event[0] for event in self.recorder.events]
-        self.assertLess(kinds.index("rehome_x"), kinds.index("move", 1))
+        first_engage = [i for i, k in enumerate(kinds) if k == "move"][2]
+        self.assertLess(kinds.index("rehome_x"), first_engage)
+        self.assertLess(kinds.index("rehome_y"), first_engage)
 
     def test_it_happens_exactly_once(self) -> None:
         self._run([(2.0, 30.0), (0.0, 30.0), (0.0, 28.3), (0.0, 28.35), (2.0, 28.35)])
@@ -82,11 +101,15 @@ class SequenceTests(unittest.TestCase):
         waypoints = [(2.0, 30.0), (0.0, 30.0), (0.0, 28.3), (0.0, 28.35), (2.0, 28.35)]
         self._run(waypoints)
         moved = [(x, y) for kind, x, y in (e for e in self.recorder.events if e[0] == "move")]
-        self.assertEqual(moved, waypoints)
+        # The Y-home hop is prepended; every original waypoint still follows.
+        self.assertEqual(moved, [(2.0, 2.7), *waypoints])
 
-    def test_turning_it_off_skips_the_probe_entirely(self) -> None:
+    def test_turning_it_off_skips_both_probes_and_the_extra_hop(self) -> None:
         self._run([(2.0, 30.0), (0.0, 30.0)], verify=False)
-        self.assertNotIn("rehome_x", [e[0] for e in self.recorder.events])
+        kinds = [e[0] for e in self.recorder.events]
+        self.assertNotIn("rehome_x", kinds)
+        self.assertNotIn("rehome_y", kinds)
+        self.assertEqual(self.recorder.events[0], ("move", 2.0, 30.0))
 
     def test_the_drift_is_reported_in_the_moves(self) -> None:
         # Worth surfacing: it is the accumulated step loss since the last home.
@@ -100,7 +123,9 @@ class SequenceTests(unittest.TestCase):
         # not verify would be worse than one that never claimed to.
         toolhead_module.xy_hardware_is_on_raspberry_pi = lambda context: False
         self._run([(2.0, 30.0), (0.0, 30.0)])
-        self.assertNotIn("rehome_x", [e[0] for e in self.recorder.events])
+        kinds = [e[0] for e in self.recorder.events]
+        self.assertNotIn("rehome_x", kinds)
+        self.assertNotIn("rehome_y", kinds)
 
 
 class WaypointShapeTests(unittest.TestCase):
@@ -353,13 +378,16 @@ class FullSequenceTests(unittest.TestCase):
 
         self._real_on_pi = toolhead_module.xy_hardware_is_on_raspberry_pi
         self._real_rehome = toolhead_module.raspberry_gantry_gpio_service.rehome_x
+        self._real_rehome_y = toolhead_module.raspberry_gantry_gpio_service.rehome_y
         toolhead_module.xy_hardware_is_on_raspberry_pi = lambda context: True
-        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome_x
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self.recorder.rehome_y
         toolhead_module.physical_state_store.confirm("toolhead.held", None)
 
     def tearDown(self) -> None:
         toolhead_module.xy_hardware_is_on_raspberry_pi = self._real_on_pi
         toolhead_module.raspberry_gantry_gpio_service.rehome_x = self._real_rehome
+        toolhead_module.raspberry_gantry_gpio_service.rehome_y = self._real_rehome_y
         toolhead_module.physical_state_store.confirm("toolhead.held", None)
 
     def _position(self, x_cm: float):
