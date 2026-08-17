@@ -338,5 +338,70 @@ class _Move:
         self.y_cm = y_cm
 
 
+class FullSequenceTests(unittest.TestCase):
+    """pickup() and drop() end to end, not just run_sequence().
+
+    The reachability guard runs only from these entry points, so testing
+    run_sequence alone let a NameError in that guard reach the machine: every
+    test passed and the block failed with "TOOLHEAD_MIN_X_CM is not defined".
+    """
+
+    def setUp(self) -> None:
+        self.recorder = _Recorder()
+        self.service = ToolheadService()
+        self.service._goto = self.recorder.goto
+
+        self._real_on_pi = toolhead_module.xy_hardware_is_on_raspberry_pi
+        self._real_rehome = toolhead_module.raspberry_gantry_gpio_service.rehome_x
+        toolhead_module.xy_hardware_is_on_raspberry_pi = lambda context: True
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self.recorder.rehome
+        toolhead_module.physical_state_store.confirm("toolhead.held", None)
+
+    def tearDown(self) -> None:
+        toolhead_module.xy_hardware_is_on_raspberry_pi = self._real_on_pi
+        toolhead_module.raspberry_gantry_gpio_service.rehome_x = self._real_rehome
+        toolhead_module.physical_state_store.confirm("toolhead.held", None)
+
+    def _position(self, x_cm: float):
+        from app.services.toolhead import ToolheadPosition
+
+        return ToolheadPosition(index=1, x_cm=x_cm, y_cm=30.0)
+
+    def test_a_pickup_at_x_zero_runs(self) -> None:
+        moves = self.service.pickup(
+            base_inputs={}, position=self._position(0.0), approach_speed_rpm=400,
+            dip_depth_cm=1.7, lift_cm=0.05, clearance_cm=2.0,
+            context={"hardware_map": {}}, verify_x_home=True,
+        )
+        self.assertTrue(moves)
+
+    def test_a_pickup_below_x_zero_is_allowed(self) -> None:
+        # A rack at the very end of the rail needs the head to come in under
+        # the homed reference.
+        moves = self.service.pickup(
+            base_inputs={}, position=self._position(-0.2), approach_speed_rpm=400,
+            dip_depth_cm=1.7, lift_cm=0.05, clearance_cm=2.0,
+            context={"hardware_map": {}}, verify_x_home=True,
+        )
+        self.assertTrue(moves)
+
+    def test_a_pickup_far_below_the_minimum_is_refused(self) -> None:
+        with self.assertRaises(RuntimeError) as caught:
+            self.service.pickup(
+                base_inputs={}, position=self._position(-5.0), approach_speed_rpm=400,
+                dip_depth_cm=1.7, lift_cm=0.05, clearance_cm=2.0,
+                context={"hardware_map": {}}, verify_x_home=True,
+            )
+        self.assertIn("minimum X", str(caught.exception))
+
+    def test_a_drop_below_x_zero_is_allowed_too(self) -> None:
+        moves = self.service.drop(
+            base_inputs={}, position=self._position(-0.2), approach_speed_rpm=400,
+            dip_depth_cm=1.7, lift_cm=0.05, release_cm=0.05, clearance_cm=2.0,
+            context={"hardware_map": {}}, verify_x_home=True,
+        )
+        self.assertTrue(moves)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -29,6 +29,15 @@ ENGAGE_RPM = 50
 
 TOOLHEAD_COUNT = 6
 
+# Tool slots may sit slightly below the homed X reference: X 0 is one limit
+# buffer off the min switch, and a rack mounted right at the end of the rail
+# can need the head to come in under that. Bounded rather than open so a typo
+# cannot aim the carriage at the far side of the switch.
+#
+# Defined here rather than with the request models because those import from
+# this module, not the other way round.
+TOOLHEAD_MIN_X_CM = -2.0
+
 # Rack as measured. These seed the block defaults; the exact position of each
 # slot is editable per toolhead and an edit is written back as the new default.
 DEFAULT_TOOLHEAD_POSITIONS: dict[int, tuple[float, float]] = {

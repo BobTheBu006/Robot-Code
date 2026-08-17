@@ -209,7 +209,9 @@ class GantryXYCalibrationResponse(BaseModel):
 
 class GantryGotoXYRequest(BaseModel):
     tool_port: str | None = None
-    x_cm: float = Field(default=0.0, ge=0.0)
+    # Same lower bound as GantryXYMoveRequest: a tool rack at the end of the
+    # rail can sit below the homed X reference.
+    x_cm: float = Field(default=0.0, ge=GANTRY_MIN_X_CM)
     y_cm: float = Field(default=0.0, ge=0.0)
     speed_profile: GantrySpeedProfile = "normal"
     speed_rpm: int = Field(default=400, gt=0)

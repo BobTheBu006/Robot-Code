@@ -1,13 +1,7 @@
 from pydantic import BaseModel, Field
 
-from app.services.toolhead import TOOLHEAD_COUNT
+from app.services.toolhead import TOOLHEAD_COUNT, TOOLHEAD_MIN_X_CM
 
-
-# Tool slots may sit slightly below the homed X reference: X 0 is one limit
-# buffer off the min switch, and a rack mounted right at the end of the rail
-# can need the head to come in under that. Bounded rather than open so a typo
-# cannot aim the carriage at the far side of the switch.
-TOOLHEAD_MIN_X_CM = -2.0
 
 
 class ToolheadRackGeometry(BaseModel):
