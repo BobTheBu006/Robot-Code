@@ -261,6 +261,10 @@ class RaspberryGantryGPIOService:
         # including runs stopped early by a limit; probes measure travel from it.
         self._last_a_steps = 0
         self._last_b_steps = 0
+        self._last_move_seconds = 0.0
+        self._last_move_steps = 0
+        self._last_requested_rpm = 0.0
+        self._last_capped_rpm = 0.0
         # The process-wide safety latch, shared by reference rather than owned
         # here. The stepping loop checks it every step so motion aborts
         # mid-move rather than running to completion, and because it is the
@@ -1391,6 +1395,16 @@ class RaspberryGantryGPIOService:
         resolved_steps_per_rotation = steps_per_rotation or int(os.getenv("ROBOT_GPIO_STEPS_PER_ROTATION", "200"))
         base_interval = self._step_interval_seconds(speed_rpm, resolved_steps_per_rotation)
         min_interval = DEFAULT_STEP_PULSE_SECONDS * 2.0
+
+        # What the requested speed would need, against what the pulse floor
+        # allows. Asking for more than the ceiling is silently ignored, which
+        # is how 400, 800 and 1600 RPM can all feel identical - they are all
+        # the same 5000 steps/s once clamped.
+        self._last_requested_rpm = float(speed_rpm)
+        self._last_capped_rpm = min(
+            float(speed_rpm), 60.0 / (min_interval * resolved_steps_per_rotation)
+        )
+        move_started = time.perf_counter()
         # Starting a stepper from standstill at full speed stalls it, and a
         # stall on one CoreXY motor bends the commanded straight line into a
         # diagonal. Ramp exactly like the firmware instead of jumping to speed.
@@ -1462,6 +1476,11 @@ class RaspberryGantryGPIOService:
                 if pulse_b:
                     gpio.output(pins.b_step_pin, gpio.LOW)
                 self._wait_until(step_started + interval)
+            # Measured, not calculated: this is the only number that says
+            # whether the machine actually went faster. Python driving GPIO a
+            # step at a time has its own ceiling well below the electrical one.
+            self._last_move_seconds = time.perf_counter() - move_started
+            self._last_move_steps = total
         except GantryStoppedError:
             # Leave the drivers in a safe idle state on the way out.
             gpio.output(pins.a_step_pin, gpio.LOW)
@@ -1871,6 +1890,37 @@ class RaspberryGantryGPIOService:
             "simulated": execution.simulated,
         }
 
+    def _speed_report(self) -> dict:
+        """Requested, allowed, and actually achieved.
+
+        These three routinely disagree and nothing used to say so. The pulse
+        floor silently clamps anything above its ceiling, and Python driving
+        GPIO a step at a time has its own lower ceiling again - so a block can
+        ask for 1600 RPM, be clamped to 375, and manage 300, while the UI
+        cheerfully echoes 1600 back. Measured, so it cannot flatter itself.
+        """
+        seconds = self._last_move_seconds
+        steps = self._last_move_steps
+        achieved_rpm = None
+        if seconds > 0 and steps > 0:
+            achieved_rpm = round((steps / seconds) * 60.0 / self._steps_per_rotation, 1)
+
+        report = {
+            "requested_rpm": round(self._last_requested_rpm, 1),
+            "ceiling_rpm": round(self._last_capped_rpm, 1),
+            "achieved_rpm": achieved_rpm,
+            "steps": steps,
+            "seconds": round(seconds, 3) if seconds else None,
+        }
+        if self._last_requested_rpm > self._last_capped_rpm + 0.5:
+            report["note"] = (
+                f"Requested {self._last_requested_rpm:g} RPM but the step pulse floor caps this "
+                f"machine at {self._last_capped_rpm:g} RPM. Raise it with "
+                f"ROBOT_GPIO_STEP_PULSE_SECONDS (currently "
+                f"{DEFAULT_STEP_PULSE_SECONDS * 1e6:.0f} us)."
+            )
+        return report
+
     def _move_result(
         self,
         context: dict,
@@ -1887,6 +1937,7 @@ class RaspberryGantryGPIOService:
             "target": {"x_cm": request.x_cm, "y_cm": request.y_cm, "z_cm": request.z_cm},
             "speed_profile": request.speed_profile,
             "speed_rpm": request.speed_rpm,
+            "speed": self._speed_report(),
             "trapezoidal_speed": request.trapezoidal_speed,
             "acceleration_rpm_per_s": request.acceleration_rpm_per_s,
             "on_the_fly_calibration": request.on_the_fly_calibration,

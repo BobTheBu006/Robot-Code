@@ -28,5 +28,15 @@ echo "Backend health: http://127.0.0.1:8000/health"
 echo "Backend robot state: http://127.0.0.1:8000/api/robot/state"
 echo "Backend docs: http://127.0.0.1:8000/docs"
 echo
+# Step pulse width. The interval between steps is floored at twice this, so
+# it sets the machine's top speed: 15 us -> 30 us floor -> ~33k steps/s, which
+# at 800 steps/rotation is about 2500 RPM.
+#
+# It was 100 us, capping this machine at 375 RPM - which is why 400, 800 and
+# 1600 RPM all felt identical. A TB6600's opto input needs a few microseconds
+# to switch, so this cannot go much lower without the driver starting to miss
+# pulses outright.
+export ROBOT_GPIO_STEP_PULSE_SECONDS="${ROBOT_GPIO_STEP_PULSE_SECONDS:-0.000015}"
+
 echo "Starting FastAPI backend..."
 ".venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
