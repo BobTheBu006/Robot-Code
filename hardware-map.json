@@ -22,6 +22,17 @@
       "expected_serial_number": "58d72d4c84bcf01191f2167148e9de0f",
       "expected_hardware_id": null,
       "expected_device_label": null
+    },
+    {
+      "id": "xy-closed-loop",
+      "label": "CoreXY closed-loop controller",
+      "usb_port": "/dev/ttyUSB2",
+      "enabled": false,
+      "notes": "Not yet built. See docs/CLOSED_LOOP_XY_PLAN.md. Placeholder usb_port and no expected_serial_number - both need the real board plugged in and identified before this can be trusted.",
+      "dynamic": false,
+      "expected_serial_number": null,
+      "expected_hardware_id": null,
+      "expected_device_label": null
     }
   ],
   "devices": [
@@ -1088,6 +1099,195 @@
         }
       ],
       "notes": "Peristaltic pump on the Z/pump ESP32. Calibrate mL per 200 full steps."
+    },
+    {
+      "id": "xy-cl-motor-a",
+      "board_id": "xy-closed-loop",
+      "name": "CoreXY A Motor (closed-loop)",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-a-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "x_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "xy-cl-a-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "x_step_pin",
+          "notes": null
+        },
+        {
+          "id": "xy-cl-enable",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": "gantry_enable_pin",
+          "notes": "Shared ENABLE for both CoreXY TB6600 drivers on the closed-loop board. Same wiring convention as the Pi-driven pair: ENA- to GND with PUL-/DIR-, ENA+ here. Confirm polarity on hardware before trusting it - do not assume it matches the Pi board without checking."
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "xy-cl-motor-b",
+      "board_id": "xy-closed-loop",
+      "name": "CoreXY B Motor (closed-loop)",
+      "kind": "stepper_motor",
+      "enabled": false,
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-b-dir",
+          "signal": "direction",
+          "gpio": "-",
+          "function_input_key": "y_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "xy-cl-b-step",
+          "signal": "step",
+          "gpio": "-",
+          "function_input_key": "y_step_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "xy-cl-x-min-limit-switch",
+      "board_id": "xy-closed-loop",
+      "name": "X Min Limit Switch (closed-loop)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-x-min-limit",
+          "signal": "signal",
+          "gpio": "-",
+          "function_input_key": "x_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": "Moved off the Pi per the plan: nothing in the control loop should cross the serial link."
+    },
+    {
+      "id": "xy-cl-x-max-limit-switch",
+      "board_id": "xy-closed-loop",
+      "name": "X Max Limit Switch (closed-loop)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-x-max-limit",
+          "signal": "signal",
+          "gpio": "-",
+          "function_input_key": "x_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": "Moved off the Pi per the plan: nothing in the control loop should cross the serial link."
+    },
+    {
+      "id": "xy-cl-y-min-limit-switch",
+      "board_id": "xy-closed-loop",
+      "name": "Y Min Limit Switch (closed-loop)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-y-min-limit",
+          "signal": "signal",
+          "gpio": "-",
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": "Moved off the Pi per the plan: nothing in the control loop should cross the serial link."
+    },
+    {
+      "id": "xy-cl-y-max-limit-switch",
+      "board_id": "xy-closed-loop",
+      "name": "Y Max Limit Switch (closed-loop)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-y-max-limit",
+          "signal": "signal",
+          "gpio": "-",
+          "function_input_key": "y_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "notes": "Moved off the Pi per the plan: nothing in the control loop should cross the serial link."
+    },
+    {
+      "id": "xy-cl-encoder-a",
+      "board_id": "xy-closed-loop",
+      "name": "AS5047P Encoder (Motor A)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "rotary_position_encoder",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-encoder-a-cs",
+          "signal": "chip_select",
+          "gpio": "-",
+          "function_input_key": "encoder_a_cs_pin",
+          "notes": null
+        }
+      ],
+      "notes": "AS5047P-TS_EK_AB on the CoreXY motor A shaft, SPI. Shares SCK/MISO/MOSI with the other encoder; only the chip-select is per-device. Mount concentric with the shaft within a few tenths of a millimetre at the datasheet air gap - a poorly centred magnet produces a smooth, plausible-looking error."
+    },
+    {
+      "id": "xy-cl-encoder-b",
+      "board_id": "xy-closed-loop",
+      "name": "AS5047P Encoder (Motor B)",
+      "kind": "sensor",
+      "enabled": false,
+      "sensor_kind": "rotary_position_encoder",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "xy-cl-encoder-b-cs",
+          "signal": "chip_select",
+          "gpio": "-",
+          "function_input_key": "encoder_b_cs_pin",
+          "notes": null
+        }
+      ],
+      "notes": "AS5047P-TS_EK_AB on the CoreXY motor B shaft, SPI. Shares SCK/MISO/MOSI with the other encoder; only the chip-select is per-device. Mount concentric with the shaft within a few tenths of a millimetre at the datasheet air gap - a poorly centred magnet produces a smooth, plausible-looking error."
     }
   ],
   "groups": [],
@@ -1366,58 +1566,58 @@
   "node_positions": [
     {
       "node_id": "raspberry-pi",
-      "x": 40.0,
-      "y": 180.0
+      "x": 570.0,
+      "y": 790.0
     },
     {
       "node_id": "y-max-limit-switch",
-      "x": 521.84,
-      "y": -686.34
+      "x": 1137.84,
+      "y": 241.41
     },
     {
       "node_id": "x-axis-motor",
-      "x": 521.84,
-      "y": -686.34
+      "x": 1137.84,
+      "y": 241.41
     },
     {
       "node_id": "y-axis-motor",
-      "x": 521.84,
-      "y": -576.34
+      "x": 1137.84,
+      "y": 351.41
     },
     {
       "node_id": "x-min-limit-switch",
-      "x": 521.84,
-      "y": -466.34
+      "x": 1137.84,
+      "y": 461.41
     },
     {
       "node_id": "x-max-limit-switch",
-      "x": 521.84,
-      "y": -356.34
+      "x": 1137.84,
+      "y": 571.41
     },
     {
       "node_id": "y-min-limit-switch",
-      "x": 521.84,
-      "y": -246.34
+      "x": 1137.84,
+      "y": 681.41
     },
     {
       "node_id": "z-left-min-limit-switch",
-      "x": 1112.0,
-      "y": -390.0
+      "x": 1338.0,
+      "y": 225.75
     },
     {
       "node_id": "z-left-max-limit-switch",
-      "x": 1112.0,
-      "y": -280.0
+      "x": 1338.0,
+      "y": 335.75
     },
     {
       "node_id": "z-right-min-limit-switch",
-      "x": 1112.0,
-      "y": -170.0
+      "x": 1338.0,
+      "y": 445.75
     },
     {
       "node_id": "z-right-max-limit-switch",
-      "x": 1110.9,
-      "y": -63.4
+      "x": 1336.9,
+      "y": 552.35
     },
     {
       "node_id": "controller-x83xnc",
@@ -1461,44 +1661,44 @@
     },
     {
       "node_id": "controller-ykkl80",
-      "x": 950.0,
-      "y": 368.0
+      "x": 1634.0,
+      "y": 796.0
     },
     {
       "node_id": "z-left-motor",
-      "x": 1352.0,
-      "y": -103.0
+      "x": 2216.0,
+      "y": 545.0
     },
     {
       "node_id": "z-right-motor",
-      "x": 1356.0,
-      "y": -17.0
+      "x": 2220.0,
+      "y": 631.0
     },
     {
       "node_id": "peristaltic-pump-1",
-      "x": 1372.0,
-      "y": 188.0
+      "x": 1998.0,
+      "y": 544.0
     },
     {
       "node_id": "peristaltic-pump-2",
-      "x": 1372.0,
-      "y": 298.0
+      "x": 1998.0,
+      "y": 654.0
     },
     {
       "node_id": "peristaltic-pump-3",
-      "x": 1372.0,
-      "y": 408.0
+      "x": 1998.0,
+      "y": 764.0
     },
     {
       "node_id": "peristaltic-pump-4",
-      "x": 1372.0,
-      "y": 518.0
+      "x": 1998.0,
+      "y": 874.0
     },
     {
       "node_id": "peristaltic-pump-5",
-      "x": 1372.0,
-      "y": 628.0
+      "x": 1998.0,
+      "y": 984.0
     }
   ],
-  "updated_at": "2026-08-13T16:25:53.607091Z"
+  "updated_at": "2026-08-19T08:54:48.526384Z"
 }

@@ -69,6 +69,23 @@ class GantryXYMoveRequest(BaseModel):
     z_right_max_limit_pin: int = Field(default=13, ge=0)
     baud_rate: int | None = Field(default=None, gt=0)
 
+    # AS5047P chip-select pins, one per motor. -1 means no encoder is wired -
+    # the firmware runs open-loop exactly as before, and no encoder command is
+    # ever sent, so a machine without encoders behaves identically to today.
+    encoder_a_cs_pin: int = Field(default=-1, ge=-1)
+    encoder_b_cs_pin: int = Field(default=-1, ge=-1)
+    # PID gains. Zero is the firmware's own inert default - matched here so a
+    # block that has never touched these fields sends the same "do nothing"
+    # values the firmware already assumes, rather than depending on the
+    # firmware default and the model default happening to agree.
+    xy_pid_kp: float = Field(default=0.0, ge=0.0)
+    xy_pid_ki: float = Field(default=0.0, ge=0.0)
+    xy_pid_kd: float = Field(default=0.0, ge=0.0)
+    # Following-error fault threshold, in encoder counts (AS5047P: 16384/rev).
+    # ~205 counts is ~10 full steps at 800 steps/rev - generous enough not to
+    # trip on ordinary motion, tight enough to catch a real stall.
+    xy_follow_limit_counts: float = Field(default=205.0, gt=0.0)
+
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryXYMoveRequest":
         assigned_pins = {
@@ -95,6 +112,10 @@ class GantryXYMoveRequest(BaseModel):
 
         if self.gantry_enable_pin >= 0:
             assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
+        if self.encoder_a_cs_pin >= 0:
+            assigned_pins["encoder_a_cs_pin"] = self.encoder_a_cs_pin
+        if self.encoder_b_cs_pin >= 0:
+            assigned_pins["encoder_b_cs_pin"] = self.encoder_b_cs_pin
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",
@@ -129,6 +150,11 @@ class GantryXYMoveResponse(BaseModel):
     target: dict[str, float]
     configured_pins: dict[str, int | float]
     configured_limits: dict[str, int | str]
+    # None when no encoder is configured for this move, so "not measured" and
+    # "measured zero error" are never confused with each other.
+    follow_error_peak_a: float | None = None
+    follow_error_peak_b: float | None = None
+    follow_error_tripped: bool = False
 
 
 class GantryXYCalibrationRequest(BaseModel):

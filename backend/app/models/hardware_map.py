@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 HardwareDeviceKind = Literal["stepper_motor", "servo", "sensor"]
-HardwareSensorKind = Literal["position_limit_switch", "aht20_temperature_humidity"]
+HardwareSensorKind = Literal["position_limit_switch", "aht20_temperature_humidity", "rotary_position_encoder"]
 
 
 class HardwareBoardMapping(BaseModel):

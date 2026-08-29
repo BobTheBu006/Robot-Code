@@ -315,6 +315,12 @@ class GantryControllerService:
         action_prefix: str,
         action_deadline: float,
         enable_command: str | list[str] | None = None,
+        # Optional (command, acceptable "OK ..." prefixes) pairs sent after the
+        # enable command and before limits. Used for setup that some firmware
+        # builds do not support and some machines do not need - e.g. the
+        # closed-loop encoder/PID commands - so it stays a list of individually
+        # optional steps rather than named parameters every caller must supply.
+        extra_commands: list[tuple[str, tuple[str, ...]]] | None = None,
     ) -> tuple[str | None, str | None, str | None]:
         serial = self._load_serial_module()
         try:
@@ -359,6 +365,19 @@ class GantryControllerService:
                                     raise GantryControllerError(
                                         f"ESP32 did not acknowledge gantry enable configuration. Reply: {enable_reply}"
                                     )
+
+                        for extra_command, ok_prefixes in (extra_commands or []):
+                            extra_reply, extra_completed = self._send_command(
+                                serial_port,
+                                extra_command,
+                                terminal_prefixes=(*ok_prefixes, "ERR "),
+                                deadline_seconds=self._command_deadline(),
+                                active_session=active_session,
+                            )
+                            if not extra_completed or not self._reply_contains_prefix(extra_reply, ok_prefixes):
+                                raise GantryControllerError(
+                                    f"ESP32 did not acknowledge '{extra_command}'. Reply: {extra_reply}"
+                                )
 
                         limit_replies: list[str] = []
                         for next_limit_command in self._command_list(limit_command):
@@ -446,6 +465,57 @@ class GantryControllerService:
             f"{1 if request.enable_active_low else 0}"
         )
 
+    def _build_encoder_pin_command(self, request: GantryXYMoveRequest) -> str | None:
+        # Only sent when both CS pins are wired - a machine without encoders
+        # must behave exactly as it did before this feature existed, and the
+        # firmware's own default (encodersConfigured = false) already means
+        # "run open-loop", so there is nothing to configure in that case.
+        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+            return None
+        return f"SET ENCODER PINS {request.encoder_a_cs_pin} {request.encoder_b_cs_pin}"
+
+    def _build_xy_pid_command(self, request: GantryXYMoveRequest) -> str | None:
+        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+            return None
+        return f"SET XY PID {request.xy_pid_kp:.4f} {request.xy_pid_ki:.4f} {request.xy_pid_kd:.4f}"
+
+    def _build_xy_follow_limit_command(self, request: GantryXYMoveRequest) -> str | None:
+        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+            return None
+        return f"SET XY FOLLOW LIMIT {request.xy_follow_limit_counts:.2f}"
+
+    @staticmethod
+    def _parse_follow_error_reply(move_reply: str | None) -> tuple[float | None, float | None, bool]:
+        """Pull the follow-error numbers out of a move reply.
+
+        Two shapes to recognise: "FOLLOW ERROR PEAK <a> <b>" on a move that
+        completed normally, and "ERR FOLLOW ERROR XY <a> <b>" on a move that the
+        firmware stopped because the threshold was exceeded. Returns
+        (peak_a, peak_b, tripped); (None, None, False) when neither line is
+        present, which is what a machine with no encoders configured sends.
+        """
+        if not move_reply:
+            return None, None, False
+
+        tripped = False
+        peak_a = peak_b = None
+        for line in move_reply.splitlines():
+            upper = line.upper()
+            if upper.startswith("ERR FOLLOW ERROR XY"):
+                parts = line.split()
+                tripped = True
+                try:
+                    peak_a, peak_b = float(parts[-2]), float(parts[-1])
+                except (IndexError, ValueError):
+                    pass
+            elif upper.startswith("FOLLOW ERROR PEAK"):
+                parts = line.split()
+                try:
+                    peak_a, peak_b = float(parts[-2]), float(parts[-1])
+                except (IndexError, ValueError):
+                    pass
+        return peak_a, peak_b, tripped
+
     def _build_move_xy_command(self, request: GantryXYMoveRequest) -> str:
         return (
             f"MOVE XYZ {request.x_cm:.3f} {request.y_cm:.3f} {request.z_cm:.3f} "
@@ -503,16 +573,31 @@ class GantryControllerService:
             abs(request.y_cm) * XY_STEPS_PER_CM,
             abs(request.z_cm) * Z_STEPS_PER_CM,
         )
+
+        extra_commands: list[tuple[str, tuple[str, ...]]] = []
+        encoder_command = self._build_encoder_pin_command(request)
+        if encoder_command is not None:
+            extra_commands.append((encoder_command, ("OK ENCODER PINS",)))
+        pid_command = self._build_xy_pid_command(request)
+        if pid_command is not None:
+            extra_commands.append((pid_command, ("OK XY PID",)))
+        follow_limit_command = self._build_xy_follow_limit_command(request)
+        if follow_limit_command is not None:
+            extra_commands.append((follow_limit_command, ("OK XY FOLLOW LIMIT",)))
+
         pin_reply, limit_reply, move_reply = self._send_config_and_action(
             port=port,
             baud_rate=baud_rate,
             pin_command=pin_command,
             enable_command=self._build_xy_enable_command(request),
+            extra_commands=extra_commands or None,
             limit_command=limit_command,
             action_command=move_command,
             action_prefix="OK MOVE XYZ",
             action_deadline=self._move_deadline(dominant_steps, _effective_move_rpm(request)),
         )
+
+        follow_error_peak_a, follow_error_peak_b, follow_error_tripped = self._parse_follow_error_reply(move_reply)
 
         return GantryXYMoveResponse(
             port=port,
@@ -533,6 +618,9 @@ class GantryControllerService:
             move_reply=move_reply,
             move_applied=True,
             target={"x_cm": request.x_cm, "y_cm": request.y_cm, "z_cm": request.z_cm},
+            follow_error_peak_a=follow_error_peak_a,
+            follow_error_peak_b=follow_error_peak_b,
+            follow_error_tripped=follow_error_tripped,
             configured_pins={
                 "x_step_pin": request.x_step_pin,
                 "x_dir_pin": request.x_dir_pin,

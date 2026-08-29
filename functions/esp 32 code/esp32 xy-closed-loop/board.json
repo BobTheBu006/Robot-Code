@@ -1,0 +1,10 @@
+{
+  "board_id": "xy-closed-loop",
+  "display_name": "CoreXY closed-loop controller",
+  "port": "/dev/ttyUSB2",
+  "description": "CoreXY steppers, AS5047P encoders and the four XY limit switches. Placeholder id and port - not yet built, no serial number recorded. Rename to the real controller id once flashed and identified.",
+  "hardware_id": null,
+  "serial_number": null,
+  "firmware_entry_file": "firmware/main.ino",
+  "fqbn": "esp32:esp32:esp32"
+}
