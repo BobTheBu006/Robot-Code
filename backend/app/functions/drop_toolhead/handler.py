@@ -64,7 +64,7 @@ def execute(context: dict, inputs: dict) -> dict:
         dip_depth_cm=request.dip_depth_cm,
         lift_cm=request.lift_cm,
         release_cm=request.release_cm,
-        clearance_cm=request.clearance_cm,
+        clearance_cm=request.drop_clearance_cm,
         context=context,
         verify_x_home=request.verify_x_home,
         rack_approach_speed_rpm=request.rack_approach_speed_rpm,

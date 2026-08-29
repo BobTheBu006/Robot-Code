@@ -482,6 +482,41 @@ class FullSequenceTests(unittest.TestCase):
         )
         self.assertTrue(moves)
 
+class ClearanceTests(unittest.TestCase):
+    """Pickup and drop stand off by different amounts.
+
+    Approaching an empty slot only needs room to clear the hooks. Backing away
+    with a tool hanging off the head needs more, because the tool sticks out
+    further than the carriage does.
+    """
+
+    def setUp(self) -> None:
+        self.service = ToolheadService()
+
+    def test_pickup_and_drop_clearances_are_independent(self) -> None:
+        pickup = self.service.pickup_waypoints(_Position(), dip_depth_cm=1.7, lift_cm=0.05, clearance_cm=2.0)
+        dropped = self.service.drop_waypoints(
+            _Position(), dip_depth_cm=1.7, lift_cm=0.05, release_cm=0.05, clearance_cm=10.0
+        )
+        self.assertEqual(pickup[0][0], 2.0)
+        self.assertEqual(dropped[0][0], 10.0)
+
+    def test_the_sequence_returns_to_its_own_clearance(self) -> None:
+        # The exit standoff has to match the entry one, or the head backs out
+        # to a different place than it came in from.
+        dropped = self.service.drop_waypoints(
+            _Position(), dip_depth_cm=1.7, lift_cm=0.05, release_cm=0.05, clearance_cm=10.0
+        )
+        self.assertEqual(dropped[0][0], dropped[-1][0])
+
+
+class RequestDefaultTests(unittest.TestCase):
+    def test_the_blocks_default_to_two_and_ten(self) -> None:
+        from app.models.toolhead import ToolheadDropRequest, ToolheadPickupRequest
+
+        for request in (ToolheadPickupRequest(), ToolheadDropRequest()):
+            self.assertEqual(request.pickup_clearance_cm, 2.0)
+            self.assertEqual(request.drop_clearance_cm, 10.0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,7 +26,12 @@ class ToolheadRackGeometry(BaseModel):
     tool_6_x_cm: float = Field(default=0.0, ge=TOOLHEAD_MIN_X_CM)
     tool_6_y_cm: float = Field(default=52.7, ge=0.0)
 
-    clearance_cm: float = Field(default=2.0, gt=0.0)
+    # Separate per operation. Approaching an empty rack slot only needs
+    # enough room to clear the hooks; backing away with a tool hanging off the
+    # head wants considerably more, because the tool sticks out further than
+    # the carriage does.
+    pickup_clearance_cm: float = Field(default=2.0, gt=0.0)
+    drop_clearance_cm: float = Field(default=10.0, gt=0.0)
     dip_depth_cm: float = Field(default=1.7, gt=0.0)
     lift_cm: float = Field(default=0.1, ge=0.0)
     release_cm: float = Field(default=0.1, ge=0.0)

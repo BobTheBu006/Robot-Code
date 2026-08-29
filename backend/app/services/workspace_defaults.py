@@ -51,7 +51,7 @@ _TOOLHEAD_FUNCTION_IDS = ("pickup_toolhead", "drop_toolhead")
 # excluded: the Hardware Map owns those.
 TOOLHEAD_DEFAULT_KEYS = frozenset(
     {f"tool_{index}_{axis}_cm" for index in range(1, 7) for axis in ("x", "y")}
-    | {"clearance_cm", "dip_depth_cm", "lift_cm", "release_cm"}
+    | {"pickup_clearance_cm", "drop_clearance_cm", "dip_depth_cm", "lift_cm", "release_cm"}
 )
 
 
