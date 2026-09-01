@@ -272,7 +272,7 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
 
 
 class ClosedLoopEncoderCommandTests(unittest.TestCase):
-    """Protocol formatting for the AS5047P encoder / PID commands.
+    """Protocol formatting for the AS5047D encoder / PID commands.
 
     A machine with no encoders wired must behave exactly as it did before this
     feature existed - these commands are only ever built and sent when both

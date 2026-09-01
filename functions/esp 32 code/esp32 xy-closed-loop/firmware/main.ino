@@ -353,7 +353,7 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 
 
 // ---------------------------------------------------------------------------
-// Closed-loop XY: AS5047P encoders on the A and B motor shafts, read over SPI.
+// Closed-loop XY: AS5047D encoders on the A and B motor shafts, read over SPI.
 //
 // One encoder per physical motor - "A" and "B" here, matching xAxis/yAxis
 // above which despite their names pulse the A and B motors respectively (see
@@ -362,7 +362,7 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 // when converting a cartesian target into A/B deltas, exactly as every move
 // already does.
 //
-// AS5047P is 14-bit (16384 counts/revolution). At 800 steps/revolution that is
+// AS5047D is 14-bit (16384 counts/revolution). At 800 steps/revolution that is
 // 20.48 counts per full step, so single-step loss is directly visible.
 //
 // Correction is applied inside the existing, proven CoreXY stepping loop
@@ -377,10 +377,10 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 
 #include <SPI.h>
 
-const int ENCODER_COUNTS_PER_REV = 16384;   // AS5047P: 14-bit
-const uint16_t AS5047P_CMD_READ = 0x4000;   // read, with parity bit set below
-const uint16_t AS5047P_REG_ANGLECOM = 0x3FFF;
-const uint32_t AS5047P_SPI_HZ = 1000000;    // conservative; datasheet allows up to 10 MHz
+const int ENCODER_COUNTS_PER_REV = 16384;   // AS5047D: 14-bit
+const uint16_t AS5047D_CMD_READ = 0x4000;   // read, with parity bit set below
+const uint16_t AS5047D_REG_ANGLECOM = 0x3FFF;
+const uint32_t AS5047D_SPI_HZ = 1000000;    // conservative; datasheet allows up to 10 MHz
 
 struct EncoderChannel {
   int csPin = -1;
@@ -388,7 +388,7 @@ struct EncoderChannel {
   long turns = 0;                // accumulated whole revolutions
   bool primed = false;           // false until the first read establishes lastRaw
   bool faulted = false;          // set if a read looks like a missed wrap
-  uint16_t lastError = 0;        // AS5047P error register, if ever read
+  uint16_t lastError = 0;        // AS5047D error register, if ever read
 };
 
 EncoderChannel encoderA;   // on the A motor shaft (xAxis.stepPin/dirPin)
@@ -449,7 +449,7 @@ void configureEncoderPins(int csA, int csB) {
   encodersConfigured = (csA >= 0 && csB >= 0);
 }
 
-// Odd parity over the low 15 bits, per the AS5047P frame format.
+// Odd parity over the low 15 bits, per the AS5047D frame format.
 uint16_t as5047pWithParity(uint16_t command) {
   uint16_t value = command;
   uint8_t parity = 0;
@@ -463,10 +463,10 @@ uint16_t as5047pWithParity(uint16_t command) {
 }
 
 // One 16-bit SPI transaction: send a command frame, get back the previous
-// frame's reply (the AS5047P pipelines by one transaction, per its datasheet).
+// frame's reply (the AS5047D pipelines by one transaction, per its datasheet).
 uint16_t as5047pTransfer(int csPin, uint16_t command) {
   uint16_t frame = as5047pWithParity(command);
-  SPI.beginTransaction(SPISettings(AS5047P_SPI_HZ, MSBFIRST, SPI_MODE1));
+  SPI.beginTransaction(SPISettings(AS5047D_SPI_HZ, MSBFIRST, SPI_MODE1));
   digitalWrite(csPin, LOW);
   delayMicroseconds(1);
   uint16_t reply = SPI.transfer16(frame);
@@ -487,8 +487,8 @@ bool readEncoderChannel(EncoderChannel &channel) {
 
   // First transfer primes the pipeline; the reply belongs to the read before
   // it, so a real ANGLECOM value needs two transfers back to back.
-  as5047pTransfer(channel.csPin, AS5047P_CMD_READ | AS5047P_REG_ANGLECOM);
-  uint16_t reply = as5047pTransfer(channel.csPin, AS5047P_CMD_READ | AS5047P_REG_ANGLECOM);
+  as5047pTransfer(channel.csPin, AS5047D_CMD_READ | AS5047D_REG_ANGLECOM);
+  uint16_t reply = as5047pTransfer(channel.csPin, AS5047D_CMD_READ | AS5047D_REG_ANGLECOM);
 
   bool errorFlag = (reply & 0x4000) != 0;
   uint16_t raw = reply & 0x3FFF;

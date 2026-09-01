@@ -69,7 +69,7 @@ class GantryXYMoveRequest(BaseModel):
     z_right_max_limit_pin: int = Field(default=13, ge=0)
     baud_rate: int | None = Field(default=None, gt=0)
 
-    # AS5047P chip-select pins, one per motor. -1 means no encoder is wired -
+    # AS5047D chip-select pins, one per motor. -1 means no encoder is wired -
     # the firmware runs open-loop exactly as before, and no encoder command is
     # ever sent, so a machine without encoders behaves identically to today.
     encoder_a_cs_pin: int = Field(default=-1, ge=-1)
@@ -81,7 +81,7 @@ class GantryXYMoveRequest(BaseModel):
     xy_pid_kp: float = Field(default=0.0, ge=0.0)
     xy_pid_ki: float = Field(default=0.0, ge=0.0)
     xy_pid_kd: float = Field(default=0.0, ge=0.0)
-    # Following-error fault threshold, in encoder counts (AS5047P: 16384/rev).
+    # Following-error fault threshold, in encoder counts (AS5047D: 16384/rev).
     # ~205 counts is ~10 full steps at 800 steps/rev - generous enough not to
     # trip on ordinary motion, tight enough to catch a real stall.
     xy_follow_limit_counts: float = Field(default=205.0, gt=0.0)

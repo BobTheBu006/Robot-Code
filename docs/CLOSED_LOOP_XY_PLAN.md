@@ -28,7 +28,7 @@ firmware put the steps back.
 | Item | Detail |
 | --- | --- |
 | Controller | A **third ESP32**, dedicated to XY. Confirm availability before starting. |
-| Encoders | 2 × **AS5047P-TS_EK_AB** adapter boards (Mouser), one per motor |
+| Encoders | 2 × **AS5047D-TS_EK_AB** adapter boards ([RS, code 2018304](https://dk.rs-online.com/web/p/sensor-udvikling/2018304)), one per motor. Same register map and SPI frame as the AS5047P this was first speced against - confirmed against both datasheets, same ANGLECOM at 0x3FFF, same parity scheme - so nothing in the driver differs. Two real specs do differ, neither reached by this design: ABI resolution is lower (2048 vs 4096 counts/rev - irrelevant, this reads over SPI, not ABI) and the speed rating is unspecified for motor control rather than 28,000 RPM (irrelevant at this machine's ~2,500 RPM ceiling). |
 | Magnets | `AS5000-MD6H-2` diametric, 6 × 2.5 mm — ships with each kit |
 | Mounting | On the **A and B motor shafts**. Not on belt idlers — see below. |
 | Drivers | Existing TB6600s, step/dir, shared active-low ENABLE |
@@ -96,7 +96,7 @@ encoder ──► actual_steps ────────┘                      
 
 ### Units
 
-- AS5047P is **14-bit: 16384 counts/revolution**
+- AS5047D is **14-bit: 16384 counts/revolution**
 - Motors run **800 steps/revolution**
 - So **20.48 encoder counts per full step** — single-step loss is clearly visible
 - Do all loop maths in **encoder counts**, convert to steps only when emitting
@@ -151,7 +151,7 @@ the board reports its identity; no motor is energised.
 
 **Goal:** trustworthy position from both encoders.
 
-- SPI driver for AS5047P. Verify frame format, parity and register addresses
+- SPI driver for AS5047D. Verify frame format, parity and register addresses
   against the datasheet — do not trust this document for them.
 - **Polling over SPI is sufficient**, and simpler than wiring ABI into the PCNT
   peripheral. At 10 MHz a 16-bit frame is ~2 µs, so two encoders at 1 kHz costs
