@@ -4,6 +4,12 @@ This repository is the working prototype for a modular, open-source lab robot pl
 
 The long-term target is an extensible alternative to closed lab automation systems. The Raspberry Pi coordinates the robot, the browser UI edits workflows and hardware maps, and ESP32 controllers run the low-level motor, actuator, and sensor code.
 
+## Thesis
+
+The complete MSc thesis describing the robot's motivation, mechanical and electronic design, software architecture, commissioning, and experimental evaluation is available here:
+
+- [Download the MSc thesis (PDF)](docs/thesis/MSc_Thesis.pdf)
+
 ## Start Here
 
 For future AI coding agents and maintainers:
