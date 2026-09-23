@@ -1,9 +1,10 @@
-"""Checking pogo contact during a pick-up, before the tool is hooked.
+"""Checking pogo contact during a pick-up, once the tool is seated.
 
-The sequence on the machine: clearance (x + clearance) -> tool position ->
-wait -> check TXD-RXD. A miss backs out to the clearance position and slides in
-again, up to the retry count. Only after a confirmed contact does the head dip
-and hook the tool.
+The pogo pins only touch when the tool is hooked, so the sequence on the
+machine is: clearance (x + clearance) -> tool position -> dip -> lift -> wait
+-> check TXD-RXD. A miss unhooks the tool back into its slot along the drop's
+release path, backs out to clearance, and picks it up again, up to the retry
+count. Only after a confirmed contact does the head carry the tool away.
 """
 
 import importlib
@@ -22,9 +23,15 @@ from app.services.hardware_map import default_pogo_connector
 from app.services.pogo_connector import ConnectorStateStore, PogoConnectorService, SimulatedPinDriver
 from app.services.toolhead import ToolheadContactError, ToolheadPosition, ToolheadService
 
+POSITION = ToolheadPosition(index=5, x_cm=0.0, y_cm=42.7)
+DIP, LIFT, RELEASE, CLEAR = 1.5, 0.1, 0.1, 2.0
+
 CLEARANCE = (2.0, 42.7)
 TOOL = (0.0, 42.7)
-WAYPOINTS = [CLEARANCE, TOOL, (0.0, 41.2), (0.0, 42.0), (2.0, 42.0)]
+DIPPED = (0.0, 41.2)
+SEATED = (0.0, 41.3)
+EXIT = (2.0, 41.3)
+UNHOOK = (0.0, 42.8)
 
 
 class _Checks:
@@ -66,31 +73,50 @@ class SequenceTests(unittest.TestCase):
 
     def _run(self, answers, retries):
         return self.service.run_sequence(
-            {}, WAYPOINTS, approach_speed_rpm=400,
-            contact_check=_Checks(answers, self.events), contact_retries=retries, contact_settle_seconds=0.0,
+            {}, self.service.pickup_waypoints(POSITION, DIP, LIFT, CLEAR), approach_speed_rpm=400,
+            contact_check=_Checks(answers, self.events),
+            contact_path=self.service.pickup_contact_path(POSITION, DIP, LIFT, RELEASE, CLEAR),
+            contact_retries=retries, contact_settle_seconds=0.0,
         )
 
-    def test_a_confirmed_contact_carries_on_to_hook_the_tool(self) -> None:
+    def _moves(self):
+        return [event[1:] for event in self.events if event[0] == "move"]
+
+    def test_the_check_runs_once_the_tool_is_seated(self) -> None:
         self._run([True], retries=2)
         self.assertEqual(self.events, [
-            ("move", *CLEARANCE), ("move", *TOOL), ("check", True),
-            ("move", 0.0, 41.2), ("move", 0.0, 42.0), ("move", 2.0, 42.0),
+            ("move", *CLEARANCE), ("move", *TOOL), ("move", *DIPPED), ("move", *SEATED),
+            ("check", True),
+            ("move", *EXIT),
         ])
 
-    def test_a_miss_backs_out_and_slides_in_again(self) -> None:
+    def test_a_miss_puts_the_tool_back_and_picks_it_up_again(self) -> None:
         self._run([False, True], retries=2)
-        self.assertEqual(self.events[:6], [
-            ("move", *CLEARANCE), ("move", *TOOL), ("check", False),
-            ("move", *CLEARANCE), ("move", *TOOL), ("check", True),
+        self.assertEqual(self.events, [
+            ("move", *CLEARANCE), ("move", *TOOL), ("move", *DIPPED), ("move", *SEATED),
+            ("check", False),
+            # Unhook along the drop's release path, then leave at slot height.
+            ("move", *UNHOOK), ("move", *TOOL), ("move", *CLEARANCE),
+            # Collect it again.
+            ("move", *TOOL), ("move", *DIPPED), ("move", *SEATED),
+            ("check", True),
+            ("move", *EXIT),
         ])
-        self.assertEqual(self.events[6], ("move", 0.0, 41.2), "then the dip")
 
-    def test_exhausted_retries_end_backed_out_without_dipping(self) -> None:
-        with self.assertRaisesRegex(ToolheadContactError, "after 3 attempts"):
+    def test_the_retry_path_matches_a_drop(self) -> None:
+        # The release must be exactly what a drop does, or a retry could leave
+        # the tool half-hooked.
+        drop = self.service.drop_waypoints(POSITION, DIP, LIFT, RELEASE, CLEAR)
+        path = self.service.pickup_contact_path(POSITION, DIP, LIFT, RELEASE, CLEAR)
+        self.assertEqual(drop[1], SEATED, "the drop starts from the seated height")
+        self.assertEqual(path.backout, drop[2:])
+
+    def test_exhausted_retries_leave_the_tool_in_its_slot(self) -> None:
+        with self.assertRaisesRegex(ToolheadContactError, "after 3 attempts.*put back in its slot"):
             self._run([False, False, False], retries=2)
         self.assertEqual([e for e in self.events if e[0] == "check"], [("check", False)] * 3)
-        self.assertEqual(self.events[-1], ("move", *CLEARANCE), "left at the clearance position")
-        self.assertNotIn(("move", 0.0, 41.2), self.events, "never dipped into the hooks")
+        self.assertEqual(self._moves()[-3:], [UNHOOK, TOOL, CLEARANCE], "released, then backed out")
+        self.assertNotIn(EXIT, self._moves(), "never carried the tool away")
 
     def test_zero_retries_fails_on_the_first_miss(self) -> None:
         with self.assertRaisesRegex(ToolheadContactError, "after 1 attempt:"):
@@ -108,8 +134,9 @@ class SequenceTests(unittest.TestCase):
         self.assertNotIn(("check", True), self.events)
 
     def test_no_check_means_the_old_sequence(self) -> None:
-        self.service.run_sequence({}, WAYPOINTS, approach_speed_rpm=400)
-        self.assertEqual([e[1:] for e in self.events], WAYPOINTS)
+        waypoints = self.service.pickup_waypoints(POSITION, DIP, LIFT, CLEAR)
+        self.service.run_sequence({}, waypoints, approach_speed_rpm=400)
+        self.assertEqual(self._moves(), waypoints)
 
 
 class _HeldState:
@@ -125,8 +152,8 @@ class _HeldState:
 
 class PickupStateTests(unittest.TestCase):
     def test_a_failed_contact_records_the_head_as_empty(self) -> None:
-        # Every attempt backed out before the dip, so the tool stayed in the
-        # rack; "uncertain" would make the operator confirm something known.
+        # The last attempt released the tool into its slot, as a drop does;
+        # "uncertain" would make the operator confirm something known.
         service = ToolheadService()
         service._goto = lambda *a, **k: {}
         state = _HeldState()
@@ -134,8 +161,9 @@ class PickupStateTests(unittest.TestCase):
                 mock.patch.object(toolhead_module, "safety_controller", _Safety()):
             with self.assertRaises(ToolheadContactError):
                 service.pickup(
-                    {}, ToolheadPosition(index=5, x_cm=0.0, y_cm=42.7), 400, 1.5, 0.8, 2.0,
+                    {}, POSITION, 400, DIP, LIFT, CLEAR,
                     contact_check=lambda: (False, "no loopback"), contact_retries=0, contact_settle_seconds=0.0,
+                    release_cm=RELEASE,
                 )
         self.assertEqual(state.calls, [("begin", 5), ("commit", None)])
 
@@ -228,6 +256,7 @@ class PickupBlockTests(unittest.TestCase):
         self.assertIsNotNone(toolhead.pickup_kwargs["contact_check"])
         self.assertEqual(toolhead.pickup_kwargs["contact_retries"], 3)
         self.assertEqual(toolhead.pickup_kwargs["contact_settle_seconds"], 1.0)
+        self.assertEqual(toolhead.pickup_kwargs["release_cm"], 0.1, "the retry unhooks with the rack's release")
 
     def test_the_check_is_off_by_default(self) -> None:
         module, toolhead, inputs = self._run([], {"toolhead_index": 4})

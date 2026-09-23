@@ -115,6 +115,7 @@ def execute(context: dict, inputs: dict) -> dict:
         contact_check=contact_check,
         contact_retries=request.contact_retries,
         contact_settle_seconds=request.contact_settle_seconds,
+        release_cm=request.release_cm,
     )
 
     connector_results = _connect_tool(target.index, reverify=True)

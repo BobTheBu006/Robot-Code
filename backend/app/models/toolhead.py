@@ -61,12 +61,12 @@ class ToolheadPickupRequest(ToolheadRackGeometry):
     # is nearly free, and a tool change is where lost steps actually cost
     # something - the head misses its hooks.
     verify_x_home: bool = True
-    # Confirm the pogo contact before hooking the tool: at the tool position,
-    # wait, then check that TXD and RXD are shorted through the tool. Off by
-    # default because only tools wired with that short can pass it.
+    # Confirm the pogo contact once the tool is hooked and seated (after the
+    # dip and lift): wait, then check that TXD and RXD are shorted through the
+    # tool. Off by default because only tools wired with that short pass it.
     check_tool_contact: bool = False
-    # Extra attempts after a failed check: back out to the clearance position
-    # and slide in again. 0 means fail on the first miss.
+    # Extra attempts after a failed check: unhook the tool back into its slot,
+    # back out to clearance and pick it up again. 0 fails on the first miss.
     contact_retries: int = Field(default=2, ge=0, le=10)
     contact_settle_seconds: float = Field(default=1.0, ge=0.0, le=10.0)
 

@@ -54,7 +54,7 @@
       "key": "check_tool_contact",
       "label": "Check Tool Contact",
       "type": "boolean",
-      "description": "At the tool position, before hooking the tool, wait and check that TXD and RXD are shorted through the tool's pogo pins. On a miss the head backs out to the clearance position and tries again. Only for tools wired with that short.",
+      "description": "Once the tool is hooked and seated (after the dip and lift), wait and check that TXD and RXD are shorted through the tool's pogo pins. On a miss the tool is unhooked back into its slot, the head backs out to the clearance position, and it picks the tool up again. Only for tools wired with that short.",
       "default": false,
       "advanced": false
     },
@@ -67,7 +67,7 @@
       "key": "contact_retries",
       "label": "Contact Retries",
       "type": "number",
-      "description": "How many more times to back out and slide in again after a failed contact check. 0 fails on the first miss.",
+      "description": "How many more times to put the tool back and pick it up again after a failed contact check. 0 fails on the first miss, with the tool left in its slot.",
       "default": 2,
       "advanced": false
     }
@@ -404,7 +404,7 @@
       "key": "contact_settle_seconds",
       "label": "Contact Settle (s)",
       "type": "number",
-      "description": "How long to wait at the tool position before checking contact.",
+      "description": "How long to wait with the tool seated before checking contact.",
       "default": 1.0,
       "advanced": true
     },
