@@ -1515,6 +1515,29 @@ body {
   font-weight: 700;
 }
 
+.workflow-editor__connector {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #47675c;
+  background: #eef3f1;
+}
+
+.workflow-editor__connector--verified {
+  color: #0f6f45;
+  background: #e1f5ea;
+}
+
+.workflow-editor__connector--unverified {
+  color: #8a5a12;
+  background: #fdf1dc;
+}
+
 .workflow-editor__skip-flash input {
   width: 16px;
   height: 16px;

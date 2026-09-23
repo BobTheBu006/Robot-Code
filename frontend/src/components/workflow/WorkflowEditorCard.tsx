@@ -30,6 +30,7 @@ import {
   fetchSavedWorkflow,
   flashEsp32BoardFirmware,
   fetchAccessDoor,
+  fetchConnectorStatus,
   setAccessDoorOverride,
   startRunSession,
   endRunSession,
@@ -44,7 +45,7 @@ import {
   submitEngineNodeResult,
   endEngineRun,
 } from "../../lib/api";
-import type { AccessDoorState, EngineDueNode, EngineRunStep, UncertainFact } from "../../lib/api";
+import type { AccessDoorState, ConnectorStatus, EngineDueNode, EngineRunStep, UncertainFact } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   WORKFLOW_BLOCK_MIME,
@@ -1099,6 +1100,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // flashing is now decided by asking each board whether its firmware is
   // already correct, so skipping it by hand is no longer a thing anyone needs.
   const [accessDoor, setAccessDoor] = useState<AccessDoorState | null>(null);
+  const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
   const [quickAddSource, setQuickAddSource] = useState<QuickAddSource>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
@@ -1255,7 +1257,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     void refreshAccessDoor();
     // The door is physical and can change while the editor sits open, so the
     // Run button's state has to follow it rather than a value read once.
-    const doorPoll = window.setInterval(() => void refreshAccessDoor(), 3000);
+    // The connected tool changes as blocks run (pick-up, Connect Tool), so it
+    // is polled alongside the door.
+    void refreshConnectors();
+    const doorPoll = window.setInterval(() => {
+      void refreshAccessDoor();
+      void refreshConnectors();
+    }, 3000);
 
     return () => {
       cancellationToken.cancelled = true;
@@ -3082,6 +3090,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     return Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
   }
 
+  async function refreshConnectors() {
+    try {
+      setConnectors(await fetchConnectorStatus());
+    } catch {
+      // Informational only; a failed poll keeps the last known value.
+    }
+  }
+
   async function refreshAccessDoor(): Promise<AccessDoorState | null> {
     try {
       const state = await fetchAccessDoor();
@@ -3549,6 +3565,19 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       </div>
 
       <div className="toolbar-group toolbar-group--run">
+        {connectors.map((connector) => {
+          const state = !connector.active_group_id ? "empty" : connector.verified ? "verified" : "unverified";
+          return (
+            <span
+              className={`workflow-editor__connector workflow-editor__connector--${state}`}
+              key={connector.connector_id}
+              title={connector.message}
+            >
+              {connector.label}: {connector.active_group_name ?? "empty"}
+              {state === "verified" ? " ✓" : state === "unverified" ? " (unverified)" : ""}
+            </span>
+          );
+        })}
         {accessDoor?.blocks_run || accessDoor?.override_active ? (
           <label className="workflow-editor__skip-flash" title={accessDoor.reason}>
             <input

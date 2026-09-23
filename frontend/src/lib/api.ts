@@ -305,6 +305,20 @@ export interface AccessDoorState {
   reason: string;
 }
 
+export interface ConnectorStatus {
+  connector_id: string;
+  label: string;
+  active_group_id: string | null;
+  active_group_name: string | null;
+  verified: boolean;
+  message: string;
+  groups: { id: string; name: string; toolhead_index: number | null }[];
+}
+
+export function fetchConnectorStatus(): Promise<ConnectorStatus[]> {
+  return request<ConnectorStatus[]>("/api/hardware-map/connectors/status");
+}
+
 export function fetchAccessDoor(): Promise<AccessDoorState> {
   return request<AccessDoorState>("/api/safety/access-door");
 }
