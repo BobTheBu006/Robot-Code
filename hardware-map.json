@@ -1310,7 +1310,7 @@
       "pin_modes": {},
       "usb_board_id": "controller-x83xnc",
       "verification": "fingerprint",
-      "toolhead_index": null
+      "toolhead_index": 5
     }
   ],
   "function_assignments": [
