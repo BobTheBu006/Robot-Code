@@ -310,7 +310,13 @@ class PogoConnectorService:
                 self._apply_pin_modes(connector, group)
             except Exception as exc:
                 self._park_all(connector)
-                raise ConnectorError(f"Could not connect tool '{group.name}' on {connector.label}: {exc}") from exc
+                failure = f"Could not connect tool '{group.name}' on {connector.label}: {exc}"
+                # Empty, but remember why, so the UI can say more than "empty".
+                self._state_store.set(
+                    connector.id,
+                    {"group_id": None, "verified": False, "message": failure, "updated_at": time.time()},
+                )
+                raise ConnectorError(failure) from exc
 
             result = ConnectorResult(
                 connector_id=connector.id,
@@ -442,6 +448,29 @@ class PogoConnectorService:
                 return False, str(exc)
             suffix = " (simulated)" if _simulating() else ""
             return True, f"TXD-RXD contact confirmed on {connector.label}{suffix}."
+
+    def sync_to_held_tool(self, toolhead_index: int | None) -> list[ConnectorResult]:
+        """Follow an operator's answer to "which tool is on the head?".
+
+        The answer is the truth about the head, so a connector check that
+        fails here is reported rather than raised: the connector is left
+        empty, and the failure is recorded for the UI to show.
+        """
+        if toolhead_index is None:
+            return self.deactivate()
+        try:
+            return self.connect_for_toolhead(toolhead_index)
+        except ConnectorError as exc:
+            return [
+                ConnectorResult(
+                    connector_id="",
+                    group_id=None,
+                    group_name=None,
+                    verification="none",
+                    verified=False,
+                    message=str(exc),
+                )
+            ]
 
     # -- internals --
 

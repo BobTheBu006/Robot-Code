@@ -419,5 +419,58 @@ class BlockEntryPointTests(unittest.TestCase):
         self.assertEqual(self.rig.store.active_group_ids(), set())
 
 
+class OperatorConfirmTests(unittest.TestCase):
+    """Answering the "which tool is on the head?" dialog moves the connector."""
+
+    def setUp(self) -> None:
+        self.rig = _Rig(_map(_group("camera-tool", toolhead_index=2, verification="loopback")), shorted=[LOOPBACK])
+        self.addCleanup(self.rig.close)
+        from app.api.routes import safety as safety_routes
+        from app.services import pogo_connector as pogo_module
+
+        self.routes = safety_routes
+        self.confirmed: list = []
+        for target, name, value in [
+            (pogo_module, "pogo_connector_service", self.rig.service),
+            (safety_routes.physical_state_store, "confirm",
+             lambda fact_id, value, operator="operator": self.confirmed.append((fact_id, value))),
+            (safety_routes, "_snapshot_with_access_door", lambda: None),
+            (safety_routes.SafetySnapshot, "model_validate", staticmethod(lambda payload: payload)),
+        ]:
+            patcher = mock.patch.object(target, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _confirm(self, value):
+        from app.models.safety import PhysicalStateConfirmRequest
+
+        self.routes.confirm_physical_state(PhysicalStateConfirmRequest(fact_id="toolhead.held", value=value))
+
+    def test_confirming_a_slot_connects_its_tool(self) -> None:
+        self._confirm(2)
+        self.assertEqual(self.confirmed, [("toolhead.held", 2)])
+        self.assertEqual(self.rig.store.active_group_id("pogo-connector"), "camera-tool")
+
+    def test_confirming_an_empty_head_empties_the_connector(self) -> None:
+        self.rig.service.activate("camera-tool")
+        self._confirm(None)
+        self.assertEqual(self.rig.store.active_group_ids(), set())
+
+    def test_a_failed_check_still_records_the_answer_and_says_why(self) -> None:
+        self.rig.pins.shorted.clear()
+        self._confirm(2)
+        self.assertEqual(self.confirmed, [("toolhead.held", 2)], "the operator's answer stands")
+        self.assertEqual(self.rig.store.active_group_ids(), set())
+        status = self.rig.service.status()[0]
+        self.assertIn("Could not connect tool", status["message"])
+
+    def test_other_facts_leave_the_connector_alone(self) -> None:
+        self.rig.service.activate("camera-tool")
+        from app.models.safety import PhysicalStateConfirmRequest
+
+        self.routes.confirm_physical_state(PhysicalStateConfirmRequest(fact_id="gantry.xy_calibrated", value=True))
+        self.assertEqual(self.rig.store.active_group_id("pogo-connector"), "camera-tool")
+
+
 if __name__ == "__main__":
     unittest.main()

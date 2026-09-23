@@ -21,6 +21,7 @@ from app.models.safety import (
 from app.services.motor_power import Z_PUMP_DOMAIN, motor_power_service
 from app.services.access_door import access_door_sensor
 from app.services.physical_state import PhysicalStateError, physical_state_store
+from app.services.toolhead import TOOLHEAD_FACT_ID
 
 # Importing the drivers is what registers them as stoppable actors. Without
 # this, an E-Stop arriving before any function had been run would find an empty
@@ -158,6 +159,18 @@ def confirm_physical_state(request: PhysicalStateConfirmRequest) -> SafetySnapsh
         physical_state_store.confirm(request.fact_id, request.value, operator=request.operator)
     except PhysicalStateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if request.fact_id == TOOLHEAD_FACT_ID:
+        # The pogo connector follows the tool the operator says is on the
+        # head. Never fails the confirmation: a connector problem is recorded
+        # on the connector, where the editor shows it.
+        from app.services.pogo_connector import pogo_connector_service
+
+        try:
+            held = None if request.value is None else int(request.value)
+            pogo_connector_service.sync_to_held_tool(held)
+        except Exception:  # the operator's answer must be recorded regardless
+            pass
 
     return SafetySnapshot.model_validate(_snapshot_with_access_door())
 
