@@ -472,5 +472,19 @@ class OperatorConfirmTests(unittest.TestCase):
         self.assertEqual(self.rig.store.active_group_id("pogo-connector"), "camera-tool")
 
 
+class ContactEndpointTests(unittest.TestCase):
+    def test_the_endpoint_reports_the_short_without_recording_anything(self) -> None:
+        from app.api.routes import hardware_map as routes
+        from app.services import pogo_connector as pogo_module
+
+        rig = _Rig(_map(), shorted=[LOOPBACK])
+        self.addCleanup(rig.close)
+        with mock.patch.object(pogo_module, "pogo_connector_service", rig.service):
+            self.assertTrue(routes.check_connector_contact()["ok"])
+            rig.pins.shorted.clear()
+            self.assertFalse(routes.check_connector_contact()["ok"])
+        self.assertEqual(rig.store.read(), {}, "a check is not a connection")
+
+
 if __name__ == "__main__":
     unittest.main()

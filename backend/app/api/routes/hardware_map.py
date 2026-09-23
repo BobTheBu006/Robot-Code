@@ -39,3 +39,16 @@ def get_connector_status() -> list[dict]:
         return pogo_connector_service.status()
     except HardwareMapError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/connectors/check-contact")
+def check_connector_contact() -> dict:
+    """Is TXD shorted to RXD on the pogo connector right now? Drives only the
+    connector's TXD pin; moves nothing and changes no recorded state."""
+    from app.services.pogo_connector import pogo_connector_service
+
+    try:
+        ok, message = pogo_connector_service.check_contact()
+    except HardwareMapError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": ok, "message": message}
