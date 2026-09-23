@@ -1290,7 +1290,29 @@
       "notes": "AS5047P-TS_EK_AB on the CoreXY motor B shaft, SPI. Shares SCK/MISO/MOSI with the other encoder; only the chip-select is per-device. Mount concentric with the shaft within a few tenths of a millimetre at the datasheet air gap - a poorly centred magnet produces a smooth, plausible-looking error."
     }
   ],
-  "groups": [],
+  "groups": [
+    {
+      "id": "syringe-pump-tool",
+      "name": "7-Syringe Pump",
+      "member_ids": [
+        "controller-x83xnc",
+        "syringe-head-a",
+        "syringe-head-b",
+        "syringe-head-c",
+        "syringe-head-d",
+        "syringe-head-e",
+        "syringe-head-f",
+        "syringe-head-g"
+      ],
+      "enabled": true,
+      "notes": "Docks on the pogo connector; its ESP32 appears on the connector USB.",
+      "connector_id": "pogo-connector",
+      "pin_modes": {},
+      "usb_board_id": "controller-x83xnc",
+      "verification": "fingerprint",
+      "toolhead_index": null
+    }
+  ],
   "function_assignments": [
     {
       "function_id": "calibrate_xy",
