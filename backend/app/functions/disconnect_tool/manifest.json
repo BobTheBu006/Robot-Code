@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "disconnect_tool",
+  "display_name": "Disconnect Tool",
+  "category": "Robot Actions",
+  "description": "Marks the pogo connector as empty and parks all its pins as inputs. Hardware on connector tools becomes unavailable until a tool is connected again. Drop Toolhead does this automatically.",
+  "version": "1.0.0",
+  "inputs": [],
+  "outputs": [
+    { "key": "next", "label": "Next", "type": "flow" }
+  ]
+}

@@ -1700,5 +1700,40 @@
       "y": 984.0
     }
   ],
-  "updated_at": "2026-08-19T08:54:48.526384Z"
+  "updated_at": "2026-08-19T08:54:48.526384Z",
+  "connectors": [
+    {
+      "id": "pogo-connector",
+      "label": "Pogo connector",
+      "pins": [
+        {
+          "name": "SDA",
+          "gpio": "2",
+          "peripheral": "i2c",
+          "alt_function": "a3"
+        },
+        {
+          "name": "SCL",
+          "gpio": "3",
+          "peripheral": "i2c",
+          "alt_function": "a3"
+        },
+        {
+          "name": "TXD",
+          "gpio": "14",
+          "peripheral": "uart",
+          "alt_function": "a4"
+        },
+        {
+          "name": "RXD",
+          "gpio": "15",
+          "peripheral": "uart",
+          "alt_function": "a4"
+        }
+      ],
+      "usb_port": "/dev/ttyUSB1",
+      "enabled": true,
+      "notes": "USB is the port the 7-syringe pump (controller-x83xnc) uses."
+    }
+  ]
 }

@@ -50,7 +50,21 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-278 tests, stdlib `unittest`, no pytest.
+313 tests, stdlib `unittest`, no pytest.
+
+## The pogo connector (dynamic tools)
+
+The toolhead's spring-pin connector carries Pi GPIO 2/3/14/15 (SDA, SCL, TXD,
+RXD) and the USB port the 7-syringe pump uses. It is `connectors` in the
+Hardware Map. **Only groups attach to it**: each group is one tool, with a
+per-pin mode (I²C / UART / GPIO / unused), an optional USB controller, a
+verification method (ESP32 fingerprint, USB serial, TXD–RXD loopback, or none)
+and an optional rack slot. `services/pogo_connector.py` activates one group at
+a time: verify first, then set pin functions with `pinctrl`, then record it in
+`connector-state.json`. Devices in any other tool group are unavailable to
+functions, with a reason. Pick-up activates the slot's group (or empties the
+connector for a tool with no connector); drop and Disconnect Tool park the pins.
+A failed verification leaves the connector empty — never the old tool.
 
 ## Safety architecture
 

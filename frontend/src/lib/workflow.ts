@@ -450,6 +450,23 @@ export function mapDiscoveredFunctionToBlock(
       };
     }
 
+    if (input.key === "connector_group_id") {
+      // Only groups attached to a connector are tools that can be docked.
+      const connectorLabels = new Map((hardwareMap?.connectors ?? []).map((connector) => [connector.id, connector.label]));
+      const toolGroups = (hardwareMap?.groups ?? []).filter((group) => group.connector_id);
+      return {
+        ...input,
+        options: toolGroups.length > 0
+          ? toolGroups.map((group) => ({
+              label: connectorLabels.size > 1
+                ? `${group.name} (${connectorLabels.get(group.connector_id ?? "") ?? group.connector_id})`
+                : group.name,
+              value: group.id,
+            }))
+          : [{ label: "(attach tool groups to the pogo connector in Hardware Map)", value: "" }],
+      };
+    }
+
     return input;
   };
 

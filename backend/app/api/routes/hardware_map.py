@@ -28,3 +28,14 @@ def get_board_connection_status(board_id: str) -> HardwareBoardConnectionStatus:
         return hardware_map_service.verify_board_connection(board_id)
     except HardwareMapError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/connectors/status")
+def get_connector_status() -> list[dict]:
+    """Which tool is recorded as docked on each dynamic connector."""
+    from app.services.pogo_connector import pogo_connector_service
+
+    try:
+        return pogo_connector_service.status()
+    except HardwareMapError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

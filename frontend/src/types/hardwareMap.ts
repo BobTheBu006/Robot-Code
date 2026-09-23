@@ -35,12 +35,38 @@ export interface HardwareDeviceMapping {
   notes?: string | null;
 }
 
+export type ConnectorPinMode = "unused" | "i2c" | "uart" | "gpio";
+export type ConnectorVerification = "none" | "loopback" | "usb_serial" | "fingerprint";
+
+export interface HardwareConnectorPin {
+  name: string;
+  gpio: string;
+  peripheral?: "i2c" | "uart" | null;
+  alt_function?: string | null;
+}
+
+// A connector whose far side changes with the docked tool. Only groups attach
+// to it; each group is one tool.
+export interface HardwareConnectorMapping {
+  id: string;
+  label: string;
+  pins: HardwareConnectorPin[];
+  usb_port?: string | null;
+  enabled?: boolean;
+  notes?: string | null;
+}
+
 export interface HardwareGroupMapping {
   id: string;
   name: string;
   member_ids: string[];
   enabled?: boolean;
   notes?: string | null;
+  connector_id?: string | null;
+  pin_modes?: Record<string, ConnectorPinMode>;
+  usb_board_id?: string | null;
+  verification?: ConnectorVerification;
+  toolhead_index?: number | null;
 }
 
 export interface FunctionHardwareAssignment {
@@ -60,6 +86,7 @@ export interface HardwareMap {
   boards: HardwareBoardMapping[];
   devices: HardwareDeviceMapping[];
   groups?: HardwareGroupMapping[];
+  connectors?: HardwareConnectorMapping[];
   function_assignments?: FunctionHardwareAssignment[];
   node_positions?: HardwareNodePosition[];
   updated_at?: string | null;

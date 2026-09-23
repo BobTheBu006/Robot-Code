@@ -8,7 +8,10 @@ from app.models.function_manifest import FunctionManifest
 from app.models.hardware_map import (
     HardwareBoardConnectionStatus,
     HardwareBoardMapping,
+    HardwareConnectorMapping,
+    HardwareConnectorPin,
     HardwareDeviceMapping,
+    HardwareGroupMapping,
     HardwareMap,
     HardwareMapSaveResponse,
     HardwarePinMapping,
@@ -30,8 +33,40 @@ def _pin(pin_id: str, signal: str, gpio: int | str, function_input_key: str | No
 
 
 class HardwareMapService:
-    def __init__(self, hardware_map_path: Path) -> None:
+    def __init__(self, hardware_map_path: Path, active_connector_groups=None) -> None:
         self._hardware_map_path = hardware_map_path
+        # Which tool groups are docked on a connector right now. Injected so
+        # tests do not read the machine's connector state.
+        self._active_connector_groups = active_connector_groups
+
+    def active_connector_group_ids(self) -> set[str]:
+        if self._active_connector_groups is not None:
+            return set(self._active_connector_groups())
+        from app.services.pogo_connector import connector_state_store
+
+        return connector_state_store.active_group_ids()
+
+    def _group_covers(self, group: HardwareGroupMapping, device: HardwareDeviceMapping) -> bool:
+        return device.id in group.member_ids or bool(device.board_id and device.board_id in group.member_ids)
+
+    def _undocked_tool_group(
+        self,
+        hardware_map: HardwareMap,
+        device: HardwareDeviceMapping,
+        active_group_ids: set[str] | None = None,
+    ) -> HardwareGroupMapping | None:
+        """The connector tool this device belongs to, if that tool is not the
+        one docked. Hardware on an absent tool must not be driven: its pins are
+        wired to whatever tool *is* on the head."""
+        tool_groups = [
+            group for group in hardware_map.groups if group.connector_id and self._group_covers(group, device)
+        ]
+        if not tool_groups:
+            return None
+        active = self.active_connector_group_ids() if active_group_ids is None else active_group_ids
+        if any(group.id in active for group in tool_groups):
+            return None
+        return tool_groups[0]
 
     def load_map(self) -> HardwareMap:
         if not self._hardware_map_path.exists():
@@ -320,6 +355,9 @@ class HardwareMapService:
             if not group.enabled and device.board_id and device.board_id in group.member_ids:
                 return False
 
+        if self._undocked_tool_group(hardware_map, device) is not None:
+            return False
+
         return True
 
     def _disabled_dependency_reasons(self, hardware_map: HardwareMap, manifest: FunctionManifest) -> list[str]:
@@ -329,6 +367,13 @@ class HardwareMapService:
             if not device:
                 continue
             if not self._device_is_enabled(hardware_map, device):
+                tool = self._undocked_tool_group(hardware_map, device)
+                if tool is not None:
+                    reasons.append(
+                        f"{manifest.display_name} requires {device.name}, which is on tool '{tool.name}', "
+                        "but that tool is not connected. Pick it up or add a Connect Tool block first."
+                    )
+                    continue
                 reasons.append(f"{manifest.display_name} requires {device.name}, but it is disabled in the Hardware Map.")
         return reasons
 
@@ -762,8 +807,29 @@ class HardwareMapService:
             version=1,
             boards=[syringe_board, gantry_board],
             devices=[*syringe_devices, *peristaltic_pump_devices, *gantry_devices],
+            connectors=[default_pogo_connector()],
             updated_at=None,
         )
+
+
+def default_pogo_connector() -> HardwareConnectorMapping:
+    """The toolhead's spring-pin connector as wired on this machine.
+
+    GPIO numbers traced on the 12-pin cable; alternate functions measured on
+    the Pi 5 with `pinctrl funcs` (a3 = I2C1, a4 = UART0 / /dev/ttyAMA0).
+    """
+    return HardwareConnectorMapping(
+        id="pogo-connector",
+        label="Pogo connector",
+        pins=[
+            HardwareConnectorPin(name="SDA", gpio="2", peripheral="i2c", alt_function="a3"),
+            HardwareConnectorPin(name="SCL", gpio="3", peripheral="i2c", alt_function="a3"),
+            HardwareConnectorPin(name="TXD", gpio="14", peripheral="uart", alt_function="a4"),
+            HardwareConnectorPin(name="RXD", gpio="15", peripheral="uart", alt_function="a4"),
+        ],
+        usb_port="/dev/ttyUSB1",
+        notes="USB is the port the 7-syringe pump (controller-x83xnc) uses.",
+    )
 
 
 hardware_map_service = HardwareMapService(

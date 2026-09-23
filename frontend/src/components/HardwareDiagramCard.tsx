@@ -28,6 +28,8 @@ import type {
   HardwareBoardMapping,
   HardwareDeviceKind,
   HardwareDeviceMapping,
+  ConnectorPinMode,
+  ConnectorVerification,
   HardwareGroupMapping,
   HardwareMap,
   HardwareNodePosition,
@@ -519,6 +521,9 @@ function cleanHardwareMap(
     boards,
     devices,
     groups,
+    // Passed through untouched: the diagram does not edit connectors, and
+    // dropping them here would detach every tool group on the next save.
+    connectors: hardwareMap.connectors ?? [],
     function_assignments: (hardwareMap.function_assignments ?? []).filter((assignment) =>
       assignment.function_id.trim()
       && assignment.device_id.trim()
@@ -719,8 +724,10 @@ function buildHardwareNodes(
       data: {
         kind: "group",
         title: group.name,
-        detail: "Hardware group",
-        meta: `${group.member_ids.length} block${group.member_ids.length === 1 ? "" : "s"}`,
+        detail: group.connector_id
+          ? `Tool on ${(hardwareMap.connectors ?? []).find((connector) => connector.id === group.connector_id)?.label ?? group.connector_id}`
+          : "Hardware group",
+        meta: `${group.member_ids.length} block${group.member_ids.length === 1 ? "" : "s"}${group.toolhead_index != null ? ` · slot ${group.toolhead_index}` : ""}`,
         accent: isHardwareEnabled(group) ? (groupIndex % 2 === 0 ? "#6d5bd0" : "#0f6f66") : "#6b7280",
         status: isHardwareEnabled(group) ? "group" : "disabled",
         disabled: !isHardwareEnabled(group),
@@ -1480,6 +1487,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   }
 
   function selectedHardwareNodesAreConnected(selectedIds: string[]): boolean {
+    // A single block is a valid group: a tool on the pogo connector is often
+    // just one sensor or actuator.
+    if (selectedIds.length === 1) {
+      return true;
+    }
     if (selectedIds.length < 2) {
       return false;
     }
@@ -1516,7 +1528,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     const memberIds = getSelectedHardwareNodeIds(fallbackNodeId);
     if (!selectedHardwareNodesAreConnected(memberIds)) {
       setSaveState("error");
-      setSaveMessage("Select at least two connected controller/device blocks before creating a group.");
+      setSaveMessage("Select one block, or several connected controller/device blocks, before creating a group.");
       setContextMenu(null);
       return;
     }
@@ -1549,6 +1561,123 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
       ),
     }));
     setSaveState("idle");
+  }
+
+  function attachGroupToConnector(groupId: string, connectorId: string) {
+    // Leaving a connector clears everything that only means something on one,
+    // which the backend would otherwise reject.
+    updateGroup(groupId, connectorId
+      ? { connector_id: connectorId }
+      : { connector_id: null, pin_modes: {}, usb_board_id: null, verification: "none", toolhead_index: null });
+  }
+
+  function renderConnectorSettings(group: HardwareGroupMapping) {
+    const connectors = hardwareMap.connectors ?? [];
+    if (connectors.length === 0) {
+      return null;
+    }
+
+    const connector = connectors.find((candidate) => candidate.id === group.connector_id) ?? null;
+    const pinModes = group.pin_modes ?? {};
+    const verification = group.verification ?? "none";
+    const usbBoards = hardwareMap.boards;
+    const takenSlots = new Set(
+      (hardwareMap.groups ?? [])
+        .filter((other) => other.id !== group.id && other.connector_id === group.connector_id && other.toolhead_index != null)
+        .map((other) => other.toolhead_index as number),
+    );
+    const loopbackPins = new Set(
+      verification === "loopback" && connector
+        ? connector.pins.filter((pin) => pin.peripheral === "uart").map((pin) => pin.name)
+        : [],
+    );
+
+    return (
+      <>
+        <label className="hardware-settings__field">
+          <span>Dynamic connector</span>
+          <select
+            onChange={(event) => attachGroupToConnector(group.id, event.target.value)}
+            value={group.connector_id ?? ""}
+          >
+            <option value="">Not a connector tool</option>
+            {connectors.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>{candidate.label}</option>
+            ))}
+          </select>
+        </label>
+        {connector ? (
+          <>
+            {connector.pins.map((pin) => (
+              <label className="hardware-settings__field" key={pin.name}>
+                <span>{pin.name} (GPIO {pin.gpio})</span>
+                <select
+                  disabled={loopbackPins.has(pin.name)}
+                  onChange={(event) => updateGroup(group.id, {
+                    pin_modes: { ...pinModes, [pin.name]: event.target.value as ConnectorPinMode },
+                  })}
+                  value={loopbackPins.has(pin.name) ? "unused" : (pinModes[pin.name] ?? "unused")}
+                >
+                  <option value="unused">{loopbackPins.has(pin.name) ? "Shorted for loopback" : "Unused"}</option>
+                  {pin.peripheral === "i2c" ? <option value="i2c">I2C</option> : null}
+                  {pin.peripheral === "uart" ? <option value="uart">UART</option> : null}
+                  <option value="gpio">GPIO</option>
+                </select>
+              </label>
+            ))}
+            <label className="hardware-settings__field">
+              <span>USB controller{connector.usb_port ? ` (${connector.usb_port})` : ""}</span>
+              <select
+                onChange={(event) => updateGroup(group.id, { usb_board_id: event.target.value || null })}
+                value={group.usb_board_id ?? ""}
+              >
+                <option value="">Nothing on USB</option>
+                {usbBoards.map((board) => (
+                  <option key={board.id} value={board.id}>{board.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="hardware-settings__field">
+              <span>Verify with</span>
+              <select
+                onChange={(event) => {
+                  const next = event.target.value as ConnectorVerification;
+                  // A loopback shorts TX to RX on the tool, so those pins
+                  // cannot be used for anything else.
+                  const nextModes = next === "loopback"
+                    ? Object.fromEntries(Object.entries(pinModes).filter(([name]) =>
+                        !connector.pins.some((pin) => pin.name === name && pin.peripheral === "uart")))
+                    : pinModes;
+                  updateGroup(group.id, { verification: next, pin_modes: nextModes });
+                }}
+                value={verification}
+              >
+                <option value="none">Nothing (dumb tool - not verified)</option>
+                <option value="loopback">TXD-RXD loopback</option>
+                <option disabled={!group.usb_board_id} value="fingerprint">ESP32 fingerprint over USB</option>
+                <option disabled={!group.usb_board_id} value="usb_serial">USB serial number</option>
+              </select>
+            </label>
+            <label className="hardware-settings__field">
+              <span>Rack slot</span>
+              <select
+                onChange={(event) => updateGroup(group.id, {
+                  toolhead_index: event.target.value ? Number(event.target.value) : null,
+                })}
+                value={group.toolhead_index ?? ""}
+              >
+                <option value="">Not in the rack (Connect Tool block only)</option>
+                {[1, 2, 3, 4, 5, 6].map((slot) => (
+                  <option disabled={takenSlots.has(slot)} key={slot} value={slot}>
+                    Slot {slot}{takenSlots.has(slot) ? " (taken)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
+      </>
+    );
   }
 
   function ungroup(groupId: string) {
@@ -1750,6 +1879,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
               );
             })}
           </div>
+          {renderConnectorSettings(selectedGroup)}
           <label className="hardware-settings__field">
             <span>Notes</span>
             <textarea

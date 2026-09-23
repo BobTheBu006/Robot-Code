@@ -1,6 +1,7 @@
 from app.models.gantry import GantryGotoXYRequest
 from app.models.toolhead import ToolheadDropRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.pogo_connector import pogo_connector_service
 from app.services.toolhead import (
     ENGAGE_RPM,
     position_for_index,
@@ -57,6 +58,9 @@ def execute(context: dict, inputs: dict) -> dict:
         }
 
     position = position_for_index(held_index, request.positions())
+    # Release the connector before its contacts separate: pins parked, and the
+    # tool's hardware unavailable from here on.
+    pogo_connector_service.deactivate()
     drop_moves = toolhead_service.drop(
         base_inputs=base_inputs,
         position=position,

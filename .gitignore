@@ -50,3 +50,7 @@ physical-state.json
 # Runtime machine state: Pi gantry calibration (mirrors ESP32 NVS).
 gantry-state.json
 z-gantry-state.json
+
+# Runtime machine state: which tool group is active on the pogo connector.
+# See backend/app/services/pogo_connector.py.
+connector-state.json

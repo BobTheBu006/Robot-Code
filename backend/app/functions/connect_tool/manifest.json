@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "connect_tool",
+  "display_name": "Connect Tool",
+  "category": "Robot Actions",
+  "description": "Selects which tool is on the pogo connector. The tool is verified where possible (ESP32 fingerprint over USB, USB serial, or a TXD-RXD loopback), the connector pins are configured for it, and its hardware becomes available to later blocks. Hardware on every other tool stays unavailable. Fails if the tool cannot be confirmed; a tool with nothing to check is connected with a warning.",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "connector_group_id",
+      "label": "Tool",
+      "type": "select",
+      "description": "Which tool group from the Hardware Map is docked on the connector now.",
+      "options": [
+        { "label": "(attach tool groups to the pogo connector in Hardware Map)", "value": "" }
+      ]
+    }
+  ],
+  "outputs": [
+    { "key": "next", "label": "Next", "type": "flow" }
+  ]
+}
