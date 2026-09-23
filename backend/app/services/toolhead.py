@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from threading import Lock
+from typing import Callable
 
 from app.models.gantry import GantryGotoXYRequest, GantryXYMoveRequest
+from app.core.safety import safety_controller
 from app.services.gantry_controller import gantry_controller_service
 from app.services.physical_state import PhysicalStateError, physical_state_store
 from app.services.raspberry_gantry import (
@@ -57,6 +59,20 @@ DEFAULT_TOOLHEAD_POSITIONS: dict[int, tuple[float, float]] = {
 
 class ToolheadError(RuntimeError):
     pass
+
+
+class ToolheadContactError(ToolheadError):
+    """The pogo contact never confirmed. The head has backed out to the
+    clearance position without hooking the tool."""
+
+
+# Returns (ok, message). Called with the head at the tool position.
+ContactCheck = Callable[[], tuple[bool, str]]
+
+# Waypoint indexes in pickup_waypoints(): the clearance approach, and the tool
+# position where the pogo pins touch but the hooks are not yet engaged.
+_CLEARANCE_STEP = 0
+_TOOL_POSITION_STEP = 1
 
 
 @dataclass(frozen=True)
@@ -226,6 +242,9 @@ class ToolheadService:
         verify_x_home: bool = False,
         rack_approach_speed_rpm: int | None = None,
         home_speed_rpm: float | None = None,
+        contact_check: ContactCheck | None = None,
+        contact_retries: int = 0,
+        contact_settle_seconds: float = 1.0,
     ) -> list[dict]:
         """Run a tool-change sequence: first waypoint at the approach speed,
         every subsequent waypoint at the fixed engage speed.
@@ -273,7 +292,51 @@ class ToolheadService:
                 if rehome is not None:
                     moves.append(rehome)
 
+            if contact_check is not None and step == _TOOL_POSITION_STEP:
+                self._confirm_contact(
+                    base_inputs, waypoints, contact_check, contact_retries, contact_settle_seconds, moves, context
+                )
+
         return moves
+
+    def _confirm_contact(
+        self,
+        base_inputs: dict,
+        waypoints: list[tuple[float, float]],
+        contact_check: ContactCheck,
+        retries: int,
+        settle_seconds: float,
+        moves: list[dict],
+        context: dict | None,
+    ) -> None:
+        """At the tool position, before the dip that hooks the tool: wait, then
+        check the pogo contact. On a miss, back out to the clearance position
+        and slide in again, up to `retries` more times.
+
+        Checking here rather than after the dip is the point: the tool is not
+        yet hooked, so a failed attempt can back out and leave it in the rack.
+        """
+        clearance = waypoints[_CLEARANCE_STEP]
+        tool_position = waypoints[_TOOL_POSITION_STEP]
+        attempts = retries + 1
+        for attempt in range(1, attempts + 1):
+            # The wait ends early on an E-Stop, and the stop is then raised
+            # rather than carrying on to the check.
+            safety_controller.motion_blocked.wait(settle_seconds)
+            safety_controller.raise_if_blocked("Tool contact check")
+
+            ok, message = contact_check()
+            moves.append({"action": "check_tool_contact", "attempt": attempt, "ok": ok, "message": message})
+            if ok:
+                return
+
+            moves.append(self._goto(base_inputs, clearance[0], clearance[1], ENGAGE_RPM, context=context))
+            if attempt == attempts:
+                raise ToolheadContactError(
+                    f"Tool contact not confirmed after {attempts} attempt{'s' if attempts != 1 else ''}: {message} "
+                    "The head backed out to the clearance position without hooking the tool."
+                )
+            moves.append(self._goto(base_inputs, tool_position[0], tool_position[1], ENGAGE_RPM, context=context))
 
     def _rehome_axis(
         self, axis: str, base_inputs: dict, context: dict | None, home_speed_rpm: float | None = None
@@ -343,6 +406,9 @@ class ToolheadService:
         verify_x_home: bool = False,
         rack_approach_speed_rpm: int | None = None,
         home_speed_rpm: float | None = None,
+        contact_check: ContactCheck | None = None,
+        contact_retries: int = 0,
+        contact_settle_seconds: float = 1.0,
     ) -> list[dict]:
         waypoints = self.pickup_waypoints(position, dip_depth_cm, lift_cm, clearance_cm)
         _assert_waypoints_reachable("be picked up", position, waypoints)
@@ -351,10 +417,18 @@ class ToolheadService:
         # head may already be carrying this tool, so that is the provisional
         # value an interrupted sequence leaves behind.
         toolhead_state_store.begin_change(position.index, f"picking up toolhead {position.index}")
-        moves = self.run_sequence(
-            base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home,
-            rack_approach_speed_rpm=rack_approach_speed_rpm, home_speed_rpm=home_speed_rpm,
-        )
+        try:
+            moves = self.run_sequence(
+                base_inputs, waypoints, approach_speed_rpm, context=context, verify_x_home=verify_x_home,
+                rack_approach_speed_rpm=rack_approach_speed_rpm, home_speed_rpm=home_speed_rpm,
+                contact_check=contact_check, contact_retries=contact_retries,
+                contact_settle_seconds=contact_settle_seconds,
+            )
+        except ToolheadContactError:
+            # Every attempt backed out before the dip, so the tool was never
+            # hooked: the head is known to be empty, not merely uncertain.
+            toolhead_state_store.commit_change(None)
+            raise
         toolhead_state_store.commit_change(position.index)
         return moves
 

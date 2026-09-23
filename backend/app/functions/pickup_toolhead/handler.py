@@ -69,6 +69,15 @@ def execute(context: dict, inputs: dict) -> dict:
             "mode": context.get("mode"),
         }
 
+    # Refuse a contact check that could never pass before anything moves -
+    # including the automatic drop of a tool already held.
+    contact_check = None
+    if request.check_tool_contact:
+        blocker = pogo_connector_service.contact_check_blocker(target.index)
+        if blocker:
+            raise ValueError(blocker)
+        contact_check = pogo_connector_service.check_contact
+
     # A tool already on the gantry must go back to its own slot before a new one
     # can be collected, otherwise the pick-up drives a loaded head into the rack.
     drop_moves: list[dict] = []
@@ -103,6 +112,9 @@ def execute(context: dict, inputs: dict) -> dict:
         verify_x_home=request.verify_x_home,
         rack_approach_speed_rpm=request.rack_approach_speed_rpm,
         home_speed_rpm=request.home_speed_rpm,
+        contact_check=contact_check,
+        contact_retries=request.contact_retries,
+        contact_settle_seconds=request.contact_settle_seconds,
     )
 
     connector_results = _connect_tool(target.index, reverify=True)

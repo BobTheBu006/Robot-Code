@@ -401,7 +401,59 @@ class PogoConnectorService:
                 results.append(self.activate(group.id))
             return results
 
+    def contact_check_blocker(self, toolhead_index: int) -> str | None:
+        """Why a TXD-RXD contact check cannot work for this slot, or None.
+
+        Asked before any motion, so a check that could never pass is refused
+        up front rather than after the head has been driven into the rack.
+        """
+        hardware_map = self._map()
+        connector = self._contact_connector(hardware_map)
+        if connector is None:
+            return "No enabled connector has a TXD/RXD pair to check contact on."
+        group = next(
+            (g for g in self.connector_groups(hardware_map, connector.id) if g.toolhead_index == toolhead_index),
+            None,
+        )
+        if group is None:
+            return None
+        busy = [
+            pin.name
+            for pin in connector.pins
+            if pin.peripheral == "uart" and group.pin_modes.get(pin.name, "unused") != "unused"
+        ]
+        if busy:
+            return (
+                f"Tool '{group.name}' in slot {toolhead_index} uses {', '.join(busy)}, so they are not "
+                "shorted and a contact check would always fail. Turn the check off for this slot."
+            )
+        return None
+
+    def check_contact(self) -> tuple[bool, str]:
+        """Are TXD and RXD shorted right now? Never raises for a plain miss:
+        the pick-up decides whether to retry."""
+        with self._lock:
+            connector = self._contact_connector(self._map())
+            if connector is None:
+                return False, "No enabled connector has a TXD/RXD pair to check contact on."
+            try:
+                self._verify_loopback(connector)
+            except ConnectorError as exc:
+                return False, str(exc)
+            suffix = " (simulated)" if _simulating() else ""
+            return True, f"TXD-RXD contact confirmed on {connector.label}{suffix}."
+
     # -- internals --
+
+    def _contact_connector(self, hardware_map: HardwareMap) -> HardwareConnectorMapping | None:
+        return next(
+            (
+                connector
+                for connector in hardware_map.connectors
+                if connector.enabled and sum(1 for pin in connector.pins if pin.peripheral == "uart") == 2
+            ),
+            None,
+        )
 
     def _park_all(self, connector: HardwareConnectorMapping) -> None:
         pins = self._pins()
