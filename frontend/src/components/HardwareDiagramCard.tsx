@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -21,7 +21,7 @@ import {
 } from "@xyflow/react";
 
 import { fetchEsp32Boards, fetchFunctions, fetchHardwareMap, saveHardwareMap } from "../lib/api";
-import { DynamicConnectionsPanel } from "./DynamicConnectionsPanel";
+import { PIN_MODE_LABELS, connectorWiring } from "../lib/connectorWiring";
 import {
   DEVICE_KIND_OPTIONS,
   SENSOR_KIND_OPTIONS,
@@ -42,6 +42,7 @@ import type {
   HardwareBoardMapping,
   HardwareDeviceKind,
   HardwareDeviceMapping,
+  HardwareConnectorMapping,
   HardwareGroupMapping,
   HardwareMap,
   HardwareNodePosition,
@@ -61,7 +62,10 @@ function scheduleFitView(fitView: (options?: { padding?: number; duration?: numb
 }
 
 function serializeHardwareMapForDirtyCheck(map: HardwareMap): string {
-  return JSON.stringify(map);
+  // Node layout is not an edit: dragging never marked the map unsaved, and
+  // switching canvases folds the current layout into the map.
+  const { node_positions: _layout, ...content } = map;
+  return JSON.stringify(content);
 }
 type HardwareNodeKind = "raspberry" | "controller" | "device" | "group";
 type HardwareFlowNode = Node<HardwareNodeData>;
@@ -91,6 +95,8 @@ interface HardwareNodeData extends Record<string, unknown> {
   accent: string;
   status?: string;
   disabled?: boolean;
+  // Shown instead of the kind, e.g. "connector" for a slot canvas's root.
+  typeLabel?: string;
 }
 
 const RASPBERRY_NODE_ID = "raspberry-pi";
@@ -176,7 +182,7 @@ function HardwareDiagramNode({ data, selected }: NodeProps<HardwareFlowNode>) {
         style={{ "--hardware-node-accent": data.accent } as CSSProperties}
       >
         <Handle className="hardware-flow-node__handle" position={Position.Left} type="target" />
-        <div className="hardware-flow-node__type">{data.kind}</div>
+        <div className="hardware-flow-node__type">{data.typeLabel ?? data.kind}</div>
         <strong>{data.title}</strong>
         <span>{data.detail}</span>
         <small>{data.meta}</small>
@@ -196,7 +202,7 @@ function HardwareDiagramNode({ data, selected }: NodeProps<HardwareFlowNode>) {
       style={{ "--hardware-node-accent": data.accent } as CSSProperties}
     >
       {data.kind !== "raspberry" ? <Handle className="hardware-flow-node__handle" position={Position.Left} type="target" /> : null}
-      <div className="hardware-flow-node__type">{data.kind}</div>
+      <div className="hardware-flow-node__type">{data.typeLabel ?? data.kind}</div>
       <strong>{data.title}</strong>
       <span>{data.detail}</span>
       <small>{data.meta}</small>
@@ -381,6 +387,7 @@ function cleanHardwareMap(
   const persistedItemIds = new Set([
     ...itemIds,
     ...groups.map((group) => group.id),
+    ...connectorIds,
   ]);
   const positionById = new Map<string, HardwareNodePosition>();
   for (const position of nodePositions) {
@@ -555,23 +562,220 @@ function nodePositionForId(
   return { x: 260, y: 80 };
 }
 
-// The fixed-connections view: everything except hardware wired to a dynamic
-// connector, which lives on the Dynamic connections page. Groups keep only
-// the members this view shows, and a group left with none is not drawn.
-function fixedConnectionsMap(hardwareMap: HardwareMap): HardwareMap {
+// ---- Views of the map ----------------------------------------------------
+//
+// The Hardware Map page shows one canvas at a time: the fixed connections, or
+// the hardware of one tool slot on the pogo connector. Each canvas is the same
+// diagram looking at a *view* of the one map. In a slot view the connector
+// stands in for the Raspberry Pi root and its pins appear as their GPIO
+// numbers, so the diagram needs no special cases; edits are written back into
+// the full map by mergeHardwareView, which also keeps the slot's tool group in
+// step with what is drawn.
+
+export type HardwareMapScope = "fixed" | "all" | `slot-${number}` | `tool-${string}`;
+
+function toolGroupForScope(hardwareMap: HardwareMap, scope: HardwareMapScope): HardwareGroupMapping | null {
+  if (scope.startsWith("slot-")) {
+    const slot = Number(scope.slice(5));
+    return (hardwareMap.groups ?? []).find((group) => group.connector_id && group.toolhead_index === slot) ?? null;
+  }
+  if (scope.startsWith("tool-")) {
+    return (hardwareMap.groups ?? []).find((group) => group.id === scope.slice(5)) ?? null;
+  }
+  return null;
+}
+
+function scopeConnector(hardwareMap: HardwareMap, scope: HardwareMapScope): HardwareConnectorMapping | null {
+  const group = toolGroupForScope(hardwareMap, scope);
+  const connectors = hardwareMap.connectors ?? [];
+  return connectors.find((connector) => connector.id === group?.connector_id) ?? connectors[0] ?? null;
+}
+
+// Everything a tool group owns: its members, its USB board, and every device
+// on a board it owns.
+function toolItemIds(hardwareMap: HardwareMap, groups: HardwareGroupMapping[]): { boards: Set<string>; devices: Set<string> } {
+  const boardIds = new Set(hardwareMap.boards.map((board) => board.id));
   const connectorIds = new Set((hardwareMap.connectors ?? []).map((connector) => connector.id));
-  const devices = hardwareMap.devices.filter((device) => !connectorIds.has(device.board_id));
-  const visibleIds = new Set([...hardwareMap.boards.map((board) => board.id), ...devices.map((device) => device.id)]);
-  const groups = (hardwareMap.groups ?? [])
-    .map((group) => ({ ...group, member_ids: group.member_ids.filter((memberId) => visibleIds.has(memberId)) }))
-    .filter((group) => group.member_ids.length > 0);
-  return { ...hardwareMap, devices, groups };
+  const boards = new Set<string>();
+  const members = new Set<string>();
+  for (const group of groups) {
+    for (const memberId of group.member_ids) {
+      members.add(memberId);
+      if (boardIds.has(memberId)) {
+        boards.add(memberId);
+      }
+    }
+    if (group.usb_board_id) {
+      boards.add(group.usb_board_id);
+    }
+  }
+  const devices = new Set(
+    hardwareMap.devices
+      .filter((device) => members.has(device.id) || boards.has(device.board_id)
+        || (connectorIds.has(device.board_id) && groups.some((group) => group.connector_id === device.board_id && group.member_ids.includes(device.id))))
+      .map((device) => device.id),
+  );
+  return { boards, devices };
+}
+
+export function hardwareMapView(hardwareMap: HardwareMap, scope: HardwareMapScope): HardwareMap {
+  if (scope === "all") {
+    return hardwareMap;
+  }
+
+  const toolGroups = (hardwareMap.groups ?? []).filter((group) => group.connector_id);
+  if (scope === "fixed") {
+    const owned = toolItemIds(hardwareMap, toolGroups);
+    const connectorIds = new Set((hardwareMap.connectors ?? []).map((connector) => connector.id));
+    const boards = hardwareMap.boards.filter((board) => !owned.boards.has(board.id));
+    const devices = hardwareMap.devices.filter((device) => !owned.devices.has(device.id) && !connectorIds.has(device.board_id));
+    const visibleIds = new Set([...boards.map((board) => board.id), ...devices.map((device) => device.id)]);
+    const groups = (hardwareMap.groups ?? [])
+      .filter((group) => !group.connector_id)
+      .map((group) => ({ ...group, member_ids: group.member_ids.filter((memberId) => visibleIds.has(memberId)) }))
+      .filter((group) => group.member_ids.length > 0);
+    return { ...hardwareMap, boards, devices, groups };
+  }
+
+  const group = toolGroupForScope(hardwareMap, scope);
+  const connector = scopeConnector(hardwareMap, scope);
+  const owned = group ? toolItemIds(hardwareMap, [group]) : { boards: new Set<string>(), devices: new Set<string>() };
+  const gpioByPinName = new Map((connector?.pins ?? []).map((pin) => [pin.name, pin.gpio]));
+  const devices = hardwareMap.devices
+    .filter((device) => owned.devices.has(device.id))
+    .map((device) => device.board_id === connector?.id
+      ? {
+          ...device,
+          board_id: RASPBERRY_NODE_ID,
+          pins: device.pins.map((pin) => ({ ...pin, gpio: gpioByPinName.get(pin.gpio) ?? pin.gpio })),
+        }
+      : device);
+  // The root node is the connector here; its position is stored under the
+  // connector's id so moving it never moves the Pi on the fixed canvas.
+  const nodePositions = (hardwareMap.node_positions ?? [])
+    .filter((position) => position.node_id !== RASPBERRY_NODE_ID)
+    .map((position) => (position.node_id === connector?.id ? { ...position, node_id: RASPBERRY_NODE_ID } : position));
+  return {
+    ...hardwareMap,
+    boards: hardwareMap.boards.filter((board) => owned.boards.has(board.id)),
+    devices,
+    groups: [],
+    node_positions: nodePositions,
+  };
+}
+
+function rootPositionsToConnector(
+  positions: HardwareNodePosition[],
+  connectorId: string | undefined,
+  piPosition: HardwareNodePosition | undefined,
+): HardwareNodePosition[] {
+  const renamed = positions
+    .filter((position) => position.node_id !== connectorId)
+    .map((position) => (position.node_id === RASPBERRY_NODE_ID && connectorId ? { ...position, node_id: connectorId } : position));
+  return piPosition ? [...renamed, piPosition] : renamed;
+}
+
+function mergeById<T extends { id: string }>(all: T[], before: T[], after: T[]): T[] {
+  const beforeIds = new Set(before.map((item) => item.id));
+  const afterById = new Map(after.map((item) => [item.id, item]));
+  const merged: T[] = [];
+  for (const item of all) {
+    if (!beforeIds.has(item.id)) {
+      merged.push(item);
+    } else if (afterById.has(item.id)) {
+      merged.push(afterById.get(item.id) as T);
+      afterById.delete(item.id);
+    }
+  }
+  return [...merged, ...afterById.values()];
+}
+
+export function mergeHardwareView(
+  full: HardwareMap,
+  scope: HardwareMapScope,
+  before: HardwareMap,
+  after: HardwareMap,
+): HardwareMap {
+  if (scope === "all") {
+    return after;
+  }
+
+  const shared: Pick<HardwareMap, "connectors" | "usb_ports" | "function_assignments" | "node_positions"> = {
+    connectors: after.connectors,
+    usb_ports: after.usb_ports,
+    function_assignments: after.function_assignments,
+    node_positions: after.node_positions,
+  };
+
+  if (scope === "fixed") {
+    const toolGroups = (full.groups ?? []).filter((group) => group.connector_id);
+    return {
+      ...full,
+      ...shared,
+      boards: mergeById(full.boards, before.boards, after.boards),
+      devices: mergeById(full.devices, before.devices, after.devices),
+      groups: [...toolGroups, ...(after.groups ?? [])],
+    };
+  }
+
+  const connector = scopeConnector(full, scope);
+  const piPosition = (full.node_positions ?? []).find((position) => position.node_id === RASPBERRY_NODE_ID);
+  shared.node_positions = rootPositionsToConnector(after.node_positions ?? [], connector?.id, piPosition);
+  const pinNameByGpio = new Map((connector?.pins ?? []).map((pin) => [pin.gpio, pin.name]));
+  const afterDevices = after.devices.map((device) => device.board_id === RASPBERRY_NODE_ID && connector
+    ? {
+        ...device,
+        board_id: connector.id,
+        pins: device.pins.map((pin) => ({ ...pin, gpio: pinNameByGpio.get(pin.gpio) ?? pin.gpio })),
+      }
+    : device);
+  const boards = mergeById(full.boards, before.boards, after.boards);
+  const devices = mergeById(full.devices, before.devices, afterDevices);
+
+  // The slot's tool group is whatever is drawn on its canvas.
+  let group = toolGroupForScope(full, scope);
+  const memberIds = [...after.boards.map((board) => board.id), ...afterDevices.map((device) => device.id)];
+  let groups = full.groups ?? [];
+  if (!group && memberIds.length > 0 && connector && scope.startsWith("slot-")) {
+    const slot = Number(scope.slice(5));
+    group = {
+      id: `tool-slot-${slot}`,
+      name: `Slot ${slot} tool`,
+      member_ids: [],
+      enabled: true,
+      notes: null,
+      connector_id: connector.id,
+      pin_modes: {},
+      usb_board_id: null,
+      verification: "none",
+      toolhead_index: slot,
+    };
+    groups = [...groups, group];
+  }
+  if (group) {
+    const boardIds = new Set(after.boards.map((board) => board.id));
+    const usbBoardId = group.usb_board_id && boardIds.has(group.usb_board_id)
+      ? group.usb_board_id
+      : after.boards[0]?.id ?? null;
+    const usbCheck = group.verification === "fingerprint" || group.verification === "usb_serial";
+    const updated: HardwareGroupMapping = {
+      ...group,
+      member_ids: memberIds,
+      usb_board_id: usbBoardId,
+      verification: usbCheck && !usbBoardId ? "none" : group.verification,
+    };
+    groups = groups.map((candidate) => (candidate.id === updated.id ? updated : candidate));
+  }
+
+  return { ...full, ...shared, boards, devices, groups };
 }
 
 function buildHardwareNodes(
   hardwareMap: HardwareMap,
   detectedBoards: Esp32BoardSummary[],
   currentNodes: HardwareFlowNode[],
+  // A slot canvas roots at the pogo connector instead of the Pi.
+  root?: { title: string; detail: string; accent: string },
 ): HardwareFlowNode[] {
   const previousPositionById = new Map(currentNodes.map((node) => [node.id, node.position]));
   const savedPositionById = new Map(
@@ -636,10 +840,11 @@ function buildHardwareNodes(
       position: positionForNode(RASPBERRY_NODE_ID, { x: 40, y: 180 }),
       data: {
         kind: "raspberry",
-        title: "Raspberry Pi",
-        detail: "USB host + GPIO/I2C",
+        typeLabel: root ? "connector" : undefined,
+        title: root?.title ?? "Raspberry Pi",
+        detail: root?.detail ?? "USB host + GPIO/I2C",
         meta: `${hardwareMap.boards.length} controller${hardwareMap.boards.length === 1 ? "" : "s"}, ${raspberryDevices.length} direct device${raspberryDevices.length === 1 ? "" : "s"}`,
-        accent: "#175c96",
+        accent: root?.accent ?? "#175c96",
         status: "source",
       },
     },
@@ -864,7 +1069,27 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   const reactFlow = useReactFlow();
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [hardwareMap, setHardwareMap] = useState<HardwareMap>(EMPTY_HARDWARE_MAP);
+  // The whole map, as loaded and saved. The canvas works on a view of it for
+  // the current scope; see hardwareMapView.
+  const [fullMap, setFullMap] = useState<HardwareMap>(EMPTY_HARDWARE_MAP);
+  const [mapScope, setMapScope] = useState<HardwareMapScope>("fixed");
+  const lastToolScopeRef = useRef<HardwareMapScope>("slot-1");
+  if (mapScope !== "fixed" && mapScope !== "all") {
+    lastToolScopeRef.current = mapScope;
+  }
+  const effectiveScope: HardwareMapScope = view === "hardware-map" ? mapScope : "all";
+  const isToolScope = effectiveScope !== "fixed" && effectiveScope !== "all";
+  const hardwareMap = useMemo(() => hardwareMapView(fullMap, effectiveScope), [fullMap, effectiveScope]);
+  const setHardwareMap = useCallback((action: SetStateAction<HardwareMap>) => {
+    setFullMap((current) => {
+      const before = hardwareMapView(current, effectiveScope);
+      const after = typeof action === "function" ? action(before) : action;
+      return mergeHardwareView(current, effectiveScope, before, after);
+    });
+  }, [effectiveScope]);
+  const scopeToolGroup = toolGroupForScope(fullMap, effectiveScope);
+  const scopeConnectorMapping = isToolScope ? scopeConnector(fullMap, effectiveScope) : null;
+  const rootLabel = isToolScope ? (scopeConnectorMapping?.label ?? "Pogo connector") : RASPBERRY_CONTROLLER_LABEL;
   const [detectedBoards, setDetectedBoards] = useState<Esp32BoardSummary[]>([]);
   const [discoveredFunctions, setDiscoveredFunctions] = useState<DiscoveredFunctionDefinition[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -873,9 +1098,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const savedHardwareMapSnapshotRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
-  // Both subpages edit the same map, so switching keeps unsaved edits and one
-  // Save button covers both.
-  const [mapSubpage, setMapSubpage] = useState<"fixed" | "dynamic">("fixed");
+
   const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
   const [hardwareDrawerOpen, setHardwareDrawerOpen] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<HardwareFlowNode>([]);
@@ -1015,6 +1238,34 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     });
   }
 
+  // Positions the canvas holds right now, folded into the map's saved ones so
+  // switching canvases or saving never drops another canvas's layout.
+  function mergedNodePositions(map: HardwareMap, currentNodes: HardwareFlowNode[]): HardwareNodePosition[] {
+    const connectorId = scopeConnectorMapping?.id;
+    const current = hardwareNodePositionsFromNodes(currentNodes).map((position) =>
+      isToolScope && connectorId && position.node_id === RASPBERRY_NODE_ID ? { ...position, node_id: connectorId } : position,
+    );
+    const byId = new Map((map.node_positions ?? []).map((position) => [position.node_id, position]));
+    for (const position of current) {
+      byId.set(position.node_id, position);
+    }
+    return Array.from(byId.values());
+  }
+
+  function switchMapScope(nextScope: HardwareMapScope) {
+    if (nextScope === mapScope) {
+      return;
+    }
+    setFullMap((current) => ({ ...current, node_positions: mergedNodePositions(current, nodes) }));
+    // Start the next canvas from its saved layout, not this one's.
+    setNodes([]);
+    setMapScope(nextScope);
+    setSelectedNodeId(RASPBERRY_NODE_ID);
+    setHardwareDrawerOpen(false);
+    setContextMenu(null);
+    scheduleFitView(reactFlow.fitView);
+  }
+
   async function loadHardwareMap() {
     setStatus("loading");
     setError(null);
@@ -1031,7 +1282,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
 
     if (hardwareMapResult.status === "fulfilled") {
       const cleanedMap = cleanHardwareMap(hardwareMapResult.value);
-      setHardwareMap(cleanedMap);
+      setFullMap(cleanedMap);
       setStatus("success");
       setSaveState("idle");
       setSaveMessage(null);
@@ -1054,8 +1305,8 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
       return;
     }
 
-    setHasUnsavedChanges(serializeHardwareMapForDirtyCheck(hardwareMap) !== savedHardwareMapSnapshotRef.current);
-  }, [hardwareMap]);
+    setHasUnsavedChanges(serializeHardwareMapForDirtyCheck(fullMap) !== savedHardwareMapSnapshotRef.current);
+  }, [fullMap]);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
@@ -1072,10 +1323,16 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    const fixedMap = fixedConnectionsMap(hardwareMap);
-    setNodes((currentNodes) => buildHardwareNodes(fixedMap, detectedBoards, currentNodes));
-    setEdges(buildHardwareEdges(fixedMap));
-  }, [hardwareMap, detectedBoards, setEdges, setNodes]);
+    const root = isToolScope
+      ? {
+          title: scopeConnectorMapping?.label ?? "Pogo connector",
+          detail: scopeToolGroup ? scopeToolGroup.name : "Empty slot",
+          accent: "#8a5a12",
+        }
+      : undefined;
+    setNodes((currentNodes) => buildHardwareNodes(hardwareMap, detectedBoards, currentNodes, root));
+    setEdges(buildHardwareEdges(hardwareMap));
+  }, [hardwareMap, detectedBoards, setEdges, setNodes, isToolScope, scopeConnectorMapping?.label, scopeToolGroup?.name]);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -1395,7 +1652,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     }
 
     const selectedIdSet = new Set(selectedIds);
-    const selectedEdges = buildHardwareEdges(fixedConnectionsMap(hardwareMap))
+    const selectedEdges = buildHardwareEdges(hardwareMap)
       .filter((edge) => selectedIdSet.has(edge.source) && selectedIdSet.has(edge.target));
     if (selectedEdges.length === 0) {
       return false;
@@ -1423,6 +1680,13 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   }
 
   function handleCreateGroup(fallbackNodeId: string | null = null) {
+    if (isToolScope) {
+      // A slot canvas already is one group: the tool.
+      setSaveState("error");
+      setSaveMessage("Everything on a slot's canvas already belongs to that slot's tool; groups are for fixed connections.");
+      setContextMenu(null);
+      return;
+    }
     const memberIds = getSelectedHardwareNodeIds(fallbackNodeId);
     if (!selectedHardwareNodesAreConnected(memberIds)) {
       setSaveState("error");
@@ -1561,7 +1825,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   }
 
   async function handleSave() {
-    const cleanedMap = cleanHardwareMap(hardwareMap, hardwareNodePositionsFromNodes(nodes));
+    const cleanedMap = cleanHardwareMap(fullMap, mergedNodePositions(fullMap, nodes));
     if (cleanedMap.boards.length === 0 && cleanedMap.devices.length === 0) {
       setSaveState("error");
       setSaveMessage("Add at least one controller or Raspberry Pi GPIO/I2C device before saving the hardware map.");
@@ -1575,7 +1839,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     setSaveMessage(null);
     try {
       const response = await saveHardwareMap(cleanedMap);
-      setHardwareMap(response.hardware_map);
+      setFullMap(response.hardware_map);
       savedHardwareMapSnapshotRef.current = serializeHardwareMapForDirtyCheck(response.hardware_map);
       setHasUnsavedChanges(false);
       setSaveState("saved");
@@ -1587,7 +1851,210 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     }
   }
 
+  function updateScopeToolGroup(updates: Partial<HardwareGroupMapping>) {
+    const groupId = scopeToolGroup?.id;
+    if (!groupId) {
+      return;
+    }
+    setFullMap((current) => ({
+      ...current,
+      groups: (current.groups ?? []).map((group) => (group.id === groupId ? { ...group, ...updates } : group)),
+    }));
+    setSaveState("idle");
+  }
+
+  function updateScopeConnector(updates: Partial<HardwareConnectorMapping>) {
+    const connectorId = scopeConnectorMapping?.id;
+    if (!connectorId) {
+      return;
+    }
+    setFullMap((current) => ({
+      ...current,
+      connectors: (current.connectors ?? []).map((connector) =>
+        connector.id === connectorId ? { ...connector, ...updates } : connector),
+    }));
+    setSaveState("idle");
+  }
+
+  function moveScopeTool(slotValue: string) {
+    if (!scopeToolGroup) {
+      return;
+    }
+    const slot = slotValue ? Number(slotValue) : null;
+    updateScopeToolGroup({ toolhead_index: slot });
+    switchMapScope(slot ? `slot-${slot}` : `tool-${scopeToolGroup.id}`);
+  }
+
+  function removeScopeTool() {
+    const group = scopeToolGroup;
+    if (!group || !window.confirm(
+      `Remove ${group.name}? Every controller and device on this canvas is deleted from the Hardware Map with it.`,
+    )) {
+      return;
+    }
+    setFullMap((current) => {
+      const owned = toolItemIds(current, [group]);
+      return {
+        ...current,
+        boards: current.boards.filter((board) => !owned.boards.has(board.id)),
+        devices: current.devices.filter((device) => !owned.devices.has(device.id)),
+        groups: (current.groups ?? []).filter((candidate) => candidate.id !== group.id),
+        function_assignments: (current.function_assignments ?? []).filter(
+          (assignment) => !owned.devices.has(assignment.hardware_device_id),
+        ),
+      };
+    });
+    setSelectedNodeId(RASPBERRY_NODE_ID);
+    setSaveState("idle");
+  }
+
+  function createHandConnectedTool() {
+    const connector = (fullMap.connectors ?? [])[0];
+    if (!connector) {
+      return;
+    }
+    const groupId = makeId("tool");
+    setFullMap((current) => ({
+      ...current,
+      groups: [...(current.groups ?? []), {
+        id: groupId,
+        name: "Hand-connected tool",
+        member_ids: [],
+        enabled: true,
+        notes: null,
+        connector_id: connector.id,
+        pin_modes: {},
+        usb_board_id: null,
+        verification: "none",
+        toolhead_index: null,
+      }],
+    }));
+    switchMapScope(`tool-${groupId}`);
+  }
+
+  function renderToolSettings() {
+    const connector = scopeConnectorMapping;
+    const group = scopeToolGroup;
+    const slotLabel = effectiveScope.startsWith("slot-") ? `Slot ${effectiveScope.slice(5)}` : "This tool";
+    const wiring = group ? connectorWiring(fullMap, group) : null;
+    const usbBoard = group?.usb_board_id ? fullMap.boards.find((board) => board.id === group.usb_board_id) : null;
+    const takenSlots = new Set(
+      (fullMap.groups ?? [])
+        .filter((other) => other.connector_id && other.id !== group?.id && other.toolhead_index != null)
+        .map((other) => other.toolhead_index as number),
+    );
+
+    return (
+      <div className="hardware-settings__body">
+        {group ? (
+          <>
+            <label className="hardware-settings__field">
+              <span>Tool name</span>
+              <input onChange={(event) => updateScopeToolGroup({ name: event.target.value })} value={group.name} />
+            </label>
+            <label className="hardware-settings__check">
+              <input
+                checked={isHardwareEnabled(group)}
+                onChange={(event) => updateScopeToolGroup({ enabled: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Enabled</span>
+            </label>
+            <div className="hardware-settings__field">
+              <span>Pin usage</span>
+              <div className="tool-pin-strip">
+                {(connector?.pins ?? []).map((pin) => {
+                  const usage = wiring?.pins[pin.name];
+                  const mode = usage?.mode ?? "unused";
+                  return (
+                    <div
+                      className={`dynamic-pin dynamic-pin--${mode}`}
+                      key={pin.name}
+                      title={usage?.devices.length ? usage.devices.join(", ") : "Nothing wired"}
+                    >
+                      <strong>{pin.name}</strong>
+                      <span>{PIN_MODE_LABELS[mode]}</span>
+                    </div>
+                  );
+                })}
+                <div className={`dynamic-pin dynamic-pin--${usbBoard ? "usb" : "unused"}`} title={usbBoard?.label ?? "Nothing on USB"}>
+                  <strong>USB</strong>
+                  <span>{usbBoard ? "Controller" : "Unused"}</span>
+                </div>
+              </div>
+              {wiring && wiring.problems.length > 0 ? (
+                <ul className="tool-problems">
+                  {wiring.problems.map((problem) => <li key={problem}>{problem}</li>)}
+                </ul>
+              ) : null}
+            </div>
+            <label className="hardware-settings__field">
+              <span>Verify with</span>
+              <select
+                onChange={(event) => updateScopeToolGroup({ verification: event.target.value as HardwareGroupMapping["verification"] })}
+                value={group.verification ?? "none"}
+              >
+                <option value="none">Nothing (not verified)</option>
+                <option value="loopback">TXD-RXD loopback</option>
+                <option disabled={!usbBoard} value="fingerprint">ESP32 fingerprint over USB</option>
+                <option disabled={!usbBoard} value="usb_serial">USB serial number</option>
+              </select>
+            </label>
+            <label className="hardware-settings__field">
+              <span>Rack slot</span>
+              <select onChange={(event) => moveScopeTool(event.target.value)} value={group.toolhead_index ?? ""}>
+                <option value="">Not in the rack (hand-connected)</option>
+                {[1, 2, 3, 4, 5, 6].map((slot) => (
+                  <option disabled={takenSlots.has(slot)} key={slot} value={slot}>
+                    Slot {slot}{takenSlots.has(slot) ? " (taken)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <p className="hardware-settings__hint">
+            {slotLabel} has no tool yet. Add a device wired to the pogo pins, or a controller on the dynamic USB,
+            and the tool is created.
+          </p>
+        )}
+        {connector ? (
+          <>
+            <label className="hardware-settings__field">
+              <span>Dynamic USB port ({connector.label})</span>
+              <select
+                onChange={(event) => updateScopeConnector({
+                  usb_port_number: event.target.value ? Number(event.target.value) : null,
+                })}
+                value={connector.usb_port_number ?? ""}
+              >
+                <option value="">Not set</option>
+                {(fullMap.usb_ports ?? []).map((port) => (
+                  <option key={port.number} value={port.number}>{port.label}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
+        <button className="workflow-editor__action" onClick={() => handleAddDevice(RASPBERRY_NODE_ID)} type="button">
+          Add device on the pogo pins
+        </button>
+        <button className="workflow-editor__action workflow-editor__action--primary" onClick={handleAddBoard} type="button">
+          Add controller on the dynamic USB
+        </button>
+        {group ? (
+          <button className="workflow-editor__action workflow-editor__action--danger" onClick={removeScopeTool} type="button">
+            Remove tool
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderSettings() {
+    if (selectedKind === "raspberry" && isToolScope) {
+      return renderToolSettings();
+    }
     if (selectedKind === "raspberry") {
       const raspberryDevices = devicesByBoard.get(RASPBERRY_NODE_ID) ?? [];
       return (
@@ -1837,7 +2304,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
               }}
               value={selectedDevice.board_id}
             >
-              <option value={RASPBERRY_NODE_ID}>{RASPBERRY_CONTROLLER_LABEL}</option>
+              <option value={RASPBERRY_NODE_ID}>{rootLabel}</option>
               {hardwareMap.boards.map((board) => (
                 <option key={board.id} value={board.id}>
                   {board.label}
@@ -1941,12 +2408,28 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
               <div className="hardware-settings__pin-signal">
                 {SIGNAL_LABELS[pin.signal] ?? pin.signal}
               </div>
-              <input
-                aria-label="GPIO"
-                onChange={(event) => updatePin(selectedDevice.id, pin.id, { gpio: event.target.value })}
-                placeholder="-"
-                value={pin.gpio}
-              />
+              {isToolScope && isRaspberryBoardId(selectedDevice.board_id) ? (
+                // Hardware on the pogo connector can only reach its pins.
+                <select
+                  aria-label="Connector pin"
+                  onChange={(event) => updatePin(selectedDevice.id, pin.id, { gpio: event.target.value })}
+                  value={pin.gpio}
+                >
+                  <option value="-">Not wired</option>
+                  {(scopeConnectorMapping?.pins ?? []).map((connectorPin) => (
+                    <option key={connectorPin.name} value={connectorPin.gpio}>
+                      {connectorPin.name} (GPIO {connectorPin.gpio})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  aria-label="GPIO"
+                  onChange={(event) => updatePin(selectedDevice.id, pin.id, { gpio: event.target.value })}
+                  placeholder="-"
+                  value={pin.gpio}
+                />
+              )}
               <input
                 aria-label="Function input key"
                 onChange={(event) => updatePin(selectedDevice.id, pin.id, { function_input_key: event.target.value })}
@@ -2052,9 +2535,11 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   function renderHardwareSettingsHeader() {
     return (
       <div className="hardware-settings__header">
-        <span>{selectedKind}</span>
+        <span>{selectedKind === "raspberry" && isToolScope ? "tool" : selectedKind}</span>
         <strong>
-          {selectedBoard?.label ?? selectedDevice?.name ?? (selectedNodeId === RASPBERRY_NODE_ID ? "Raspberry Pi" : "Settings")}
+          {selectedBoard?.label ?? selectedDevice?.name ?? (selectedNodeId === RASPBERRY_NODE_ID
+            ? (isToolScope ? (scopeToolGroup?.name ?? rootLabel) : "Raspberry Pi")
+            : "Settings")}
         </strong>
       </div>
     );
@@ -2167,8 +2652,61 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     ? "Assign discovered function requirements to saved physical devices."
     : "Build the electronics map as connected blocks. Select a controller or IoT device to edit ports and pins.";
 
+  const toolScopeOptions: Array<{ value: HardwareMapScope; label: string }> = [
+    ...[1, 2, 3, 4, 5, 6].map((slot) => {
+      const tool = (fullMap.groups ?? []).find((group) => group.connector_id && group.toolhead_index === slot);
+      return { value: `slot-${slot}` as HardwareMapScope, label: `Slot ${slot} · ${tool ? tool.name : "empty"}` };
+    }),
+    ...(fullMap.groups ?? [])
+      .filter((group) => group.connector_id && group.toolhead_index == null)
+      .map((group) => ({ value: `tool-${group.id}` as HardwareMapScope, label: `Hand-connected · ${group.name}` })),
+  ];
+
   const mapHeaderControls = (
     <div className="workflow-editor__actions">
+      {view === "hardware-map" ? (
+        <div className="toolbar-group">
+          <div aria-label="Hardware map sections" className="hardware-map__subpages" role="tablist">
+            <button
+              aria-selected={!isToolScope}
+              className={!isToolScope ? "hardware-map__subpage hardware-map__subpage--active" : "hardware-map__subpage"}
+              onClick={() => switchMapScope("fixed")}
+              role="tab"
+              type="button"
+            >
+              Fixed connections
+            </button>
+            <button
+              aria-selected={isToolScope}
+              className={isToolScope ? "hardware-map__subpage hardware-map__subpage--active" : "hardware-map__subpage"}
+              onClick={() => switchMapScope(lastToolScopeRef.current)}
+              role="tab"
+              type="button"
+            >
+              Dynamic connections
+            </button>
+          </div>
+          {isToolScope ? (
+            <select
+              aria-label="Tool"
+              className="hardware-map__tool-picker"
+              onChange={(event) => {
+                if (event.target.value === "new-hand-connected") {
+                  createHandConnectedTool();
+                } else {
+                  switchMapScope(event.target.value as HardwareMapScope);
+                }
+              }}
+              value={effectiveScope}
+            >
+              {toolScopeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+              <option value="new-hand-connected">+ New hand-connected tool</option>
+            </select>
+          ) : null}
+        </div>
+      ) : null}
       <div className="toolbar-group">
         <button
           className={saveState === "saved"
@@ -2210,27 +2748,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
         {headerSlot && isActive ? createPortal(mapHeaderControls, headerSlot) : null}
         {mapErrorBanner}
 
-        <div aria-label="Hardware map sections" className="hardware-map__subpages" role="tablist">
-          {([
-            ["fixed", "Fixed connections"],
-            ["dynamic", "Dynamic connections"],
-          ] as const).map(([id, label]) => (
-            <button
-              aria-selected={mapSubpage === id}
-              className={mapSubpage === id ? "hardware-map__subpage hardware-map__subpage--active" : "hardware-map__subpage"}
-              key={id}
-              onClick={() => setMapSubpage(id)}
-              role="tab"
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {mapSubpage === "fixed"
-          ? renderHardwareCanvas("drawer")
-          : <DynamicConnectionsPanel hardwareMap={hardwareMap} setHardwareMap={setHardwareMap} />}
+        {renderHardwareCanvas("drawer")}
       </section>
     );
   }
