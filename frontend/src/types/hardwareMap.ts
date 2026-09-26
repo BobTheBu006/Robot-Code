@@ -1,5 +1,5 @@
 export type HardwareDeviceKind = "stepper_motor" | "servo" | "sensor";
-export type HardwareSensorKind = "position_limit_switch" | "aht20_temperature_humidity";
+export type HardwareSensorKind = "position_limit_switch" | "aht20_temperature_humidity" | "rotary_position_encoder";
 
 export interface HardwareBoardMapping {
   id: string;

@@ -33,7 +33,7 @@ export interface WorkflowOutputDefinition {
 }
 
 export type WorkflowHardwareDeviceKind = "stepper_motor" | "servo" | "sensor";
-export type WorkflowHardwareSensorKind = "position_limit_switch" | "aht20_temperature_humidity";
+export type WorkflowHardwareSensorKind = "position_limit_switch" | "aht20_temperature_humidity" | "rotary_position_encoder";
 
 export interface WorkflowHardwarePinReference {
   id: string;

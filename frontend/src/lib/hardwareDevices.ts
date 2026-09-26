@@ -17,6 +17,7 @@ export const DEVICE_KIND_OPTIONS: Array<{ label: string; value: HardwareDeviceKi
 export const SENSOR_KIND_OPTIONS: Array<{ label: string; value: HardwareSensorKind }> = [
   { label: "Position / limit switch", value: "position_limit_switch" },
   { label: "AHT20 temperature + humidity", value: "aht20_temperature_humidity" },
+  { label: "Rotary position encoder (SPI)", value: "rotary_position_encoder" },
 ];
 export const STEPPER_SIGNALS = ["direction", "step", "enable", "micro_step_1", "micro_step_2", "micro_step_3"];
 export const SIGNAL_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   signal: "Signal",
   scl: "SCL",
   sda: "SDA",
+  chip_select: "Chip select",
 };
 
 export function isRaspberryBoardId(boardId: string | null | undefined): boolean {
@@ -63,7 +65,12 @@ export function normalizeDeviceKind(kind: string | undefined): HardwareDeviceKin
 }
 
 export function normalizeSensorKind(sensorKind: string | null | undefined): HardwareSensorKind {
-  return sensorKind === "aht20_temperature_humidity" ? "aht20_temperature_humidity" : "position_limit_switch";
+  // Every kind the backend knows must be listed here: anything unrecognised
+  // is rewritten as a limit switch on save, pins and all.
+  if (sensorKind === "aht20_temperature_humidity" || sensorKind === "rotary_position_encoder") {
+    return sensorKind;
+  }
+  return "position_limit_switch";
 }
 
 export function normalizePinSignal(signal: string): string {
@@ -86,6 +93,8 @@ export function normalizePinSignal(signal: string): string {
     scl: "scl",
     sda: "sda",
     signal: "signal",
+    cs: "chip_select",
+    chip_select: "chip_select",
   };
 
   return aliases[normalized] ?? normalized;
@@ -106,6 +115,11 @@ export function pinTemplateForDevice(
 
   if (kind === "servo") {
     return [{ signal: "signal", gpio: "-", function_input_key: null }];
+  }
+
+  if (sensorKind === "rotary_position_encoder") {
+    // SPI encoders share the bus; each one has only its own chip select.
+    return [{ signal: "chip_select", gpio: "-", function_input_key: null }];
   }
 
   if (sensorKind === "aht20_temperature_humidity") {
