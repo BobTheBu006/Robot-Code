@@ -100,11 +100,36 @@ class HardwareConnectorMapping(BaseModel):
     id: str = Field(min_length=1)
     label: str = Field(min_length=1)
     pins: list[HardwareConnectorPin] = Field(default_factory=list)
-    # The Pi USB port the connector's USB lines are wired to. Informational:
-    # tools are verified by identity, not by which ttyUSB they enumerate as.
+    # Legacy free-text note of the USB device; superseded by usb_port_number.
     usb_port: str | None = None
+    # Which of the Pi's physical USB ports (HardwareMap.usb_ports) the
+    # connector's USB lines are wired to. Tools are still verified by
+    # identity, not by the port they enumerate on.
+    usb_port_number: int | None = None
     enabled: bool = True
     notes: str | None = None
+
+
+class HardwareUsbPort(BaseModel):
+    """One physical USB socket on the Pi, numbered by the owner.
+
+    `device_path` is the stable /dev/serial/by-path prefix for the socket, to
+    be filled in once each numbered socket has been identified on the machine.
+    """
+
+    number: int = Field(ge=1)
+    label: str = Field(min_length=1)
+    device_path: str | None = None
+
+
+def _default_usb_ports() -> list[HardwareUsbPort]:
+    return [HardwareUsbPort(number=number, label=f"USB {number}") for number in range(1, 5)]
+
+
+# Signal names that mean "this wire is the bus itself", so a device pin with
+# one of them on a pin that can carry that bus uses the Pi peripheral.
+_I2C_SIGNALS = {"sda", "scl"}
+_UART_SIGNALS = {"tx", "rx", "txd", "rxd"}
 
 
 class HardwareGroupMapping(BaseModel):
@@ -120,6 +145,55 @@ class HardwareGroupMapping(BaseModel):
     verification: ConnectorVerification = "none"
     # The rack slot this tool lives in. Picking that slot up connects it.
     toolhead_index: int | None = None
+
+
+def connector_pin_modes(hardware_map: "HardwareMap", group: HardwareGroupMapping) -> dict[str, ConnectorPinMode]:
+    """How a tool uses each connector pin, worked out from what is wired to it.
+
+    A device in the group whose board is the connector names connector pins
+    (SDA, SCL, TXD, RXD) instead of GPIO numbers. A bus signal on a pin that
+    can carry that bus uses the Pi peripheral; any other wire is plain GPIO; a
+    pin nothing is wired to is unused. Explicit `pin_modes` on the group win,
+    for tools described before wiring existed.
+
+    Raises ValueError when two wires on one pin disagree - a pin cannot be I2C
+    for one device and GPIO for another. Several I2C devices sharing the bus is
+    fine; two GPIO devices on one pin is not.
+    """
+    connector = next((c for c in hardware_map.connectors if c.id == group.connector_id), None)
+    if connector is None:
+        return {}
+
+    pins = {pin.name: pin for pin in connector.pins}
+    modes: dict[str, ConnectorPinMode] = {name: "unused" for name in pins}
+    wired_by: dict[str, str] = {}
+    members = set(group.member_ids)
+    for device in hardware_map.devices:
+        if device.board_id != connector.id or device.id not in members:
+            continue
+        for device_pin in device.pins:
+            pin = pins.get(device_pin.gpio)
+            if pin is None or device_pin.signal == "-":
+                continue
+            signal = device_pin.signal.strip().lower()
+            if pin.peripheral == "i2c" and signal in _I2C_SIGNALS:
+                mode: ConnectorPinMode = "i2c"
+            elif pin.peripheral == "uart" and signal in _UART_SIGNALS:
+                mode = "uart"
+            else:
+                mode = "gpio"
+
+            previous = wired_by.get(pin.name)
+            if previous is not None and not (mode == "i2c" and modes[pin.name] == "i2c"):
+                raise ValueError(
+                    f"Tool '{group.name}': {device.name} and {previous} are both wired to {pin.name}."
+                )
+            modes[pin.name] = mode
+            wired_by[pin.name] = device.name
+
+    for pin_name, mode in group.pin_modes.items():
+        modes[pin_name] = mode
+    return modes
 
 
 class FunctionHardwareAssignment(BaseModel):
@@ -140,6 +214,7 @@ class HardwareMap(BaseModel):
     devices: list[HardwareDeviceMapping] = Field(default_factory=list)
     groups: list[HardwareGroupMapping] = Field(default_factory=list)
     connectors: list[HardwareConnectorMapping] = Field(default_factory=list)
+    usb_ports: list[HardwareUsbPort] = Field(default_factory=_default_usb_ports)
     function_assignments: list[FunctionHardwareAssignment] = Field(default_factory=list)
     node_positions: list[HardwareNodePosition] = Field(default_factory=list)
     updated_at: datetime | None = None
@@ -197,9 +272,11 @@ class HardwareMap(BaseModel):
                         f"Group '{group.name}' uses {pin_name} as {mode.upper()}, but that pin cannot carry {mode.upper()}."
                     )
 
+            modes = connector_pin_modes(self, group)
+
             # I2C needs both wires; half a bus is a wiring mistake, not a mode.
             i2c_pins = {pin.name for pin in connector.pins if pin.peripheral == "i2c"}
-            used_i2c = {name for name, mode in group.pin_modes.items() if mode == "i2c"}
+            used_i2c = {name for name, mode in modes.items() if mode == "i2c"}
             if used_i2c and used_i2c != i2c_pins:
                 raise ValueError(f"Group '{group.name}' must use all of {', '.join(sorted(i2c_pins))} for I2C, not just some.")
 
@@ -207,7 +284,7 @@ class HardwareMap(BaseModel):
                 uart_pins = [pin.name for pin in connector.pins if pin.peripheral == "uart"]
                 if len(uart_pins) != 2:
                     raise ValueError(f"{connector.label} has no TX/RX pair to verify a loopback on.")
-                busy = [name for name in uart_pins if group.pin_modes.get(name, "unused") != "unused"]
+                busy = [name for name in uart_pins if modes.get(name, "unused") != "unused"]
                 if busy:
                     raise ValueError(
                         f"Group '{group.name}' is verified by a TX-RX loopback, so {', '.join(busy)} "
@@ -227,7 +304,34 @@ class HardwareMap(BaseModel):
                     )
                 slots[key] = group.name
 
+        self._validate_connector_wiring(connectors)
         return self
+
+    def _validate_connector_wiring(self, connectors: dict[str, HardwareConnectorMapping]) -> None:
+        port_numbers = {port.number for port in self.usb_ports}
+        for connector in connectors.values():
+            if connector.usb_port_number is not None and connector.usb_port_number not in port_numbers:
+                raise ValueError(f"{connector.label} is wired to USB {connector.usb_port_number}, which is not defined.")
+
+        for device in self.devices:
+            connector = connectors.get(device.board_id)
+            if connector is None:
+                continue
+            pin_names = {pin.name for pin in connector.pins}
+            for device_pin in device.pins:
+                if device_pin.gpio not in pin_names and device_pin.gpio != "-":
+                    raise ValueError(
+                        f"{device.name} is wired to '{device_pin.gpio}' on {connector.label}, which has only "
+                        f"{', '.join(sorted(pin_names))}."
+                    )
+            # Hardware on the connector exists only as part of a tool: without
+            # a group there is no way to know when it is actually present.
+            owners = [g for g in self.groups if g.connector_id == connector.id and device.id in g.member_ids]
+            if len(owners) != 1:
+                raise ValueError(
+                    f"{device.name} is wired to {connector.label} but belongs to "
+                    f"{'no tool' if not owners else 'more than one tool'}; it must belong to exactly one."
+                )
 
 
 class HardwareMapSaveResponse(BaseModel):

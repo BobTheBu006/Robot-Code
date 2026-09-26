@@ -47,7 +47,22 @@ class HardwareMapService:
         return connector_state_store.active_group_ids()
 
     def _group_covers(self, group: HardwareGroupMapping, device: HardwareDeviceMapping) -> bool:
-        return device.id in group.member_ids or bool(device.board_id and device.board_id in group.member_ids)
+        # A tool's USB controller belongs to the tool even when the group only
+        # names it as usb_board_id: everything on that board leaves with it.
+        return (
+            device.id in group.member_ids
+            or bool(device.board_id and device.board_id in group.member_ids)
+            or bool(device.board_id and group.usb_board_id and device.board_id == group.usb_board_id)
+        )
+
+    def _resolve_gpio(self, hardware_map: HardwareMap, device: HardwareDeviceMapping, gpio: str) -> str:
+        """Pi GPIO for a device pin. Hardware on a connector names connector
+        pins (SDA, TXD, ...); the connector says which GPIO each one is."""
+        connector = next((c for c in hardware_map.connectors if c.id == device.board_id), None)
+        if connector is None:
+            return gpio
+        pin = next((p for p in connector.pins if p.name == gpio), None)
+        return pin.gpio if pin else gpio
 
     def _undocked_tool_group(
         self,
@@ -287,7 +302,7 @@ class HardwareMapService:
                 resolved_inputs["tool_port"] = board.usb_port
 
         pins_by_input_key = {
-            pin.function_input_key: pin.gpio
+            pin.function_input_key: self._resolve_gpio(hardware_map, device, pin.gpio)
             for device in self._resolved_manifest_devices(hardware_map, manifest)
             for pin in device.pins
             if self._device_is_enabled(hardware_map, device)
@@ -347,6 +362,9 @@ class HardwareMapService:
         if device.board_id and device.board_id != "raspberry-pi":
             board = next((candidate for candidate in hardware_map.boards if candidate.id == device.board_id), None)
             if board and not board.enabled:
+                return False
+            connector = next((c for c in hardware_map.connectors if c.id == device.board_id), None)
+            if connector and not connector.enabled:
                 return False
 
         for group in hardware_map.groups:

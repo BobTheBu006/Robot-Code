@@ -33,7 +33,12 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Protocol
 
-from app.models.hardware_map import HardwareConnectorMapping, HardwareGroupMapping, HardwareMap
+from app.models.hardware_map import (
+    HardwareConnectorMapping,
+    HardwareGroupMapping,
+    HardwareMap,
+    connector_pin_modes,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -307,7 +312,7 @@ class PogoConnectorService:
 
             try:
                 verified, message, warnings = self._verify(hardware_map, connector, group)
-                self._apply_pin_modes(connector, group)
+                self._apply_pin_modes(hardware_map, connector, group)
             except Exception as exc:
                 self._park_all(connector)
                 failure = f"Could not connect tool '{group.name}' on {connector.label}: {exc}"
@@ -326,7 +331,7 @@ class PogoConnectorService:
                 verified=verified,
                 message=message,
                 warnings=warnings,
-                pin_modes=self._effective_pin_modes(connector, group),
+                pin_modes=self._effective_pin_modes(hardware_map, connector, group),
             )
             self._state_store.set(
                 connector.id,
@@ -400,7 +405,7 @@ class PogoConnectorService:
                             verification=group.verification,
                             verified=bool(record.get("verified")),
                             message=record.get("message") or f"Tool '{group.name}' is already connected.",
-                            pin_modes=self._effective_pin_modes(connector, group),
+                            pin_modes=self._effective_pin_modes(hardware_map, connector, group),
                         )
                     )
                     continue
@@ -423,10 +428,11 @@ class PogoConnectorService:
         )
         if group is None:
             return None
+        modes = connector_pin_modes(hardware_map, group)
         busy = [
             pin.name
             for pin in connector.pins
-            if pin.peripheral == "uart" and group.pin_modes.get(pin.name, "unused") != "unused"
+            if pin.peripheral == "uart" and modes.get(pin.name, "unused") != "unused"
         ]
         if busy:
             return (
@@ -489,13 +495,19 @@ class PogoConnectorService:
         for pin in connector.pins:
             pins.park(pin.gpio)
 
-    def _effective_pin_modes(self, connector: HardwareConnectorMapping, group: HardwareGroupMapping) -> dict[str, str]:
-        return {pin.name: group.pin_modes.get(pin.name, "unused") for pin in connector.pins}
+    def _effective_pin_modes(
+        self, hardware_map: HardwareMap, connector: HardwareConnectorMapping, group: HardwareGroupMapping
+    ) -> dict[str, str]:
+        modes = connector_pin_modes(hardware_map, group)
+        return {pin.name: modes.get(pin.name, "unused") for pin in connector.pins}
 
-    def _apply_pin_modes(self, connector: HardwareConnectorMapping, group: HardwareGroupMapping) -> None:
+    def _apply_pin_modes(
+        self, hardware_map: HardwareMap, connector: HardwareConnectorMapping, group: HardwareGroupMapping
+    ) -> None:
         pins = self._pins()
+        modes = self._effective_pin_modes(hardware_map, connector, group)
         for pin in connector.pins:
-            mode = group.pin_modes.get(pin.name, "unused")
+            mode = modes[pin.name]
             if mode in {"i2c", "uart"}:
                 if not pin.alt_function:
                     raise ConnectorError(f"{connector.label} pin {pin.name} has no alternate function recorded for {mode}.")
