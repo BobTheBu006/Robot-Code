@@ -457,12 +457,15 @@ export function mapDiscoveredFunctionToBlock(
       return {
         ...input,
         options: toolGroups.length > 0
-          ? toolGroups.map((group) => ({
-              label: connectorLabels.size > 1
-                ? `${group.name} (${connectorLabels.get(group.connector_id ?? "") ?? group.connector_id})`
-                : group.name,
-              value: group.id,
-            }))
+          ? [...toolGroups]
+              .sort((left, right) => (left.toolhead_index ?? 99) - (right.toolhead_index ?? 99))
+              .map((group) => {
+                const slot = group.toolhead_index != null ? `Slot ${group.toolhead_index} · ` : "Hand-connected · ";
+                const connector = connectorLabels.size > 1
+                  ? ` (${connectorLabels.get(group.connector_id ?? "") ?? group.connector_id})`
+                  : "";
+                return { label: `${slot}${group.name}${connector}`, value: group.id };
+              })
           : [{ label: "(attach tool groups to the pogo connector in Hardware Map)", value: "" }],
       };
     }

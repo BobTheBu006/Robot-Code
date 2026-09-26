@@ -21,6 +21,20 @@ import {
 } from "@xyflow/react";
 
 import { fetchEsp32Boards, fetchFunctions, fetchHardwareMap, saveHardwareMap } from "../lib/api";
+import { DynamicConnectionsPanel } from "./DynamicConnectionsPanel";
+import {
+  DEVICE_KIND_OPTIONS,
+  SENSOR_KIND_OPTIONS,
+  SIGNAL_LABELS,
+  isRaspberryBoardId,
+  makeId,
+  normalizeDeviceKind,
+  normalizeId,
+  normalizePinSignal,
+  normalizeSensorKind,
+  pinTemplateForDevice,
+  pinsForDevice,
+} from "../lib/hardwareDevices";
 import type { Esp32BoardSummary } from "../types/esp32Builder";
 import type { DiscoveredFunctionDefinition, WorkflowHardwareDeviceReference } from "../types/workflow";
 import type {
@@ -28,8 +42,6 @@ import type {
   HardwareBoardMapping,
   HardwareDeviceKind,
   HardwareDeviceMapping,
-  ConnectorPinMode,
-  ConnectorVerification,
   HardwareGroupMapping,
   HardwareMap,
   HardwareNodePosition,
@@ -103,148 +115,12 @@ const EMPTY_HARDWARE_MAP: HardwareMap = {
   updated_at: null,
 };
 
-const DEVICE_KIND_OPTIONS: Array<{ label: string; value: HardwareDeviceKind }> = [
-  { label: "Stepper motor", value: "stepper_motor" },
-  { label: "Servo", value: "servo" },
-  { label: "Sensor", value: "sensor" },
-];
-const SENSOR_KIND_OPTIONS: Array<{ label: string; value: HardwareSensorKind }> = [
-  { label: "Position / limit switch", value: "position_limit_switch" },
-  { label: "AHT20 temperature + humidity", value: "aht20_temperature_humidity" },
-];
-const STEPPER_SIGNALS = ["direction", "step", "enable", "micro_step_1", "micro_step_2", "micro_step_3"];
-const SIGNAL_LABELS: Record<string, string> = {
-  "-": "-",
-  direction: "Direction",
-  step: "Step",
-  enable: "Enable",
-  micro_step_1: "Micro step 1",
-  micro_step_2: "Micro step 2",
-  micro_step_3: "Micro step 3",
-  signal: "Signal",
-  scl: "SCL",
-  sda: "SDA",
-};
-
-function isRaspberryBoardId(boardId: string | null | undefined): boolean {
-  return boardId === RASPBERRY_NODE_ID;
-}
-
 function hardwareConnectionLabel(device: HardwareDeviceMapping): string {
   if (isRaspberryBoardId(device.board_id)) {
     return normalizeSensorKind(device.sensor_kind) === "aht20_temperature_humidity" ? "I2C" : "GPIO";
   }
 
   return deviceKindLabel(normalizeDeviceKind(device.kind));
-}
-
-function makeId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function normalizeId(value: string, fallback: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return normalized || fallback;
-}
-
-function normalizeDeviceKind(kind: string | undefined): HardwareDeviceKind {
-  if (kind === "sensor" || kind === "servo" || kind === "stepper_motor") {
-    return kind;
-  }
-
-  if (kind === "motor") {
-    return "stepper_motor";
-  }
-
-  return "servo";
-}
-
-function normalizeSensorKind(sensorKind: string | null | undefined): HardwareSensorKind {
-  return sensorKind === "aht20_temperature_humidity" ? "aht20_temperature_humidity" : "position_limit_switch";
-}
-
-function normalizePinSignal(signal: string): string {
-  const normalized = signal.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  const aliases: Record<string, string> = {
-    dir: "direction",
-    direction: "direction",
-    step: "step",
-    enable: "enable",
-    en: "enable",
-    ms1: "micro_step_1",
-    microstep1: "micro_step_1",
-    micro_step_1: "micro_step_1",
-    ms2: "micro_step_2",
-    microstep2: "micro_step_2",
-    micro_step_2: "micro_step_2",
-    ms3: "micro_step_3",
-    microstep3: "micro_step_3",
-    micro_step_3: "micro_step_3",
-    scl: "scl",
-    sda: "sda",
-    signal: "signal",
-  };
-
-  return aliases[normalized] ?? normalized;
-}
-
-function pinTemplateForDevice(
-  kind: HardwareDeviceKind,
-  sensorKind: HardwareSensorKind = "position_limit_switch",
-  boardId: string | null = null,
-): Array<Pick<HardwarePinMapping, "signal" | "gpio" | "function_input_key">> {
-  if (kind === "stepper_motor") {
-    return STEPPER_SIGNALS.map((signal) => ({
-      signal,
-      gpio: "-",
-      function_input_key: null,
-    }));
-  }
-
-  if (kind === "servo") {
-    return [{ signal: "signal", gpio: "-", function_input_key: null }];
-  }
-
-  if (sensorKind === "aht20_temperature_humidity") {
-    if (isRaspberryBoardId(boardId)) {
-      return [
-        { signal: "scl", gpio: "3", function_input_key: null },
-        { signal: "sda", gpio: "2", function_input_key: null },
-      ];
-    }
-
-    return [
-      { signal: "scl", gpio: "-", function_input_key: null },
-      { signal: "sda", gpio: "-", function_input_key: null },
-    ];
-  }
-
-  return [{ signal: "signal", gpio: "-", function_input_key: null }];
-}
-
-function pinsForDevice(
-  kind: HardwareDeviceKind,
-  sensorKind: HardwareSensorKind = "position_limit_switch",
-  existingPins: HardwarePinMapping[] = [],
-  boardId: string | null = null,
-): HardwarePinMapping[] {
-  const existingBySignal = new Map(existingPins.map((pin) => [normalizePinSignal(pin.signal), pin]));
-
-  return pinTemplateForDevice(kind, sensorKind, boardId).map((template, index) => {
-    const existing = existingBySignal.get(template.signal);
-    return {
-      id: existing?.id ?? makeId(`pin-${index + 1}`),
-      signal: template.signal,
-      gpio: existing?.gpio?.trim() || template.gpio,
-      function_input_key: existing?.function_input_key?.trim() || template.function_input_key,
-      notes: existing?.notes?.trim() || null,
-    };
-  });
 }
 
 function normalizeServoRangeValue(value: number | string | null | undefined, fallback: number): number {
@@ -457,7 +333,10 @@ function cleanHardwareMap(
       };
     })
     .filter((board) => board.id && board.label && board.usb_port);
-  const boardIds = new Set([RASPBERRY_NODE_ID, ...boards.map((board) => board.id)]);
+  // Hardware wired to a dynamic connector names the connector as its board;
+  // that is a real connection, not a dangling one to clear.
+  const connectorIds = new Set((hardwareMap.connectors ?? []).map((connector) => connector.id));
+  const boardIds = new Set([RASPBERRY_NODE_ID, ...boards.map((board) => board.id), ...connectorIds]);
   const devices = hardwareMap.devices
     .map((device) => {
       const kind = normalizeDeviceKind(device.kind);
@@ -497,7 +376,8 @@ function cleanHardwareMap(
       enabled: isHardwareEnabled(group),
       notes: group.notes?.trim() || null,
     }))
-    .filter((group) => group.id && group.name && group.member_ids.length > 0);
+    // A tool on a connector exists before anything is wired to it.
+    .filter((group) => group.id && group.name && (group.member_ids.length > 0 || !!group.connector_id));
   const persistedItemIds = new Set([
     ...itemIds,
     ...groups.map((group) => group.id),
@@ -524,6 +404,7 @@ function cleanHardwareMap(
     // Passed through untouched: the diagram does not edit connectors, and
     // dropping them here would detach every tool group on the next save.
     connectors: hardwareMap.connectors ?? [],
+    usb_ports: hardwareMap.usb_ports,
     function_assignments: (hardwareMap.function_assignments ?? []).filter((assignment) =>
       assignment.function_id.trim()
       && assignment.device_id.trim()
@@ -672,6 +553,19 @@ function nodePositionForId(
   }
 
   return { x: 260, y: 80 };
+}
+
+// The fixed-connections view: everything except hardware wired to a dynamic
+// connector, which lives on the Dynamic connections page. Groups keep only
+// the members this view shows, and a group left with none is not drawn.
+function fixedConnectionsMap(hardwareMap: HardwareMap): HardwareMap {
+  const connectorIds = new Set((hardwareMap.connectors ?? []).map((connector) => connector.id));
+  const devices = hardwareMap.devices.filter((device) => !connectorIds.has(device.board_id));
+  const visibleIds = new Set([...hardwareMap.boards.map((board) => board.id), ...devices.map((device) => device.id)]);
+  const groups = (hardwareMap.groups ?? [])
+    .map((group) => ({ ...group, member_ids: group.member_ids.filter((memberId) => visibleIds.has(memberId)) }))
+    .filter((group) => group.member_ids.length > 0);
+  return { ...hardwareMap, devices, groups };
 }
 
 function buildHardwareNodes(
@@ -979,6 +873,9 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const savedHardwareMapSnapshotRef = useRef<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(RASPBERRY_NODE_ID);
+  // Both subpages edit the same map, so switching keeps unsaved edits and one
+  // Save button covers both.
+  const [mapSubpage, setMapSubpage] = useState<"fixed" | "dynamic">("fixed");
   const [contextMenu, setContextMenu] = useState<HardwareContextMenuState>(null);
   const [hardwareDrawerOpen, setHardwareDrawerOpen] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<HardwareFlowNode>([]);
@@ -1175,8 +1072,9 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    setNodes((currentNodes) => buildHardwareNodes(hardwareMap, detectedBoards, currentNodes));
-    setEdges(buildHardwareEdges(hardwareMap));
+    const fixedMap = fixedConnectionsMap(hardwareMap);
+    setNodes((currentNodes) => buildHardwareNodes(fixedMap, detectedBoards, currentNodes));
+    setEdges(buildHardwareEdges(fixedMap));
   }, [hardwareMap, detectedBoards, setEdges, setNodes]);
 
   useEffect(() => {
@@ -1275,7 +1173,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
           ...group,
           member_ids: group.member_ids.filter((memberId) => memberId !== boardId && !currentMap.devices.some((device) => device.board_id === boardId && device.id === memberId)),
         }))
-        .filter((group) => group.member_ids.length > 0),
+        .filter((group) => group.member_ids.length > 0 || !!group.connector_id),
     }));
     setSelectedNodeId(RASPBERRY_NODE_ID);
     setSaveState("idle");
@@ -1335,7 +1233,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
           ...group,
           member_ids: group.member_ids.filter((memberId) => memberId !== deviceId),
         }))
-        .filter((group) => group.member_ids.length > 0),
+        .filter((group) => group.member_ids.length > 0 || !!group.connector_id),
     }));
     setSelectedNodeId(RASPBERRY_NODE_ID);
     setSaveState("idle");
@@ -1497,7 +1395,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     }
 
     const selectedIdSet = new Set(selectedIds);
-    const selectedEdges = buildHardwareEdges(hardwareMap)
+    const selectedEdges = buildHardwareEdges(fixedConnectionsMap(hardwareMap))
       .filter((edge) => selectedIdSet.has(edge.source) && selectedIdSet.has(edge.target));
     if (selectedEdges.length === 0) {
       return false;
@@ -1563,123 +1461,6 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
     setSaveState("idle");
   }
 
-  function attachGroupToConnector(groupId: string, connectorId: string) {
-    // Leaving a connector clears everything that only means something on one,
-    // which the backend would otherwise reject.
-    updateGroup(groupId, connectorId
-      ? { connector_id: connectorId }
-      : { connector_id: null, pin_modes: {}, usb_board_id: null, verification: "none", toolhead_index: null });
-  }
-
-  function renderConnectorSettings(group: HardwareGroupMapping) {
-    const connectors = hardwareMap.connectors ?? [];
-    if (connectors.length === 0) {
-      return null;
-    }
-
-    const connector = connectors.find((candidate) => candidate.id === group.connector_id) ?? null;
-    const pinModes = group.pin_modes ?? {};
-    const verification = group.verification ?? "none";
-    const usbBoards = hardwareMap.boards;
-    const takenSlots = new Set(
-      (hardwareMap.groups ?? [])
-        .filter((other) => other.id !== group.id && other.connector_id === group.connector_id && other.toolhead_index != null)
-        .map((other) => other.toolhead_index as number),
-    );
-    const loopbackPins = new Set(
-      verification === "loopback" && connector
-        ? connector.pins.filter((pin) => pin.peripheral === "uart").map((pin) => pin.name)
-        : [],
-    );
-
-    return (
-      <>
-        <label className="hardware-settings__field">
-          <span>Dynamic connector</span>
-          <select
-            onChange={(event) => attachGroupToConnector(group.id, event.target.value)}
-            value={group.connector_id ?? ""}
-          >
-            <option value="">Not a connector tool</option>
-            {connectors.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
-        {connector ? (
-          <>
-            {connector.pins.map((pin) => (
-              <label className="hardware-settings__field" key={pin.name}>
-                <span>{pin.name} (GPIO {pin.gpio})</span>
-                <select
-                  disabled={loopbackPins.has(pin.name)}
-                  onChange={(event) => updateGroup(group.id, {
-                    pin_modes: { ...pinModes, [pin.name]: event.target.value as ConnectorPinMode },
-                  })}
-                  value={loopbackPins.has(pin.name) ? "unused" : (pinModes[pin.name] ?? "unused")}
-                >
-                  <option value="unused">{loopbackPins.has(pin.name) ? "Shorted for loopback" : "Unused"}</option>
-                  {pin.peripheral === "i2c" ? <option value="i2c">I2C</option> : null}
-                  {pin.peripheral === "uart" ? <option value="uart">UART</option> : null}
-                  <option value="gpio">GPIO</option>
-                </select>
-              </label>
-            ))}
-            <label className="hardware-settings__field">
-              <span>USB controller{connector.usb_port ? ` (${connector.usb_port})` : ""}</span>
-              <select
-                onChange={(event) => updateGroup(group.id, { usb_board_id: event.target.value || null })}
-                value={group.usb_board_id ?? ""}
-              >
-                <option value="">Nothing on USB</option>
-                {usbBoards.map((board) => (
-                  <option key={board.id} value={board.id}>{board.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="hardware-settings__field">
-              <span>Verify with</span>
-              <select
-                onChange={(event) => {
-                  const next = event.target.value as ConnectorVerification;
-                  // A loopback shorts TX to RX on the tool, so those pins
-                  // cannot be used for anything else.
-                  const nextModes = next === "loopback"
-                    ? Object.fromEntries(Object.entries(pinModes).filter(([name]) =>
-                        !connector.pins.some((pin) => pin.name === name && pin.peripheral === "uart")))
-                    : pinModes;
-                  updateGroup(group.id, { verification: next, pin_modes: nextModes });
-                }}
-                value={verification}
-              >
-                <option value="none">Nothing (dumb tool - not verified)</option>
-                <option value="loopback">TXD-RXD loopback</option>
-                <option disabled={!group.usb_board_id} value="fingerprint">ESP32 fingerprint over USB</option>
-                <option disabled={!group.usb_board_id} value="usb_serial">USB serial number</option>
-              </select>
-            </label>
-            <label className="hardware-settings__field">
-              <span>Rack slot</span>
-              <select
-                onChange={(event) => updateGroup(group.id, {
-                  toolhead_index: event.target.value ? Number(event.target.value) : null,
-                })}
-                value={group.toolhead_index ?? ""}
-              >
-                <option value="">Not in the rack (Connect Tool block only)</option>
-                {[1, 2, 3, 4, 5, 6].map((slot) => (
-                  <option disabled={takenSlots.has(slot)} key={slot} value={slot}>
-                    Slot {slot}{takenSlots.has(slot) ? " (taken)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        ) : null}
-      </>
-    );
-  }
-
   function ungroup(groupId: string) {
     setHardwareMap((currentMap) => ({
       ...currentMap,
@@ -1723,7 +1504,7 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
             ...group,
             member_ids: group.member_ids.filter((memberId) => !deletedBoardIds.has(memberId) && !deletedDeviceIds.has(memberId)),
           }))
-          .filter((group) => group.member_ids.length > 0),
+          .filter((group) => group.member_ids.length > 0 || !!group.connector_id),
       };
     });
     setSelectedNodeId(RASPBERRY_NODE_ID);
@@ -1879,7 +1660,13 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
               );
             })}
           </div>
-          {renderConnectorSettings(selectedGroup)}
+          {selectedGroup.connector_id ? (
+            <p className="hardware-settings__hint">
+              This group is a tool on {(hardwareMap.connectors ?? []).find((connector) => connector.id === selectedGroup.connector_id)?.label ?? selectedGroup.connector_id}
+              {selectedGroup.toolhead_index != null ? `, slot ${selectedGroup.toolhead_index}` : ""}. Edit how it
+              connects under Dynamic connections.
+            </p>
+          ) : null}
           <label className="hardware-settings__field">
             <span>Notes</span>
             <textarea
@@ -2423,7 +2210,27 @@ function HardwareDiagramSurface({ onHardwareMapSaved, view = "full", headerSlot 
         {headerSlot && isActive ? createPortal(mapHeaderControls, headerSlot) : null}
         {mapErrorBanner}
 
-        {renderHardwareCanvas("drawer")}
+        <div aria-label="Hardware map sections" className="hardware-map__subpages" role="tablist">
+          {([
+            ["fixed", "Fixed connections"],
+            ["dynamic", "Dynamic connections"],
+          ] as const).map(([id, label]) => (
+            <button
+              aria-selected={mapSubpage === id}
+              className={mapSubpage === id ? "hardware-map__subpage hardware-map__subpage--active" : "hardware-map__subpage"}
+              key={id}
+              onClick={() => setMapSubpage(id)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mapSubpage === "fixed"
+          ? renderHardwareCanvas("drawer")
+          : <DynamicConnectionsPanel hardwareMap={hardwareMap} setHardwareMap={setHardwareMap} />}
       </section>
     );
   }

@@ -52,8 +52,17 @@ export interface HardwareConnectorMapping {
   label: string;
   pins: HardwareConnectorPin[];
   usb_port?: string | null;
+  // Which of the Pi's physical USB ports (HardwareMap.usb_ports) the
+  // connector's USB is wired to.
+  usb_port_number?: number | null;
   enabled?: boolean;
   notes?: string | null;
+}
+
+export interface HardwareUsbPort {
+  number: number;
+  label: string;
+  device_path?: string | null;
 }
 
 export interface HardwareGroupMapping {
@@ -87,6 +96,7 @@ export interface HardwareMap {
   devices: HardwareDeviceMapping[];
   groups?: HardwareGroupMapping[];
   connectors?: HardwareConnectorMapping[];
+  usb_ports?: HardwareUsbPort[];
   function_assignments?: FunctionHardwareAssignment[];
   node_positions?: HardwareNodePosition[];
   updated_at?: string | null;
