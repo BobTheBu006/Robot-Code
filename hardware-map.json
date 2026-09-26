@@ -1131,6 +1131,27 @@
           "gpio": "-",
           "function_input_key": "gantry_enable_pin",
           "notes": "Shared ENABLE for both CoreXY TB6600 drivers on the closed-loop board. Same wiring convention as the Pi-driven pair: ENA- to GND with PUL-/DIR-, ENA+ here. Confirm polarity on hardware before trusting it - do not assume it matches the Pi board without checking."
+        },
+        {
+          "id": "pin-4-n5381k",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-5-9f6u3l",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-6-32mfou",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
         }
       ],
       "notes": null
@@ -1158,6 +1179,34 @@
           "signal": "step",
           "gpio": "-",
           "function_input_key": "y_step_pin",
+          "notes": null
+        },
+        {
+          "id": "pin-3-15ff14",
+          "signal": "enable",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-4-nuxb98",
+          "signal": "micro_step_1",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-5-9imi79",
+          "signal": "micro_step_2",
+          "gpio": "-",
+          "function_input_key": null,
+          "notes": null
+        },
+        {
+          "id": "pin-6-jmxvty",
+          "signal": "micro_step_3",
+          "gpio": "-",
+          "function_input_key": null,
           "notes": null
         }
       ],
@@ -1311,6 +1360,64 @@
       "usb_board_id": "controller-x83xnc",
       "verification": "fingerprint",
       "toolhead_index": 5
+    }
+  ],
+  "connectors": [
+    {
+      "id": "pogo-connector",
+      "label": "Pogo connector",
+      "pins": [
+        {
+          "name": "SDA",
+          "gpio": "2",
+          "peripheral": "i2c",
+          "alt_function": "a3"
+        },
+        {
+          "name": "SCL",
+          "gpio": "3",
+          "peripheral": "i2c",
+          "alt_function": "a3"
+        },
+        {
+          "name": "TXD",
+          "gpio": "14",
+          "peripheral": "uart",
+          "alt_function": "a4"
+        },
+        {
+          "name": "RXD",
+          "gpio": "15",
+          "peripheral": "uart",
+          "alt_function": "a4"
+        }
+      ],
+      "usb_port": "/dev/ttyUSB1",
+      "usb_port_number": null,
+      "enabled": true,
+      "notes": "USB is the port the 7-syringe pump (controller-x83xnc) uses."
+    }
+  ],
+  "usb_ports": [
+    {
+      "number": 1,
+      "label": "USB 1",
+      "device_path": null
+    },
+    {
+      "number": 2,
+      "label": "USB 2",
+      "device_path": null
+    },
+    {
+      "number": 3,
+      "label": "USB 3",
+      "device_path": null
+    },
+    {
+      "number": 4,
+      "label": "USB 4",
+      "device_path": null
     }
   ],
   "function_assignments": [
@@ -1588,8 +1695,8 @@
   "node_positions": [
     {
       "node_id": "raspberry-pi",
-      "x": 570.0,
-      "y": 790.0
+      "x": 40.0,
+      "y": 180.0
     },
     {
       "node_id": "y-max-limit-switch",
@@ -1720,42 +1827,57 @@
       "node_id": "peristaltic-pump-5",
       "x": 1998.0,
       "y": 984.0
+    },
+    {
+      "node_id": "xy-closed-loop",
+      "x": 350.0,
+      "y": 960.0
+    },
+    {
+      "node_id": "xy-cl-motor-a",
+      "x": 680.0,
+      "y": 960.0
+    },
+    {
+      "node_id": "xy-cl-motor-b",
+      "x": 680.0,
+      "y": 1070.0
+    },
+    {
+      "node_id": "xy-cl-x-min-limit-switch",
+      "x": 680.0,
+      "y": 1180.0
+    },
+    {
+      "node_id": "xy-cl-x-max-limit-switch",
+      "x": 680.0,
+      "y": 1290.0
+    },
+    {
+      "node_id": "xy-cl-y-min-limit-switch",
+      "x": 680.0,
+      "y": 1400.0
+    },
+    {
+      "node_id": "xy-cl-y-max-limit-switch",
+      "x": 680.0,
+      "y": 1510.0
+    },
+    {
+      "node_id": "xy-cl-encoder-a",
+      "x": 680.0,
+      "y": 1620.0
+    },
+    {
+      "node_id": "xy-cl-encoder-b",
+      "x": 680.0,
+      "y": 1730.0
+    },
+    {
+      "node_id": "pogo-connector",
+      "x": 480.0,
+      "y": 906.75
     }
   ],
-  "updated_at": "2026-08-19T08:54:48.526384Z",
-  "connectors": [
-    {
-      "id": "pogo-connector",
-      "label": "Pogo connector",
-      "pins": [
-        {
-          "name": "SDA",
-          "gpio": "2",
-          "peripheral": "i2c",
-          "alt_function": "a3"
-        },
-        {
-          "name": "SCL",
-          "gpio": "3",
-          "peripheral": "i2c",
-          "alt_function": "a3"
-        },
-        {
-          "name": "TXD",
-          "gpio": "14",
-          "peripheral": "uart",
-          "alt_function": "a4"
-        },
-        {
-          "name": "RXD",
-          "gpio": "15",
-          "peripheral": "uart",
-          "alt_function": "a4"
-        }
-      ],
-      "usb_port": "/dev/ttyUSB1",
-      "enabled": true,
-      "notes": "USB is the port the 7-syringe pump (controller-x83xnc) uses."
-    }
-  ]
+  "updated_at": "2026-09-26T09:36:13.876935Z"
 }
