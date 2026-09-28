@@ -28,7 +28,7 @@ firmware put the steps back.
 | Item | Detail |
 | --- | --- |
 | Controller | A **third ESP32**, dedicated to XY. Confirm availability before starting. |
-| Encoders | 2 × **AS5047D-TS_EK_AB** adapter boards ([RS, code 2018304](https://dk.rs-online.com/web/p/sensor-udvikling/2018304)), one per motor. Same register map and SPI frame as the AS5047P this was first speced against - confirmed against both datasheets, same ANGLECOM at 0x3FFF, same parity scheme - so nothing in the driver differs. Two real specs do differ, neither reached by this design: ABI resolution is lower (2048 vs 4096 counts/rev - irrelevant, this reads over SPI, not ABI) and the speed rating is unspecified for motor control rather than 28,000 RPM (irrelevant at this machine's ~2,500 RPM ceiling). |
+| Encoders | 2 × **AS5600** magnetic encoder modules (magnet included), one per motor. Procurement changed from the AS5047D (SPI, 14-bit) on 2026-09-28. The AS5600 is **12-bit over I2C at a fixed address (0x36)**, so the two encoders cannot share a bus: encoder A runs on the ESP32's I2C controller 0 (`Wire`), encoder B on controller 1 (`Wire1`), each with its own SDA/SCL. Tie each module's DIR pin to GND or 3V3 — never floating — and leave OUT unconnected. |
 | Magnets | `AS5000-MD6H-2` diametric, 6 × 2.5 mm — ships with each kit |
 | Mounting | On the **A and B motor shafts**. Not on belt idlers — see below. |
 | Drivers | Existing TB6600s, step/dir, shared active-low ENABLE |
@@ -39,7 +39,7 @@ firmware put the steps back.
 - 2 × step + 2 × dir = 4
 - 1 × shared driver enable = 1
 - 4 × limit switches = 4
-- SPI: SCK, MISO, MOSI shared + 2 × CS = 5
+- I2C: 2 × (SDA + SCL), one bus per encoder = 4
 
 Avoid GPIO 6–11 (flash), 34–39 (input only), 1/3 (UART to the Pi), and the
 strapping pins 0, 2, 5, 12, 15. On a WROVER module also avoid 16/17 (PSRAM).
@@ -96,9 +96,11 @@ encoder ──► actual_steps ────────┘                      
 
 ### Units
 
-- AS5047D is **14-bit: 16384 counts/revolution**
+- AS5600 is **12-bit: 4096 counts/revolution**
 - Motors run **800 steps/revolution**
-- So **20.48 encoder counts per full step** — single-step loss is clearly visible
+- So **5.12 encoder counts per full step** — single-step loss is still visible,
+  though with a quarter of the AS5047D's margin; half-step noise sits closer
+  to the signal, so tune the following-error limit on the machine
 - Do all loop maths in **encoder counts**, convert to steps only when emitting
 
 ### The three things that must be true
@@ -151,11 +153,15 @@ the board reports its identity; no motor is energised.
 
 **Goal:** trustworthy position from both encoders.
 
-- SPI driver for AS5047D. Verify frame format, parity and register addresses
-  against the datasheet — do not trust this document for them.
-- **Polling over SPI is sufficient**, and simpler than wiring ABI into the PCNT
-  peripheral. At 10 MHz a 16-bit frame is ~2 µs, so two encoders at 1 kHz costs
-  nothing. ABI stays available as an escape hatch if the loop ever needs it.
+- I2C driver for the AS5600: one 3-byte read from STATUS (0x0B) returns the
+  magnet state (MD/ML/MH) and RAW ANGLE (0x0C/0x0D) together. A missing magnet,
+  or one too near or too far, is a read fault. Verify registers against the
+  datasheet — do not trust this document for them.
+- **Polling over I2C** at 400 kHz costs roughly 0.1–0.2 ms per encoder read,
+  about ten times an SPI frame. That is why the loop reads every N step
+  iterations rather than every one; measure the real cost on the machine
+  before shortening N. The bus has a 2 ms timeout so a disconnected encoder
+  fails the read instead of hanging the stepping loop.
 - Accumulate turns across wraps. The sensor is absolute over one revolution
   only; a poll must never miss half a revolution. At 1 kHz that is safe past any
   speed this machine can reach, but assert it rather than assume: if two
@@ -164,7 +170,7 @@ the board reports its identity; no motor is energised.
   magnitude/error status per encoder.
 
 **Acceptance:** turn each motor by hand one full revolution; accumulated count
-changes by 16384 ± a small tolerance, and does not jump at the wrap. Rotate
+changes by 4096 ± a small tolerance, and does not jump at the wrap. Rotate
 several turns each way and confirm it returns to where it started.
 
 ### Stage 2 — following-error monitoring, no correction
@@ -174,7 +180,7 @@ several turns each way and confirm it returns to where it started.
 - Keep the existing blocking move loop for now. Read the encoders every N steps
   inside it and compute following error.
 - Halt the move if `|error| > following_error_limit` (default ~10 full steps =
-  ~205 counts). Report the axis and the measured error.
+  ~51 counts). Report the axis and the measured error.
 - Report the peak and final following error in the move reply, and surface it
   through `gantry_controller.py` into the move result — mirror the shape of the
   `speed` report added to `_move_result` in `raspberry_gantry.py`.

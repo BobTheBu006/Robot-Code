@@ -227,9 +227,9 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
             "SET XY LIMITS": "OK XY LIMITS", "SET Z LIMITS": "OK Z LIMITS",
             "MOVE XYZ": "FOLLOW ERROR PEAK 8.50 -2.00\nOK MOVE XYZ",
         })
-        response = service.move_xy(self._request(encoder_a_cs_pin=5, encoder_b_cs_pin=27))
+        response = service.move_xy(self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26))
 
-        self.assertIn("SET ENCODER PINS 5 27", sent)
+        self.assertIn("SET ENCODER PINS 32 33 25 26", sent)
         self.assertIn("SET XY PID 0.0000 0.0000 0.0000", sent)
         self.assertEqual(response.follow_error_peak_a, 8.50)
         self.assertEqual(response.follow_error_peak_b, -2.00)
@@ -246,9 +246,9 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
             "SET XY LIMITS": "OK XY LIMITS", "SET Z LIMITS": "OK Z LIMITS",
             "MOVE XYZ": "OK MOVE XYZ",
         })
-        service.move_xy(self._request(encoder_a_cs_pin=5, encoder_b_cs_pin=27))
+        service.move_xy(self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26))
 
-        self.assertLess(sent.index("SET ENCODER PINS 5 27"), sent.index("SET XY LIMITS 4 21 22 23 -1"))
+        self.assertLess(sent.index("SET ENCODER PINS 32 33 25 26"), sent.index("SET XY LIMITS 4 21 22 23 -1"))
 
     def test_a_tripped_following_error_is_a_reported_firmware_error(self) -> None:
         # A caller must be told the move stopped for a different reason than a
@@ -266,17 +266,17 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
         # GantryControllerError (existing behaviour, not new here), so the
         # firmware's own error text is checked instead of the exception's type.
         with self.assertRaises(GantryControllerError) as caught:
-            service.move_xy(self._request(encoder_a_cs_pin=5, encoder_b_cs_pin=27))
+            service.move_xy(self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26))
         self.assertIn("FOLLOW ERROR", str(caught.exception))
 
 
 
 class ClosedLoopEncoderCommandTests(unittest.TestCase):
-    """Protocol formatting for the AS5047D encoder / PID commands.
+    """Protocol formatting for the AS5600 encoder / PID commands.
 
     A machine with no encoders wired must behave exactly as it did before this
     feature existed - these commands are only ever built and sent when both
-    encoder CS pins are actually configured.
+    encoder I2C pins are actually configured.
     """
 
     def _request(self, **overrides):
@@ -296,20 +296,28 @@ class ClosedLoopEncoderCommandTests(unittest.TestCase):
         self.assertIsNone(service._build_xy_pid_command(request))
         self.assertIsNone(service._build_xy_follow_limit_command(request))
 
-    def test_no_encoder_command_with_only_one_cs_pin_set(self) -> None:
+    def test_no_encoder_command_with_only_one_encoder_wired(self) -> None:
         service = GantryControllerService()
-        request = self._request(encoder_a_cs_pin=5)
+        request = self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33)
         self.assertIsNone(service._build_encoder_pin_command(request))
 
-    def test_encoder_pin_command_names_both_chip_selects(self) -> None:
+    def test_an_encoder_pin_that_clashes_with_a_limit_switch_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "distinct GPIO"):
+            self._request(encoder_a_sda_pin=21, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26)
+
+    def test_the_default_follow_limit_is_ten_steps_of_as5600_counts(self) -> None:
+        # 4096 counts / 800 steps = 5.12 counts per step.
+        self.assertAlmostEqual(self._request().xy_follow_limit_counts / (4096 / 800), 10.0, delta=0.1)
+
+    def test_encoder_pin_command_names_both_i2c_buses(self) -> None:
         service = GantryControllerService()
-        request = self._request(encoder_a_cs_pin=5, encoder_b_cs_pin=27)
-        self.assertEqual(service._build_encoder_pin_command(request), "SET ENCODER PINS 5 27")
+        request = self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26)
+        self.assertEqual(service._build_encoder_pin_command(request), "SET ENCODER PINS 32 33 25 26")
 
     def test_pid_command_sends_all_three_gains(self) -> None:
         service = GantryControllerService()
         request = self._request(
-            encoder_a_cs_pin=5, encoder_b_cs_pin=27,
+            encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26,
             xy_pid_kp=1.5, xy_pid_ki=0.25, xy_pid_kd=0.1,
         )
         self.assertEqual(service._build_xy_pid_command(request), "SET XY PID 1.5000 0.2500 0.1000")
@@ -321,7 +329,7 @@ class ClosedLoopEncoderCommandTests(unittest.TestCase):
 
     def test_follow_limit_command_is_sent_with_encoders(self) -> None:
         service = GantryControllerService()
-        request = self._request(encoder_a_cs_pin=5, encoder_b_cs_pin=27, xy_follow_limit_counts=150.0)
+        request = self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26, xy_follow_limit_counts=150.0)
         self.assertEqual(service._build_xy_follow_limit_command(request), "SET XY FOLLOW LIMIT 150.00")
 
 

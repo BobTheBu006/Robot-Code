@@ -1299,7 +1299,7 @@
     {
       "id": "xy-cl-encoder-a",
       "board_id": "xy-closed-loop",
-      "name": "AS5047P Encoder (Motor A)",
+      "name": "AS5600 Encoder (Motor A)",
       "kind": "sensor",
       "enabled": false,
       "sensor_kind": "rotary_position_encoder",
@@ -1308,19 +1308,26 @@
       "calibration_ml_per_200_steps": null,
       "pins": [
         {
-          "id": "xy-cl-encoder-a-cs",
-          "signal": "chip_select",
+          "id": "xy-cl-encoder-a-sda",
+          "signal": "sda",
           "gpio": "-",
-          "function_input_key": "encoder_a_cs_pin",
+          "function_input_key": "encoder_a_sda_pin",
+          "notes": null
+        },
+        {
+          "id": "xy-cl-encoder-a-scl",
+          "signal": "scl",
+          "gpio": "-",
+          "function_input_key": "encoder_a_scl_pin",
           "notes": null
         }
       ],
-      "notes": "AS5047P-TS_EK_AB on the CoreXY motor A shaft, SPI. Shares SCK/MISO/MOSI with the other encoder; only the chip-select is per-device. Mount concentric with the shaft within a few tenths of a millimetre at the datasheet air gap - a poorly centred magnet produces a smooth, plausible-looking error."
+      "notes": "AS5600 magnetic encoder on the CoreXY motor A shaft, on the ESP32's I2C bus 0 (Wire). Every AS5600 has the fixed address 0x36, so each encoder has its own SDA/SCL pair; they cannot share a bus. Tie DIR to GND or 3V3 (never floating). Diametric magnet centred on the shaft at the 0.5-3 mm air gap - a poorly centred magnet produces a smooth, plausible-looking error."
     },
     {
       "id": "xy-cl-encoder-b",
       "board_id": "xy-closed-loop",
-      "name": "AS5047P Encoder (Motor B)",
+      "name": "AS5600 Encoder (Motor B)",
       "kind": "sensor",
       "enabled": false,
       "sensor_kind": "rotary_position_encoder",
@@ -1329,14 +1336,21 @@
       "calibration_ml_per_200_steps": null,
       "pins": [
         {
-          "id": "xy-cl-encoder-b-cs",
-          "signal": "chip_select",
+          "id": "xy-cl-encoder-b-sda",
+          "signal": "sda",
           "gpio": "-",
-          "function_input_key": "encoder_b_cs_pin",
+          "function_input_key": "encoder_b_sda_pin",
+          "notes": null
+        },
+        {
+          "id": "xy-cl-encoder-b-scl",
+          "signal": "scl",
+          "gpio": "-",
+          "function_input_key": "encoder_b_scl_pin",
           "notes": null
         }
       ],
-      "notes": "AS5047P-TS_EK_AB on the CoreXY motor B shaft, SPI. Shares SCK/MISO/MOSI with the other encoder; only the chip-select is per-device. Mount concentric with the shaft within a few tenths of a millimetre at the datasheet air gap - a poorly centred magnet produces a smooth, plausible-looking error."
+      "notes": "AS5600 magnetic encoder on the CoreXY motor B shaft, on the ESP32's I2C bus 1 (Wire1). Every AS5600 has the fixed address 0x36, so each encoder has its own SDA/SCL pair; they cannot share a bus. Tie DIR to GND or 3V3 (never floating). Diametric magnet centred on the shaft at the 0.5-3 mm air gap - a poorly centred magnet produces a smooth, plausible-looking error."
     }
   ],
   "groups": [

@@ -69,11 +69,16 @@ class GantryXYMoveRequest(BaseModel):
     z_right_max_limit_pin: int = Field(default=13, ge=0)
     baud_rate: int | None = Field(default=None, gt=0)
 
-    # AS5047D chip-select pins, one per motor. -1 means no encoder is wired -
-    # the firmware runs open-loop exactly as before, and no encoder command is
-    # ever sent, so a machine without encoders behaves identically to today.
-    encoder_a_cs_pin: int = Field(default=-1, ge=-1)
-    encoder_b_cs_pin: int = Field(default=-1, ge=-1)
+    # AS5600 I2C pins, one bus per motor: every AS5600 answers at the same
+    # fixed address, so encoder A and encoder B each need their own SDA/SCL
+    # pair (the ESP32 runs them on its two I2C controllers). -1 means no
+    # encoder is wired - the firmware runs open-loop exactly as before, and no
+    # encoder command is ever sent, so a machine without encoders behaves
+    # identically to today.
+    encoder_a_sda_pin: int = Field(default=-1, ge=-1)
+    encoder_a_scl_pin: int = Field(default=-1, ge=-1)
+    encoder_b_sda_pin: int = Field(default=-1, ge=-1)
+    encoder_b_scl_pin: int = Field(default=-1, ge=-1)
     # PID gains. Zero is the firmware's own inert default - matched here so a
     # block that has never touched these fields sends the same "do nothing"
     # values the firmware already assumes, rather than depending on the
@@ -81,10 +86,15 @@ class GantryXYMoveRequest(BaseModel):
     xy_pid_kp: float = Field(default=0.0, ge=0.0)
     xy_pid_ki: float = Field(default=0.0, ge=0.0)
     xy_pid_kd: float = Field(default=0.0, ge=0.0)
-    # Following-error fault threshold, in encoder counts (AS5047D: 16384/rev).
-    # ~205 counts is ~10 full steps at 800 steps/rev - generous enough not to
+    # Following-error fault threshold, in encoder counts (AS5600: 4096/rev).
+    # ~51 counts is ~10 full steps at 800 steps/rev - generous enough not to
     # trip on ordinary motion, tight enough to catch a real stall.
-    xy_follow_limit_counts: float = Field(default=205.0, gt=0.0)
+    xy_follow_limit_counts: float = Field(default=51.0, gt=0.0)
+
+    @property
+    def encoders_wired(self) -> bool:
+        """Both encoders have both I2C wires. Half a bus is not an encoder."""
+        return min(self.encoder_a_sda_pin, self.encoder_a_scl_pin, self.encoder_b_sda_pin, self.encoder_b_scl_pin) >= 0
 
     @model_validator(mode="after")
     def validate_pin_assignments(self) -> "GantryXYMoveRequest":
@@ -112,10 +122,9 @@ class GantryXYMoveRequest(BaseModel):
 
         if self.gantry_enable_pin >= 0:
             assigned_pins["gantry_enable_pin"] = self.gantry_enable_pin
-        if self.encoder_a_cs_pin >= 0:
-            assigned_pins["encoder_a_cs_pin"] = self.encoder_a_cs_pin
-        if self.encoder_b_cs_pin >= 0:
-            assigned_pins["encoder_b_cs_pin"] = self.encoder_b_cs_pin
+        for encoder_pin in ("encoder_a_sda_pin", "encoder_a_scl_pin", "encoder_b_sda_pin", "encoder_b_scl_pin"):
+            if getattr(self, encoder_pin) >= 0:
+                assigned_pins[encoder_pin] = getattr(self, encoder_pin)
         _validate_distinct_pins(
             assigned_pins,
             "Each active gantry driver/limit input must use a distinct GPIO pin. Conflicts",

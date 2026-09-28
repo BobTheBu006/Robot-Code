@@ -1,6 +1,10 @@
 #include <Arduino.h>
 #include "controller_identity.h"
 #include <Preferences.h>
+// Included up here, not beside the encoder code, because the Arduino builder
+// inserts function prototypes right after the first include block - and the
+// encoder functions take a TwoWire&.
+#include <Wire.h>
 
 // Forward declaration only. The Arduino build auto-generates function
 // prototypes right after this include block, before EncoderChannel's full
@@ -353,7 +357,8 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 
 
 // ---------------------------------------------------------------------------
-// Closed-loop XY: AS5047D encoders on the A and B motor shafts, read over SPI.
+// Closed-loop XY: AS5600 magnetic encoders on the A and B motor shafts, read
+// over I2C.
 //
 // One encoder per physical motor - "A" and "B" here, matching xAxis/yAxis
 // above which despite their names pulse the A and B motors respectively (see
@@ -362,8 +367,14 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 // when converting a cartesian target into A/B deltas, exactly as every move
 // already does.
 //
-// AS5047D is 14-bit (16384 counts/revolution). At 800 steps/revolution that is
-// 20.48 counts per full step, so single-step loss is directly visible.
+// AS5600 is 12-bit (4096 counts/revolution). At 800 steps/revolution that is
+// 5.12 counts per full step, so single-step loss is still visible.
+//
+// Every AS5600 answers at the same fixed I2C address (0x36), so the two
+// cannot share a bus. Each gets one of the ESP32's two hardware I2C
+// controllers instead: encoder A on Wire, encoder B on Wire1, each with its
+// own SDA/SCL pair. No multiplexer chip, and one encoder's bus fault cannot
+// stall the other's.
 //
 // Correction is applied inside the existing, proven CoreXY stepping loop
 // rather than a separate high-rate timer ISR. This is a deliberate interim
@@ -375,27 +386,36 @@ void applyAxisLimits(AxisChannel &axis, int minLimitPin, int maxLimitPin, int li
 // blind, with no encoder yet wired, is exactly the risk the plan warns against.
 // ---------------------------------------------------------------------------
 
-#include <SPI.h>
-
-const int ENCODER_COUNTS_PER_REV = 16384;   // AS5047D: 14-bit
-const uint16_t AS5047D_CMD_READ = 0x4000;   // read, with parity bit set below
-const uint16_t AS5047D_REG_ANGLECOM = 0x3FFF;
-const uint32_t AS5047D_SPI_HZ = 1000000;    // conservative; datasheet allows up to 10 MHz
+const int ENCODER_COUNTS_PER_REV = 4096;    // AS5600: 12-bit
+const uint8_t AS5600_ADDRESS = 0x36;        // fixed; cannot be changed
+// STATUS (0x0B) is immediately followed by RAW ANGLE (0x0C high, 0x0D low),
+// so one 3-byte read returns the magnet state and the angle together.
+const uint8_t AS5600_REG_STATUS = 0x0B;
+const uint8_t AS5600_STATUS_MD = 0x20;      // magnet detected
+const uint8_t AS5600_STATUS_ML = 0x10;      // magnet too weak (too far away)
+const uint8_t AS5600_STATUS_MH = 0x08;      // magnet too strong (too close)
+// Fast mode. The AS5600 also allows 1 MHz, but the pull-ups on the common
+// breakout boards are sized for 400 kHz; raise it only after checking the
+// edges on a scope.
+const uint32_t AS5600_I2C_HZ = 400000;
+// A missing or wedged encoder must fail a read, not hang the stepping loop.
+const uint16_t AS5600_I2C_TIMEOUT_MS = 2;
 
 struct EncoderChannel {
-  int csPin = -1;
-  uint16_t lastRaw = 0;          // last raw 14-bit angle read
-  long turns = 0;                // accumulated whole revolutions
+  TwoWire *bus = nullptr;
+  int sdaPin = -1;
+  int sclPin = -1;
+  uint16_t lastRaw = 0;          // last raw 12-bit angle read
+  long turns = 0;                // accumulated counts across revolutions
   bool primed = false;           // false until the first read establishes lastRaw
-  bool faulted = false;          // set if a read looks like a missed wrap
-  uint16_t lastError = 0;        // AS5047D error register, if ever read
+  bool faulted = false;          // set on a bus error, a magnet fault or a missed wrap
+  uint8_t lastStatus = 0;        // AS5600 STATUS from the last read
 };
 
-EncoderChannel encoderA;   // on the A motor shaft (xAxis.stepPin/dirPin)
-EncoderChannel encoderB;   // on the B motor shaft (yAxis.stepPin/dirPin)
+EncoderChannel encoderA;   // on the A motor shaft (xAxis.stepPin/dirPin), I2C bus 0
+EncoderChannel encoderB;   // on the B motor shaft (yAxis.stepPin/dirPin), I2C bus 1
 
 bool encodersConfigured = false;
-bool spiStarted = false;
 
 // PID gains and the following-error fault limit. Zero gains are deliberately
 // inert - the loop runs and can report error, but applies no correction -
@@ -416,93 +436,78 @@ XYPidState xyPid;
 
 // Encoder counts, not steps: correcting in the same units the sensor reports
 // avoids a lossy round trip through cm on every control tick.
-float xyFollowLimitCounts = 205.0f;   // ~10 full steps at 20.48 counts/step
-long xyIntegralClampCounts = 4096;    // +-1/4 revolution; anti-windup
+float xyFollowLimitCounts = 51.0f;    // ~10 full steps at 5.12 counts/step
+long xyIntegralClampCounts = 1024;    // +-1/4 revolution; anti-windup
 
 // How often (in step iterations) the loop reads encoders and applies
-// correction. Every iteration would mean an SPI transaction between every
+// correction. Every iteration would mean two I2C transactions between every
 // single step pulse, which risks the encoder read itself becoming the speed
 // limiter; every few iterations keeps the correction frequent (continuous
-// relative to the move, not only at the end) while bounding SPI traffic. Start
+// relative to the move, not only at the end) while bounding bus traffic. Start
 // conservative; the achievable rate is a hardware question, not a code one.
 const int PID_CHECK_EVERY_N_ITERATIONS = 8;
 
-void configureEncoderPins(int csA, int csB) {
-  if (!spiStarted) {
-    SPI.begin();
-    spiStarted = true;
+void configureEncoderChannel(EncoderChannel &channel, TwoWire &bus, int sdaPin, int sclPin) {
+  if (channel.bus != nullptr && (channel.sdaPin != sdaPin || channel.sclPin != sclPin)) {
+    channel.bus->end();
   }
-  encoderA.csPin = csA;
-  encoderB.csPin = csB;
-  encoderA.primed = false;
-  encoderB.primed = false;
-  encoderA.faulted = false;
-  encoderB.faulted = false;
-  if (csA >= 0) {
-    pinMode(csA, OUTPUT);
-    digitalWrite(csA, HIGH);
+  channel.bus = nullptr;
+  channel.sdaPin = sdaPin;
+  channel.sclPin = sclPin;
+  channel.primed = false;
+  channel.faulted = false;
+  channel.lastStatus = 0;
+  if (sdaPin < 0 || sclPin < 0) {
+    return;
   }
-  if (csB >= 0) {
-    pinMode(csB, OUTPUT);
-    digitalWrite(csB, HIGH);
+  if (bus.begin(sdaPin, sclPin, AS5600_I2C_HZ)) {
+    bus.setTimeOut(AS5600_I2C_TIMEOUT_MS);
+    channel.bus = &bus;
   }
-  encodersConfigured = (csA >= 0 && csB >= 0);
 }
 
-// Odd parity over the low 15 bits, per the AS5047D frame format.
-uint16_t as5047pWithParity(uint16_t command) {
-  uint16_t value = command;
-  uint8_t parity = 0;
-  for (uint8_t bit = 0; bit < 15; bit++) {
-    parity ^= (value >> bit) & 0x1;
-  }
-  if (parity) {
-    value |= 0x8000;
-  }
-  return value;
+void configureEncoderPins(int sdaA, int sclA, int sdaB, int sclB) {
+  configureEncoderChannel(encoderA, Wire, sdaA, sclA);
+  configureEncoderChannel(encoderB, Wire1, sdaB, sclB);
+  encodersConfigured = (encoderA.bus != nullptr && encoderB.bus != nullptr);
 }
 
-// One 16-bit SPI transaction: send a command frame, get back the previous
-// frame's reply (the AS5047D pipelines by one transaction, per its datasheet).
-uint16_t as5047pTransfer(int csPin, uint16_t command) {
-  uint16_t frame = as5047pWithParity(command);
-  SPI.beginTransaction(SPISettings(AS5047D_SPI_HZ, MSBFIRST, SPI_MODE1));
-  digitalWrite(csPin, LOW);
-  delayMicroseconds(1);
-  uint16_t reply = SPI.transfer16(frame);
-  digitalWrite(csPin, HIGH);
-  SPI.endTransaction();
-  return reply;
-}
-
-// Reads ANGLECOM and folds the reply into the channel's accumulated position.
-// Returns false if the reply looks like it missed a wrap (jumped by more than
-// half a revolution since the last read) - that is a fault, not a value to
-// silently accept, because it means the channel was not polled often enough
-// for the speed the axis was moving at.
+// Reads STATUS and RAW ANGLE in one transaction and folds the angle into the
+// channel's accumulated position. Returns false on anything that makes the
+// reading untrustworthy: a bus error, a magnet that is missing or out of
+// range, or a jump of close to half a revolution since the last read - that
+// last one means the channel was not polled often enough for the speed the
+// axis was moving at, which is a fault, not a value to silently accept.
 bool readEncoderChannel(EncoderChannel &channel) {
-  if (channel.csPin < 0) {
+  if (channel.bus == nullptr) {
     return false;
   }
 
-  // First transfer primes the pipeline; the reply belongs to the read before
-  // it, so a real ANGLECOM value needs two transfers back to back.
-  as5047pTransfer(channel.csPin, AS5047D_CMD_READ | AS5047D_REG_ANGLECOM);
-  uint16_t reply = as5047pTransfer(channel.csPin, AS5047D_CMD_READ | AS5047D_REG_ANGLECOM);
+  TwoWire &bus = *channel.bus;
+  bus.beginTransmission(AS5600_ADDRESS);
+  bus.write(AS5600_REG_STATUS);
+  if (bus.endTransmission(false) != 0 || bus.requestFrom(AS5600_ADDRESS, (uint8_t)3) != 3) {
+    channel.faulted = true;
+    return false;
+  }
+  uint8_t status = bus.read();
+  uint8_t high = bus.read();
+  uint8_t low = bus.read();
+  channel.lastStatus = status;
 
-  bool errorFlag = (reply & 0x4000) != 0;
-  uint16_t raw = reply & 0x3FFF;
+  bool magnetOk = (status & AS5600_STATUS_MD) && !(status & (AS5600_STATUS_ML | AS5600_STATUS_MH));
+  uint16_t raw = ((uint16_t)(high & 0x0F) << 8) | low;
 
   if (!channel.primed) {
     channel.lastRaw = raw;
-    channel.primed = true;
-    channel.faulted = errorFlag;
-    return !errorFlag;
+    channel.primed = magnetOk;
+    channel.faulted = !magnetOk;
+    return magnetOk;
   }
 
   int32_t delta = (int32_t)raw - (int32_t)channel.lastRaw;
-  // Wrap handling: a delta near +-16384 is really a small step across the
-  // 0/16384 boundary, not a big jump. Fold it into the smaller, correct delta.
+  // Wrap handling: a delta near +-4096 is really a small step across the
+  // 0/4096 boundary, not a big jump. Fold it into the smaller, correct delta.
   if (delta > ENCODER_COUNTS_PER_REV / 2) {
     delta -= ENCODER_COUNTS_PER_REV;
   } else if (delta < -ENCODER_COUNTS_PER_REV / 2) {
@@ -515,10 +520,13 @@ bool readEncoderChannel(EncoderChannel &channel) {
   // miss half a revolution" rule from the plan, checked rather than assumed.
   bool ambiguousWrap = labs(delta) > (ENCODER_COUNTS_PER_REV * 3) / 8;
 
-  channel.turns += delta;
-  channel.lastRaw = raw;
-  channel.faulted = errorFlag || ambiguousWrap;
-  channel.lastError = errorFlag ? reply : channel.lastError;
+  // A reading taken without a good magnet is noise; keep the last position
+  // rather than integrate it.
+  if (magnetOk) {
+    channel.turns += delta;
+    channel.lastRaw = raw;
+  }
+  channel.faulted = !magnetOk || ambiguousWrap;
   return !channel.faulted;
 }
 
@@ -745,7 +753,7 @@ bool applyPidCorrectionTick(
   }
 
   if (!okA || !okB) {
-    // A read fault does not by itself stop the move - transient SPI noise
+    // A read fault does not by itself stop the move - transient bus noise
     // should not abort a physical motion - but no correction is applied this
     // tick, since the measurement cannot be trusted.
     return true;
@@ -945,7 +953,7 @@ bool runCoreXYCartesianMove(
     }
 
     // Closed-loop correction tick. Every Nth iteration rather than every one,
-    // so an SPI round trip is not inserted between every single step pulse -
+    // so an I2C round trip is not inserted between every single step pulse -
     // see the design note above applyPidCorrectionTick. This is what makes the
     // correction continuous through the move instead of only happening at the
     // end: it runs dozens of times per move even at modest step counts.
@@ -2810,17 +2818,28 @@ bool handleMoveXCommand(const String &cmd) {
 }
 
 bool handleSetEncoderPinsCommand(const String &cmd) {
-  int csA = -1;
-  int csB = -1;
-  int parsed = sscanf(cmd.c_str(), "SET ENCODER PINS %d %d", &csA, &csB);
-  if (parsed != 2) {
+  // SET ENCODER PINS <sdaA> <sclA> <sdaB> <sclB>: one I2C bus per encoder.
+  int sdaA = -1;
+  int sclA = -1;
+  int sdaB = -1;
+  int sclB = -1;
+  int parsed = sscanf(cmd.c_str(), "SET ENCODER PINS %d %d %d %d", &sdaA, &sclA, &sdaB, &sclB);
+  if (parsed != 4) {
     return false;
   }
-  configureEncoderPins(csA, csB);
+  configureEncoderPins(sdaA, sclA, sdaB, sclB);
+  if (!encodersConfigured) {
+    Serial.println("ERR ENCODER I2C BEGIN FAILED");
+    return true;
+  }
   Serial.print("OK ENCODER PINS ");
-  Serial.print(csA);
+  Serial.print(sdaA);
   Serial.print(" ");
-  Serial.println(csB);
+  Serial.print(sclA);
+  Serial.print(" ");
+  Serial.print(sdaB);
+  Serial.print(" ");
+  Serial.println(sclB);
   return true;
 }
 
@@ -2834,18 +2853,24 @@ bool handleEncoderQueryCommand(const String &cmd) {
   }
   bool okA = readEncoderChannel(encoderA);
   bool okB = readEncoderChannel(encoderB);
+  // Raw angle, accumulated counts, ok flag, then the AS5600 STATUS byte in
+  // hex so a magnet problem (MD/ML/MH) can be read straight off the reply.
   Serial.print("OK ENCODER A ");
   Serial.print(encoderA.lastRaw);
   Serial.print(" ");
   Serial.print(encoderAccumulatedCounts(encoderA));
   Serial.print(" ");
   Serial.print(okA ? 1 : 0);
+  Serial.print(" ");
+  Serial.print(encoderA.lastStatus, HEX);
   Serial.print(" B ");
   Serial.print(encoderB.lastRaw);
   Serial.print(" ");
   Serial.print(encoderAccumulatedCounts(encoderB));
   Serial.print(" ");
-  Serial.println(okB ? 1 : 0);
+  Serial.print(okB ? 1 : 0);
+  Serial.print(" ");
+  Serial.println(encoderB.lastStatus, HEX);
   return true;
 }
 

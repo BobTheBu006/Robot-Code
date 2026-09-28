@@ -466,21 +466,24 @@ class GantryControllerService:
         )
 
     def _build_encoder_pin_command(self, request: GantryXYMoveRequest) -> str | None:
-        # Only sent when both CS pins are wired - a machine without encoders
-        # must behave exactly as it did before this feature existed, and the
-        # firmware's own default (encodersConfigured = false) already means
-        # "run open-loop", so there is nothing to configure in that case.
-        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+        # Only sent when both encoders' I2C pins are wired - a machine without
+        # encoders must behave exactly as it did before this feature existed,
+        # and the firmware's own default (encodersConfigured = false) already
+        # means "run open-loop", so there is nothing to configure in that case.
+        if not request.encoders_wired:
             return None
-        return f"SET ENCODER PINS {request.encoder_a_cs_pin} {request.encoder_b_cs_pin}"
+        return (
+            f"SET ENCODER PINS {request.encoder_a_sda_pin} {request.encoder_a_scl_pin} "
+            f"{request.encoder_b_sda_pin} {request.encoder_b_scl_pin}"
+        )
 
     def _build_xy_pid_command(self, request: GantryXYMoveRequest) -> str | None:
-        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+        if not request.encoders_wired:
             return None
         return f"SET XY PID {request.xy_pid_kp:.4f} {request.xy_pid_ki:.4f} {request.xy_pid_kd:.4f}"
 
     def _build_xy_follow_limit_command(self, request: GantryXYMoveRequest) -> str | None:
-        if request.encoder_a_cs_pin < 0 or request.encoder_b_cs_pin < 0:
+        if not request.encoders_wired:
             return None
         return f"SET XY FOLLOW LIMIT {request.xy_follow_limit_counts:.2f}"
 

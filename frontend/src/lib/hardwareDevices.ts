@@ -17,7 +17,7 @@ export const DEVICE_KIND_OPTIONS: Array<{ label: string; value: HardwareDeviceKi
 export const SENSOR_KIND_OPTIONS: Array<{ label: string; value: HardwareSensorKind }> = [
   { label: "Position / limit switch", value: "position_limit_switch" },
   { label: "AHT20 temperature + humidity", value: "aht20_temperature_humidity" },
-  { label: "Rotary position encoder (SPI)", value: "rotary_position_encoder" },
+  { label: "Rotary position encoder (AS5600, I2C)", value: "rotary_position_encoder" },
 ];
 export const STEPPER_SIGNALS = ["direction", "step", "enable", "micro_step_1", "micro_step_2", "micro_step_3"];
 export const SIGNAL_LABELS: Record<string, string> = {
@@ -118,8 +118,12 @@ export function pinTemplateForDevice(
   }
 
   if (sensorKind === "rotary_position_encoder") {
-    // SPI encoders share the bus; each one has only its own chip select.
-    return [{ signal: "chip_select", gpio: "-", function_input_key: null }];
+    // AS5600: I2C at a fixed address, so each encoder needs its own bus -
+    // its own SDA and SCL, not a shared bus with a chip select.
+    return [
+      { signal: "sda", gpio: "-", function_input_key: null },
+      { signal: "scl", gpio: "-", function_input_key: null },
+    ];
   }
 
   if (sensorKind === "aht20_temperature_humidity") {
