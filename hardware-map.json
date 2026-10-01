@@ -1406,10 +1406,10 @@
           "alt_function": "a4"
         }
       ],
-      "usb_port": "/dev/ttyUSB1",
+      "usb_port": "/dev/serial/by-path/platform-xhci-hcd.1-usb-0:2:1.0-port0",
       "usb_port_number": null,
       "enabled": true,
-      "notes": "USB is the port the 7-syringe pump (controller-x83xnc) uses."
+      "notes": "USB is the Pi socket at platform-xhci-hcd.1 port 2, confirmed on 2026-10-01 by the 7-syringe pump enumerating through the pogo pins there. The Z/pump controller uses a different socket (xhci-hcd.0 port 2)."
     }
   ],
   "usb_ports": [
