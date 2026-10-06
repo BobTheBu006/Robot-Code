@@ -1351,6 +1351,48 @@
         }
       ],
       "notes": "AS5600 magnetic encoder on the CoreXY motor B shaft, on the ESP32's I2C bus 1 (Wire1). Every AS5600 has the fixed address 0x36, so each encoder has its own SDA/SCL pair; they cannot share a bus. Tie DIR to GND or 3V3 (never floating). Diametric magnet centred on the shaft at the 0.5-3 mm air gap - a poorly centred magnet produces a smooth, plausible-looking error."
+    },
+    {
+      "id": "gripper-left-servo",
+      "board_id": "pogo-connector",
+      "name": "Gripper Left Servo",
+      "kind": "servo",
+      "sensor_kind": null,
+      "rotation_min_deg": -90,
+      "rotation_max_deg": 90,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "gripper-left-signal",
+          "signal": "signal",
+          "gpio": "SCL",
+          "function_input_key": "left_servo_pin",
+          "notes": null
+        }
+      ],
+      "notes": null,
+      "enabled": true
+    },
+    {
+      "id": "gripper-right-servo",
+      "board_id": "pogo-connector",
+      "name": "Gripper Right Servo",
+      "kind": "servo",
+      "sensor_kind": null,
+      "rotation_min_deg": -90,
+      "rotation_max_deg": 90,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "gripper-right-signal",
+          "signal": "signal",
+          "gpio": "SDA",
+          "function_input_key": "right_servo_pin",
+          "notes": null
+        }
+      ],
+      "notes": null,
+      "enabled": true
     }
   ],
   "groups": [
@@ -1374,6 +1416,21 @@
       "usb_board_id": "controller-x83xnc",
       "verification": "fingerprint",
       "toolhead_index": 5
+    },
+    {
+      "id": "gripper-tool",
+      "name": "Gripper",
+      "member_ids": [
+        "gripper-left-servo",
+        "gripper-right-servo"
+      ],
+      "enabled": true,
+      "notes": "Two hobby servos on the pogo SCL (left) and SDA (right) pins, driven as plain GPIO.",
+      "connector_id": "pogo-connector",
+      "pin_modes": {},
+      "usb_board_id": null,
+      "verification": "none",
+      "toolhead_index": 6
     }
   ],
   "connectors": [

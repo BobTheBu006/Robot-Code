@@ -1,6 +1,7 @@
 from app.models.gantry import GantryGotoXYRequest
 from app.models.toolhead import ToolheadDropRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.gripper import gripper_service
 from app.services.pogo_connector import pogo_connector_service
 from app.services.toolhead import (
     ENGAGE_RPM,
@@ -58,6 +59,9 @@ def execute(context: dict, inputs: dict) -> dict:
         }
 
     position = position_for_index(held_index, request.positions())
+    # A gripper must be closed to fit its slot, and must stop driving its
+    # servos before the connector lets go of the pins.
+    gripper_service.park()
     # Release the connector before its contacts separate: pins parked, and the
     # tool's hardware unavailable from here on.
     pogo_connector_service.deactivate()

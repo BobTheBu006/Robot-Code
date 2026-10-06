@@ -1,6 +1,7 @@
 from app.models.gantry import GantryGotoXYRequest
 from app.models.toolhead import ToolheadPickupRequest
 from app.services.gantry_controller import gantry_controller_service
+from app.services.gripper import gripper_service
 from app.services.pogo_connector import ConnectorError, pogo_connector_service
 from app.services.toolhead import (
     ENGAGE_RPM,
@@ -83,7 +84,9 @@ def execute(context: dict, inputs: dict) -> dict:
     drop_moves: list[dict] = []
     auto_dropped_index = None
     if held_index is not None:
-        # Release the connector before its contacts separate.
+        # Close a gripper so it fits its slot, then release the connector
+        # before its contacts separate.
+        gripper_service.park()
         pogo_connector_service.deactivate()
         held_position = position_for_index(held_index, positions)
         drop_moves = toolhead_service.drop(

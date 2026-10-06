@@ -187,6 +187,11 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
             def _acquire_connection(inner_self, serial, port, baud_rate):
                 return object()
 
+            def _port_candidates(inner_self):
+                # The connection is faked, so the port must be too: these
+                # tests failed whenever no real ESP32 happened to be plugged in.
+                return ["/dev/ttyFAKE0"]
+
             def _send_command(inner_self, serial_port, command, *, terminal_prefixes, deadline_seconds, active_session=None):
                 sent.append(command)
                 for prefix, reply in replies.items():

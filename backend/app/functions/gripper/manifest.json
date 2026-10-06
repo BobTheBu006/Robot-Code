@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "id": "gripper",
+  "display_name": "Gripper",
+  "category": "Robot Actions",
+  "description": "Opens or closes the gripper tool's two servos together, mirrored. Moves are ramped from the last commanded angle, and the servos keep holding afterwards. The first command after pick-up starts from the closed (rack) position, so a gripper parked closed never snaps. Needs the gripper to be the connected tool.",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "action",
+      "label": "Action",
+      "type": "select",
+      "description": "Open or close the claws.",
+      "required": true,
+      "default": "close",
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "Close",
+          "value": "close"
+        },
+        {
+          "label": "Open",
+          "value": "open"
+        }
+      ]
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "left_open_deg",
+      "label": "Left Open (deg)",
+      "type": "number",
+      "description": "Left servo angle when open. Left + opens.",
+      "required": false,
+      "default": 30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "left_closed_deg",
+      "label": "Left Closed (deg)",
+      "type": "number",
+      "description": "Left servo angle when closed - the rack position.",
+      "required": false,
+      "default": -90.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "right_open_deg",
+      "label": "Right Open (deg)",
+      "type": "number",
+      "description": "Right servo angle when open. Right - opens.",
+      "required": false,
+      "default": -30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "right_closed_deg",
+      "label": "Right Closed (deg)",
+      "type": "number",
+      "description": "Right servo angle when closed - the rack position.",
+      "required": false,
+      "default": 90.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "left_pulse_min_us",
+      "label": "Left Pulse Min (us)",
+      "type": "number",
+      "description": "Left servo pulse at -90 deg.",
+      "required": false,
+      "default": 500.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "left_pulse_max_us",
+      "label": "Left Pulse Max (us)",
+      "type": "number",
+      "description": "Left servo pulse at +90 deg.",
+      "required": false,
+      "default": 2500.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "right_pulse_min_us",
+      "label": "Right Pulse Min (us)",
+      "type": "number",
+      "description": "Right servo pulse at -90 deg.",
+      "required": false,
+      "default": 500.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "right_pulse_max_us",
+      "label": "Right Pulse Max (us)",
+      "type": "number",
+      "description": "Right servo pulse at +90 deg.",
+      "required": false,
+      "default": 2500.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "ramp_deg_per_s",
+      "label": "Ramp Speed (deg/s)",
+      "type": "number",
+      "description": "How fast the claws move. Lower is gentler.",
+      "required": false,
+      "default": 180.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "left_servo_pin",
+      "label": "Left Servo Pin",
+      "type": "number",
+      "description": "Runtime GPIO for the left servo (from the Hardware Map).",
+      "required": false,
+      "default": 3.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "right_servo_pin",
+      "label": "Right Servo Pin",
+      "type": "number",
+      "description": "Runtime GPIO for the right servo (from the Hardware Map).",
+      "required": false,
+      "default": 2.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow"
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "gripper-left-servo",
+      "name": "Gripper Left Servo",
+      "kind": "servo",
+      "board_id": "pogo-connector",
+      "sensor_kind": null,
+      "rotation_min_deg": -90,
+      "rotation_max_deg": 90,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "gripper-left-signal",
+          "signal": "signal",
+          "gpio": "SCL",
+          "function_input_key": "left_servo_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "gripper-right-servo",
+      "name": "Gripper Right Servo",
+      "kind": "servo",
+      "board_id": "pogo-connector",
+      "sensor_kind": null,
+      "rotation_min_deg": -90,
+      "rotation_max_deg": 90,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "gripper-right-signal",
+          "signal": "signal",
+          "gpio": "SDA",
+          "function_input_key": "right_servo_pin",
+          "notes": null
+        }
+      ],
+      "notes": null
+    }
+  ]
+}
