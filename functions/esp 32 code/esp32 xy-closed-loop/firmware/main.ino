@@ -2843,6 +2843,78 @@ bool handleSetEncoderPinsCommand(const String &cmd) {
   return true;
 }
 
+// ENCODER PROBE: does anything answer at the AS5600 address on each bus?
+// Separates "no chip on the bus" (wiring, power, pull-ups) from "chip answers
+// but reports no magnet", which ENCODER? alone cannot. Per bus: the Wire
+// error code (0 = answered, 2 = no ACK, 5 = timeout, -1 = bus not set up)
+// and, when it answered, the STATUS byte in hex.
+void probeEncoderChannel(const char *name, EncoderChannel &channel) {
+  Serial.print(name);
+  if (channel.bus == nullptr) {
+    Serial.print(" -1");
+    return;
+  }
+  channel.bus->beginTransmission(AS5600_ADDRESS);
+  uint8_t error = channel.bus->endTransmission();
+  Serial.print(" ");
+  Serial.print(error);
+  if (error == 0) {
+    channel.bus->beginTransmission(AS5600_ADDRESS);
+    channel.bus->write(AS5600_REG_STATUS);
+    if (channel.bus->endTransmission(false) == 0 && channel.bus->requestFrom(AS5600_ADDRESS, (uint8_t)1) == 1) {
+      Serial.print(" STATUS ");
+      Serial.print(channel.bus->read(), HEX);
+    }
+  }
+}
+
+// ENCODER SCAN: every 7-bit address that answers on each encoder bus. Finds a
+// chip at an unexpected address (an AS5600L answers at 0x40, not 0x36) and
+// tells "nothing on the bus at all" (power, wiring) apart from "wrong chip".
+void scanEncoderBus(const char *name, EncoderChannel &channel) {
+  Serial.print(name);
+  if (channel.bus == nullptr) {
+    Serial.print(" -");
+    return;
+  }
+  bool any = false;
+  for (uint8_t address = 1; address < 127; address++) {
+    channel.bus->beginTransmission(address);
+    if (channel.bus->endTransmission() == 0) {
+      Serial.print(" 0x");
+      Serial.print(address, HEX);
+      any = true;
+    }
+  }
+  if (!any) {
+    Serial.print(" none");
+  }
+}
+
+bool handleEncoderScanCommand(const String &cmd) {
+  if (cmd != "ENCODER SCAN") {
+    return false;
+  }
+  Serial.print("OK ENCODER SCAN ");
+  scanEncoderBus("A", encoderA);
+  Serial.print(" B");
+  scanEncoderBus("", encoderB);
+  Serial.println();
+  return true;
+}
+
+bool handleEncoderProbeCommand(const String &cmd) {
+  if (cmd != "ENCODER PROBE") {
+    return false;
+  }
+  Serial.print("OK ENCODER PROBE ");
+  probeEncoderChannel("A", encoderA);
+  Serial.print(" ");
+  probeEncoderChannel("B", encoderB);
+  Serial.println();
+  return true;
+}
+
 bool handleEncoderQueryCommand(const String &cmd) {
   if (cmd != "ENCODER?") {
     return false;
@@ -3146,6 +3218,10 @@ void loop() {
   else if (handleSetEncoderPinsCommand(cmd)) {
   }
   else if (handleEncoderQueryCommand(cmd)) {
+  }
+  else if (handleEncoderProbeCommand(cmd)) {
+  }
+  else if (handleEncoderScanCommand(cmd)) {
   }
   else if (handleSetXYPidCommand(cmd)) {
   }
