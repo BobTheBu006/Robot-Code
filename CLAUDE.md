@@ -66,7 +66,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-370 tests, stdlib `unittest`, no pytest.
+371 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 

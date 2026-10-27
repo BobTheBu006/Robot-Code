@@ -137,6 +137,13 @@ class BlockTests(unittest.TestCase):
         result, _ = self._execute(self._inputs(action="close"))
         self.assertEqual((result["left_deg"], result["right_deg"]), (-90.0, 90.0))
 
+    def test_a_call_with_only_the_action_uses_the_block_defaults(self) -> None:
+        # The machine once got open == close == 0 deg from exactly this call.
+        result, _ = self._execute({"action": "open", "left_servo_pin": "3", "right_servo_pin": "2"})
+        self.assertEqual((result["left_deg"], result["right_deg"]), (30.0, -30.0))
+        result, _ = self._execute({"action": "close", "left_servo_pin": "3", "right_servo_pin": "2"})
+        self.assertEqual((result["left_deg"], result["right_deg"]), (-90.0, 90.0))
+
     def test_both_servos_on_one_pin_is_refused(self) -> None:
         with self.assertRaisesRegex(ValueError, "same GPIO"):
             self._execute(self._inputs(left_servo_pin=2, right_servo_pin=2))
