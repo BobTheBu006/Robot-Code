@@ -45,7 +45,19 @@ def _gantry_base_inputs(inputs: dict) -> dict:
     return {key: value for key, value in inputs.items() if key in _GANTRY_KEYS}
 
 
+# The rack slots are measured once (Teach Tool Positions) and shared. A
+# placed block's own copy goes stale, and because a successful pick-up writes
+# its values back as the defaults, a stale block would also undo the teach.
+_SLOT_POSITION_KEYS = {f"tool_{index}_{axis}_cm" for index in range(1, 7) for axis in ("x", "y")}
+
+
+def _with_shared_slot_positions(inputs: dict) -> dict:
+    shared = workspace_defaults_service.current_toolhead_defaults()
+    return {**inputs, **{key: value for key, value in shared.items() if key in _SLOT_POSITION_KEYS}}
+
+
 def execute(context: dict, inputs: dict) -> dict:
+    inputs = _with_shared_slot_positions(inputs)
     request = ToolheadPickupRequest.model_validate(inputs)
     base_inputs = _gantry_base_inputs(inputs)
     positions = request.positions()

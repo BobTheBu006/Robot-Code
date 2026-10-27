@@ -227,8 +227,16 @@ class _Held:
 
 
 class _Defaults:
-    def apply_toolhead_defaults(self, _values):
+    def __init__(self, shared=None) -> None:
+        self.shared = shared or {}
+        self.applied: list[dict] = []
+
+    def apply_toolhead_defaults(self, values):
+        self.applied.append(dict(values))
         return {}
+
+    def current_toolhead_defaults(self):
+        return dict(self.shared)
 
 
 class PickupBlockTests(unittest.TestCase):
@@ -262,6 +270,25 @@ class PickupBlockTests(unittest.TestCase):
         module, toolhead, inputs = self._run([], {"toolhead_index": 4})
         module.execute({}, inputs)
         self.assertIsNone(toolhead.pickup_kwargs["contact_check"])
+
+    def test_slot_positions_come_from_the_teach_not_the_placed_block(self) -> None:
+        # A block placed before the teach still carries the old slot values;
+        # using them would aim at the old spot and, written back, undo the teach.
+        module = importlib.import_module("app.functions.pickup_toolhead.handler")
+        defaults = _Defaults(shared={"tool_1_x_cm": -0.145, "tool_1_y_cm": 2.525})
+        directory, service, _ = _connector_rig([])
+        self.addCleanup(directory.cleanup)
+        toolhead = _FakeToolhead()
+        for name, value in {"pogo_connector_service": service, "toolhead_service": toolhead,
+                            "toolhead_state_store": _Held(None), "workspace_defaults_service": defaults}.items():
+            patcher = mock.patch.object(module, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        module.execute({}, {"toolhead_index": 1, "tool_1_x_cm": 0.0, "tool_1_y_cm": 2.5})
+
+        self.assertEqual(defaults.applied[-1]["tool_1_y_cm"], 2.525, "the taught value, not the block's stale 2.5")
+        self.assertEqual(defaults.applied[-1]["tool_1_x_cm"], -0.145)
 
     def test_an_impossible_check_is_refused_before_anything_moves(self) -> None:
         group = HardwareGroupMapping(id="uart-tool", name="UART Tool", connector_id="pogo-connector",
