@@ -92,7 +92,7 @@ def execute(context: dict, inputs: dict) -> dict:
         return {"ok": False, "status": "error", "error": str(exc), "pumps": planned}
 
     result["pumps"] = planned
-    result["tool_port"] = inputs.get("tool_port")
+    result["tool_port"] = result.get("port") or inputs.get("tool_port")
     if result.get("status") == "completed":
         described = ", ".join(f"pump {p['pump']} {p['volume_ml']:g} mL" for p in planned)
         result["message"] = f"Dispensed {described}."

@@ -97,7 +97,11 @@ class PeristalticPumpService:
             with service._lock:
                 serial_port = service._open_serial(port, 115200)
                 self._configure(serial_port, dir_pins, step_pins)
-                return self._run(serial_port, steps, rpm)
+                result = self._run(serial_port, steps, rpm)
+                # The port actually used: found by USB serial, which can
+                # differ from the block's stale tool_port input.
+                result["port"] = port
+                return result
         finally:
             motor_power_service.release(Z_PUMP_DOMAIN)
 
