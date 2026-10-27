@@ -1310,19 +1310,19 @@
         {
           "id": "xy-cl-encoder-a-sda",
           "signal": "sda",
-          "gpio": "-",
+          "gpio": "21",
           "function_input_key": "encoder_a_sda_pin",
           "notes": null
         },
         {
           "id": "xy-cl-encoder-a-scl",
           "signal": "scl",
-          "gpio": "-",
+          "gpio": "22",
           "function_input_key": "encoder_a_scl_pin",
           "notes": null
         }
       ],
-      "notes": "Encoder feedback disabled while wiring is diagnosed. Physically A SDA21/SCL22, B SDA19/SCL18; do not configure these buses for motion yet."
+      "notes": "AS5600 on motor A, own I2C bus at 100 kHz. Verified detected 2026-10-27. Kept disabled until both encoders read valid: enabling feeds closed-loop monitoring on every move."
     },
     {
       "id": "xy-cl-encoder-b",
@@ -1338,19 +1338,19 @@
         {
           "id": "xy-cl-encoder-b-sda",
           "signal": "sda",
-          "gpio": "-",
+          "gpio": "19",
           "function_input_key": "encoder_b_sda_pin",
           "notes": null
         },
         {
           "id": "xy-cl-encoder-b-scl",
           "signal": "scl",
-          "gpio": "-",
+          "gpio": "18",
           "function_input_key": "encoder_b_scl_pin",
           "notes": null
         }
       ],
-      "notes": "Encoder feedback disabled while wiring is diagnosed. Physically A SDA21/SCL22, B SDA19/SCL18; do not configure these buses for motion yet."
+      "notes": "AS5600 on motor B, own I2C bus at 100 kHz. Verified detected 2026-10-27. Kept disabled until both encoders read valid: enabling feeds closed-loop monitoring on every move."
     },
     {
       "id": "gripper-left-servo",
