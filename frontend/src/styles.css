@@ -3300,3 +3300,47 @@ body {
   color: #a1302a;
   font-size: 0.85rem;
 }
+
+/* ---- Teach Tool Positions dialog --------------------------------------- */
+
+.teach-dialog__position {
+  display: grid;
+  gap: 2px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f8f6;
+}
+
+.teach-dialog__position span {
+  color: #55766b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.teach-dialog__position strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.teach-dialog__position em {
+  color: #a1302a;
+  font-size: 0.85rem;
+}
+
+.teach-dialog__slot {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.teach-dialog__saved {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: #17322a;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}

@@ -97,6 +97,10 @@ int xEnablePin = XY_ENABLE;
 int yEnablePin = XY_ENABLE;
 bool xyMotorsEnableActiveLow = true;
 bool xyMotorsEnabled = false;
+// Hand-teach mode: the drivers are off so the carriage can be pushed by hand
+// and the position comes from the encoders. Nothing may energise the motors
+// until TEACH END has adopted the new position.
+bool teachMode = false;
 unsigned long xyLastCommandMs = 0;
 const unsigned long XY_IDLE_DISABLE_MS = 3000;
 
@@ -276,6 +280,9 @@ void writeEnablePin(int pin, bool enabled) {
 }
 
 void setXYMotorsEnabled(bool enabled) {
+  if (enabled && teachMode) {
+    return;
+  }
   bool wasEnabled = xyMotorsEnabled;
   writeEnablePin(xEnablePin, enabled);
   writeEnablePin(yEnablePin, enabled);
@@ -3462,6 +3469,124 @@ void setup() {
   Serial.println("READY");
 }
 
+// ---- Hand-teach: push the carriage by hand, the encoders track it --------
+//
+// TEACH START switches the XY drivers off and records where the carriage is
+// (from the calibration) and what the encoders read. TEACH POS? reports the
+// position the encoders say it has been pushed to, in the same user cm as
+// GOTOXY. TEACH END adopts that position, so the calibration survives the
+// hand move. CoreXY: A = X + Y and B = X - Y, so X = (A + B) / 2 and
+// Y = (A - B) / 2, all in motor steps.
+long teachBaseCountsA = 0;
+long teachBaseCountsB = 0;
+long teachBaseMotorA = 0;
+long teachBaseMotorB = 0;
+long teachBaseX = 0;
+long teachBaseY = 0;
+
+bool teachDelta(long &deltaA, long &deltaB) {
+  long countsA = 0;
+  long countsB = 0;
+  bool okA = false;
+  bool okB = false;
+  readEncoderSnapshot(countsA, countsB, okA, okB);
+  float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
+  deltaA = lroundf((float)(countsA - teachBaseCountsA) / countsPerStep);
+  deltaB = lroundf((float)(countsB - teachBaseCountsB) / countsPerStep);
+  return okA && okB;
+}
+
+void printTeachPosition(const char *label, long deltaA, long deltaB, bool ok) {
+  long x = teachBaseX + (deltaA + deltaB) / 2;
+  long y = teachBaseY + (deltaA - deltaB) / 2;
+  Serial.print(label);
+  Serial.print(" ");
+  Serial.print(stepsToCm(x, xStepsPerCm) - xyLimitBufferCm, 3);
+  Serial.print(" ");
+  Serial.print(stepsToCm(y, xStepsPerCm) - xyLimitBufferCm, 3);
+  Serial.print(" ");
+  Serial.println(ok ? 1 : 0);
+}
+
+bool handleTeachCommand(const String &cmd) {
+  if (cmd == "TEACH START") {
+    if (!xyCalibrated) {
+      Serial.println("ERR TEACH NOT CALIBRATED");
+      return true;
+    }
+    if (!encodersConfigured) {
+      Serial.println("ERR TEACH ENCODERS NOT CONFIGURED");
+      return true;
+    }
+    setXYMotorsEnabled(false);
+    teachMode = true;
+    delay(20);   // let the reader publish a reading of the standing carriage
+    long countsA = 0;
+    long countsB = 0;
+    bool okA = false;
+    bool okB = false;
+    readEncoderSnapshot(countsA, countsB, okA, okB);
+    if (!okA || !okB) {
+      teachMode = false;
+      Serial.println("ERR TEACH ENCODER READ");
+      return true;
+    }
+    teachBaseCountsA = countsA;
+    teachBaseCountsB = countsB;
+    teachBaseMotorA = xAxis.currentSteps;
+    teachBaseMotorB = yAxis.currentSteps;
+    teachBaseX = currentXSteps;
+    teachBaseY = currentYSteps;
+    printTeachPosition("OK TEACH START", 0, 0, true);
+    return true;
+  }
+  if (cmd == "TEACH POS?") {
+    if (!teachMode) {
+      Serial.println("ERR TEACH NOT ACTIVE");
+      return true;
+    }
+    long deltaA = 0;
+    long deltaB = 0;
+    bool ok = teachDelta(deltaA, deltaB);
+    printTeachPosition("OK TEACH POS", deltaA, deltaB, ok);
+    return true;
+  }
+  if (cmd == "TEACH END") {
+    if (!teachMode) {
+      Serial.println("OK TEACH END NOT ACTIVE");
+      return true;
+    }
+    long deltaA = 0;
+    long deltaB = 0;
+    bool ok = teachDelta(deltaA, deltaB);
+    if (!ok) {
+      // Without a trustworthy reading the position is unknown: say so and
+      // drop the calibration rather than adopt a guess.
+      teachMode = false;
+      invalidateXCalibrationState();
+      Serial.println("ERR TEACH ENCODER READ CALIBRATION DROPPED");
+      return true;
+    }
+    xAxis.currentSteps = teachBaseMotorA + deltaA;
+    yAxis.currentSteps = teachBaseMotorB + deltaB;
+    currentXSteps = teachBaseX + (deltaA + deltaB) / 2;
+    currentYSteps = teachBaseY + (deltaA - deltaB) / 2;
+    teachMode = false;
+    saveXCalibrationState();
+    printTeachPosition("OK TEACH END", deltaA, deltaB, true);
+    return true;
+  }
+  return false;
+}
+
+// While teaching, only commands that cannot energise or step the motors.
+bool allowedDuringTeach(const String &cmd) {
+  return cmd.startsWith("TEACH") || cmd == "ID?" || cmd == "ID" || cmd == "PING" || cmd == "STOP"
+    || cmd.startsWith("XY STATUS") || cmd.startsWith("ENCODER") || cmd.startsWith("SET ENCODER")
+    || cmd.startsWith("SET XY PINS") || cmd.startsWith("SET XY ENABLE") || cmd.startsWith("SET XY LIMITS")
+    || cmd.startsWith("SET XY PID") || cmd.startsWith("SET XY FOLLOW LIMIT") || cmd.startsWith("XY PID");
+}
+
 void loop() {
   if (xyMotorsEnabled && (millis() - xyLastCommandMs >= XY_IDLE_DISABLE_MS)) {
     setXYMotorsEnabled(false);
@@ -3476,8 +3601,15 @@ void loop() {
     return;
   }
 
+  if (teachMode && !allowedDuringTeach(cmd)) {
+    Serial.println("ERR TEACH MODE ACTIVE");
+    return;
+  }
+
   if (cmd == "ID?" || cmd == "ID") {
     printControllerIdentity();
+  }
+  else if (handleTeachCommand(cmd)) {
   }
   else if (cmd == "PING") {
     Serial.println("PONG");

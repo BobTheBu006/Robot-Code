@@ -245,6 +245,22 @@ export function saveWorkflowToFile(
   });
 }
 
+export interface TeachPosition {
+  x_cm: number | null;
+  y_cm: number | null;
+  encoders_ok: boolean;
+  reply?: string;
+}
+
+// Hand-teach of the tool rack: start switches the XY motors off, position
+// reads where the encoders say the carriage was pushed, end adopts it.
+export function xyTeach(action: "start" | "position" | "end", inputs: Record<string, unknown>): Promise<TeachPosition> {
+  return request<TeachPosition>(`/api/robot/xy-teach/${action}`, {
+    method: "POST",
+    body: JSON.stringify(inputs),
+  });
+}
+
 export function testFunction(
   functionId: string,
   inputs: Record<string, WorkflowParameterValue>,

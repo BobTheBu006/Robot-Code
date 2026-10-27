@@ -40,6 +40,13 @@ required after the migration. Verified 2026-10-27: +X jog of 20 cm via
 alternating TEST MOTOR A/B (both DIR 1) moved the carriage the right way. The Pi motion implementation remains available
 as a fallback if the hardware is rewired and the map changed back.
 
+The **Teach Tool Positions** block records rack slots by hand: while it
+runs, the XY motors are off (firmware TEACH mode refuses anything that could
+energise them), the editor's dialog shows the encoder-derived position, Save
+stores a slot, Finish ends the teach - the gantry adopts the pushed-to
+position, so calibration survives - and writes tool_N_x/y_cm into the
+toolhead defaults. Endpoints: POST /api/robot/xy-teach/{start,position,end}.
+
 The **Gripper** block already exists: Open/Close, slot 6, left Pi GPIO3 (SCL),
 right Pi GPIO2 (SDA), closed -90/+90 degrees, open +30/-30 degrees. It requires
 the gripper tool to be connected, ramps both servos, and holds until release. Pulses come from the Pi 5's
@@ -73,7 +80,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-386 tests, stdlib `unittest`, no pytest.
+398 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 

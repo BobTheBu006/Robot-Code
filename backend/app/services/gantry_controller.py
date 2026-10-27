@@ -870,6 +870,50 @@ class GantryControllerService:
             },
         )
 
+    def teach(self, request: GantryGotoXYRequest, action: str) -> dict:
+        """One step of the hand-teach: start, position or end.
+
+        The encoder setup goes out only on start - reconfiguring the encoder
+        buses mid-teach would re-prime them and lose any push in that gap.
+        """
+        commands = {"start": ("TEACH START", "OK TEACH START"),
+                    "position": ("TEACH POS?", "OK TEACH POS"),
+                    "end": ("TEACH END", "OK TEACH END")}
+        if action not in commands:
+            raise GantryControllerError(f"Unknown teach action '{action}'.")
+        command, prefix = commands[action]
+        port = self._selected_port(request.tool_port)
+        extra_commands = None
+        if action == "start":
+            encoder_request = self._with_map_encoders(GantryXYMoveRequest.model_construct())
+            extra_commands = self._encoder_setup_commands(encoder_request)
+            if not extra_commands:
+                raise GantryControllerError(
+                    "Teaching by hand needs the XY encoders, and they are not enabled in the Hardware Map."
+                )
+        _, _, reply = self._send_config_and_action(
+            port=port,
+            baud_rate=request.baud_rate or self._baud_rate(),
+            pin_command=self._build_xy_pin_command(request),
+            enable_command=self._build_xy_enable_command(request),
+            extra_commands=extra_commands,
+            limit_command=self._build_xy_limit_command(request),
+            action_command=command,
+            action_prefix=prefix,
+            action_deadline=5.0,
+        )
+        return self._parse_teach_reply(reply or "", prefix)
+
+    @staticmethod
+    def _parse_teach_reply(reply: str, prefix: str) -> dict:
+        line = next((l for l in reply.splitlines() if l.startswith(prefix)), "")
+        parts = line[len(prefix):].split()
+        if len(parts) < 3:
+            # "OK TEACH END NOT ACTIVE": nothing was being taught.
+            return {"x_cm": None, "y_cm": None, "encoders_ok": False, "reply": reply.strip()}
+        return {"x_cm": float(parts[0]), "y_cm": float(parts[1]), "encoders_ok": parts[2] == "1",
+                "reply": reply.strip()}
+
     def circle_xy(self, request: GantryCircleXYRequest) -> GantryCircleXYResponse:
         port = self._selected_port(request.tool_port)
         baud_rate = request.baud_rate or self._baud_rate()

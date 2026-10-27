@@ -30,6 +30,7 @@ import {
   fetchSavedWorkflow,
   flashEsp32BoardFirmware,
   fetchAccessDoor,
+  xyTeach,
   fetchConnectorStatus,
   setAccessDoorOverride,
   startRunSession,
@@ -45,7 +46,7 @@ import {
   submitEngineNodeResult,
   endEngineRun,
 } from "../../lib/api";
-import type { AccessDoorState, ConnectorStatus, EngineDueNode, EngineRunStep, UncertainFact } from "../../lib/api";
+import type { AccessDoorState, ConnectorStatus, TeachPosition, EngineDueNode, EngineRunStep, UncertainFact } from "../../lib/api";
 import {
   blockUsesUpstreamInput,
   WORKFLOW_BLOCK_MIME,
@@ -1054,6 +1055,23 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // rather than reported as an error, because an error tells an operator they
   // are stuck while a question tells them how to get moving.
   const [pendingConfirmations, setPendingConfirmations] = useState<UncertainFact[]>([]);
+  // The Teach Tool Positions dialog. Open while that block runs; the block
+  // waits on the promise held in teachResolverRef.
+  const [teach, setTeach] = useState<{
+    slot: number;
+    firstSlot: number;
+    lastSlot: number;
+    position: TeachPosition | null;
+    saved: Record<string, { x_cm: number; y_cm: number }>;
+    error: string | null;
+    finishing: boolean;
+  } | null>(null);
+  const teachResolverRef = useRef<{
+    resolve: (positions: Record<string, { x_cm: number; y_cm: number }>) => void;
+    reject: (error: Error) => void;
+    params: Record<string, unknown>;
+  } | null>(null);
+  const teachSavedRef = useRef<Record<string, { x_cm: number; y_cm: number }>>({});
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [openedNodeId, setOpenedNodeId] = useState<string | null>(null);
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
@@ -2411,6 +2429,98 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     );
   }
 
+  async function runTeachDialog(
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<Record<string, { x_cm: number; y_cm: number }>> {
+    const clampSlot = (value: unknown, fallback: number) => {
+      const number = Math.round(Number(value));
+      return Number.isFinite(number) ? Math.min(6, Math.max(1, number)) : fallback;
+    };
+    const firstSlot = clampSlot(params.first_slot, 1);
+    const lastSlot = Math.max(firstSlot, clampSlot(params.last_slot, 6));
+    // Throws (and so fails the block) when teaching cannot start, e.g. an
+    // uncalibrated gantry or encoders that are not enabled.
+    const start = await xyTeach("start", params);
+    teachSavedRef.current = {};
+    setTeach({ slot: firstSlot, firstSlot, lastSlot, position: start, saved: {}, error: null, finishing: false });
+    return new Promise((resolve, reject) => {
+      teachResolverRef.current = { resolve, reject, params };
+      signal?.addEventListener("abort", () => void finishTeach(false, "The run was stopped; no tool positions were saved."));
+    });
+  }
+
+  async function finishTeach(save: boolean, reason?: string) {
+    const pending = teachResolverRef.current;
+    if (!pending) {
+      return;
+    }
+    teachResolverRef.current = null;
+    setTeach((current) => (current ? { ...current, finishing: true } : current));
+    // Always end the teach on the board, even when cancelling: ending is what
+    // re-enables the motors and keeps the gantry's position (and calibration).
+    let endError: string | null = null;
+    try {
+      await xyTeach("end", pending.params);
+    } catch (error) {
+      endError = error instanceof Error ? error.message : String(error);
+    }
+    setTeach(null);
+    if (endError) {
+      pending.reject(new Error(`Teaching could not end cleanly: ${endError}`));
+    } else if (save) {
+      pending.resolve({ ...teachSavedRef.current });
+    } else {
+      pending.reject(new Error(reason ?? "Teaching cancelled; no tool positions were saved."));
+    }
+  }
+
+  function saveTeachSlot() {
+    setTeach((current) => {
+      if (!current || !current.position || current.position.x_cm == null || current.position.y_cm == null) {
+        return current;
+      }
+      if (!current.position.encoders_ok) {
+        return { ...current, error: "The encoders did not give a valid reading; move a little and try again." };
+      }
+      const saved = {
+        ...current.saved,
+        [String(current.slot)]: { x_cm: current.position.x_cm, y_cm: current.position.y_cm },
+      };
+      teachSavedRef.current = saved;
+      return { ...current, saved, error: null, slot: Math.min(current.lastSlot, current.slot + 1) };
+    });
+  }
+
+  useEffect(() => {
+    if (!teach || teach.finishing) {
+      return;
+    }
+    let cancelled = false;
+    const poll = window.setInterval(async () => {
+      const pending = teachResolverRef.current;
+      if (!pending) {
+        return;
+      }
+      try {
+        const position = await xyTeach("position", pending.params);
+        if (!cancelled) {
+          setTeach((current) => (current ? { ...current, position } : current));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTeach((current) => (current
+            ? { ...current, error: error instanceof Error ? error.message : String(error) }
+            : current));
+        }
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [teach !== null, teach?.finishing]);
+
   async function runSingleNode(
     node: WorkflowFlowNode,
     inputData: Record<string, unknown> | null,
@@ -2461,6 +2571,17 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
     if (isClientExecutedBlock(node.data.block)) {
       return runBuiltInBlockTest(node.data.block, hardwareResolvedParameters, inputData);
+    }
+
+    if (node.data.block.id === "teach_tool_positions") {
+      // Interactive: the dialog collects the positions, the block saves them.
+      const positions = await runTeachDialog(hardwareResolvedParameters as Record<string, unknown>, signal);
+      return testFunction(
+        node.data.block.id,
+        { ...hardwareResolvedParameters, positions: JSON.stringify(positions) },
+        inputData,
+        signal,
+      );
     }
 
     return testFunction(node.data.block.id, hardwareResolvedParameters, inputData, signal);
@@ -3654,6 +3775,66 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                 type="button"
               >
                 Not now
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {teach ? (
+          <div className="workflow-confirm__backdrop" role="presentation">
+            <div className="workflow-confirm teach-dialog" role="dialog" aria-modal="true" aria-labelledby="teach-title">
+              <h2 className="workflow-confirm__title" id="teach-title">Teach tool positions</h2>
+              <p className="workflow-confirm__lead">
+                The XY motors are off. Push the carriage by hand to where it picks up the tool in
+                slot {teach.slot}, then press Save.
+              </p>
+              <div className="teach-dialog__position">
+                <span>Current position</span>
+                <strong>
+                  {teach.position?.x_cm != null && teach.position?.y_cm != null
+                    ? `X ${teach.position.x_cm.toFixed(2)} cm · Y ${teach.position.y_cm.toFixed(2)} cm`
+                    : "-"}
+                </strong>
+                {teach.position && !teach.position.encoders_ok ? <em>encoder reading not valid</em> : null}
+              </div>
+              <label className="teach-dialog__slot">
+                <span>Slot</span>
+                <select
+                  disabled={teach.finishing}
+                  onChange={(event) => {
+                    const slot = Number(event.target.value);
+                    setTeach((current) => (current ? { ...current, slot } : current));
+                  }}
+                  value={teach.slot}
+                >
+                  {Array.from({ length: teach.lastSlot - teach.firstSlot + 1 }, (_, i) => teach.firstSlot + i).map((slot) => (
+                    <option key={slot} value={slot}>
+                      Slot {slot}{teach.saved[String(slot)] ? " ✓" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ul className="teach-dialog__saved">
+                {Object.entries(teach.saved).sort(([a], [b]) => Number(a) - Number(b)).map(([slot, position]) => (
+                  <li key={slot}>Slot {slot}: X {position.x_cm.toFixed(2)} · Y {position.y_cm.toFixed(2)}</li>
+                ))}
+              </ul>
+              {teach.error ? <p className="workflow-confirm__reason">{teach.error}</p> : null}
+              <div className="workflow-confirm__answers">
+                <button className="workflow-confirm__answer" disabled={teach.finishing} onClick={saveTeachSlot} type="button">
+                  Save slot {teach.slot}
+                </button>
+                <button
+                  className="workflow-confirm__answer"
+                  disabled={teach.finishing || Object.keys(teach.saved).length === 0}
+                  onClick={() => void finishTeach(true)}
+                  type="button"
+                >
+                  {teach.finishing ? "Finishing…" : `Finish and save (${Object.keys(teach.saved).length})`}
+                </button>
+              </div>
+              <button className="workflow-confirm__dismiss" disabled={teach.finishing} onClick={() => void finishTeach(false)} type="button">
+                Cancel without saving
               </button>
             </div>
           </div>
