@@ -14,6 +14,14 @@ trap pause_on_error EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/frontend"
 
+# Same as the backend launcher: an already-running frontend is not an error.
+if curl --silent --fail --max-time 3 http://127.0.0.1:5173 >/dev/null 2>&1; then
+  echo "The frontend is already running on port 5173."
+  echo "Frontend UI: http://127.0.0.1:5173"
+  [[ -t 0 ]] && read -r -p "Press Enter to close this window..." _
+  exit 0
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is not installed or is not on PATH."
   echo "Install Node.js 20+ and npm, then run this script again."

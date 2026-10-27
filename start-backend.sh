@@ -14,6 +14,22 @@ trap pause_on_error EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/backend"
 
+# A backend may already be running (e.g. left over from an earlier launch).
+# Starting a second one only fails with "Address already in use", so say
+# what is going on instead.
+if curl --silent --fail --max-time 3 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+  echo "The backend is already running and healthy on port 8000."
+  echo "Backend health: http://127.0.0.1:8000/health"
+  echo "Nothing to start. (It reloads by itself when code changes.)"
+  [[ -t 0 ]] && read -r -p "Press Enter to close this window..." _
+  exit 0
+fi
+if ss -ltn 2>/dev/null | grep -q ':8000 '; then
+  echo "Port 8000 is in use but the backend does not answer /health."
+  echo "Find the process with:  ss -ltnp | grep :8000"
+  exit 1
+fi
+
 if [ ! -x ".venv/bin/python" ]; then
   echo "Creating virtual environment..."
   python3 -m venv .venv
