@@ -416,10 +416,11 @@ const uint8_t AS5600_REG_STATUS = 0x0B;
 const uint8_t AS5600_STATUS_MD = 0x20;      // magnet detected
 const uint8_t AS5600_STATUS_ML = 0x10;      // magnet too weak (too far away)
 const uint8_t AS5600_STATUS_MH = 0x08;      // magnet too strong (too close)
-// Fast mode. The AS5600 also allows 1 MHz, but the pull-ups on the common
-// breakout boards are sized for 400 kHz; raise it only after checking the
-// edges on a scope.
-const uint32_t AS5600_I2C_HZ = 400000;
+// Standard mode, 100 kHz. 400 kHz worked on short leads but reads failed
+// intermittently on the motor-mounted encoder cables (2026-10-27); 100 kHz
+// tolerates the cable capacitance and still reads both encoders in ~1 ms,
+// far inside one control tick.
+const uint32_t AS5600_I2C_HZ = 100000;
 // A missing or wedged encoder must fail a read, not hang the stepping loop.
 const uint16_t AS5600_I2C_TIMEOUT_MS = 2;
 
