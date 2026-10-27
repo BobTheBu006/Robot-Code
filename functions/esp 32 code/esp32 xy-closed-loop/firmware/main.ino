@@ -2645,6 +2645,7 @@ bool moveGantryXYTo(
   }
 
   beginFollowTracking();
+  bool rackMove = targetXCm < 0.0f;
   long accumulatorA = 0;
   long accumulatorB = 0;
   long accumulatorX = 0;
@@ -2661,9 +2662,13 @@ bool moveGantryXYTo(
       return false;
     }
 
-    // Immediate fault if a limit switch in the travel direction trips.
+    // Immediate fault if a limit switch in the travel direction trips - except
+    // X-min on a move into the tool rack. The rack sits a few mm past the
+    // X-min trigger point (X = -buffer); the owner confirmed the switch takes
+    // that overtravel, and a target below 0 is only ever the rack (the range
+    // check above floors it at -2 cm). Encoder monitoring still catches a jam.
     if ((xSign > 0 && isLimitActive(xAxis.maxLimitPin))
-        || (xSign < 0 && isLimitActive(xAxis.minLimitPin))
+        || (xSign < 0 && !rackMove && isLimitActive(xAxis.minLimitPin))
         || (ySign > 0 && isLimitActive(yAxis.maxLimitPin))
         || (ySign < 0 && isLimitActive(yAxis.minLimitPin))) {
       saveXCalibrationState();

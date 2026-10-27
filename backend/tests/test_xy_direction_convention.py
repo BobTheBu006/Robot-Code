@@ -71,5 +71,18 @@ class FollowErrorMonitoringTests(unittest.TestCase):
         self.assertIn("commandedA -= followBaseStepsA", body)
 
 
+class RackOvertravelTests(unittest.TestCase):
+    """The rack sits past the X-min trigger point; a pick-up into it must not
+    stop on X-min, while every other move still does."""
+
+    def test_only_moves_into_the_rack_pass_a_pressed_x_min(self) -> None:
+        source = FIRMWARE.read_text()
+        body = source[source.index("bool moveGantryXYTo("):]
+        body = body[:body.index("\n}\n")]
+        self.assertIn("bool rackMove = targetXCm < 0.0f;", body)
+        self.assertIn("(xSign < 0 && !rackMove && isLimitActive(xAxis.minLimitPin))", body)
+        self.assertIn("targetXCm < -2.0f", body, "the -2 cm floor still bounds it")
+
+
 if __name__ == "__main__":
     unittest.main()
