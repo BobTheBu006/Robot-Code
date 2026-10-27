@@ -737,6 +737,34 @@ float xyLastFollowErrorB = 0.0f;
 float xyPeakFollowErrorA = 0.0f;
 float xyPeakFollowErrorB = 0.0f;
 
+// Per-move zero points. Motor step counts run from calibration while encoder
+// counts run from whenever the encoder was set up, so comparing the absolute
+// numbers would read as a huge lag and trip the first monitored move. Each
+// move records both at its start and compares only what changed since.
+long followBaseStepsA = 0;
+long followBaseStepsB = 0;
+long followBaseCountsA = 0;
+long followBaseCountsB = 0;
+
+void beginFollowTracking() {
+  xyFollowErrorTripped = false;
+  xyLastFollowErrorA = 0.0f;
+  xyLastFollowErrorB = 0.0f;
+  xyPeakFollowErrorA = 0.0f;
+  xyPeakFollowErrorB = 0.0f;
+  xyPid.integralA = 0.0f;
+  xyPid.integralB = 0.0f;
+  xyPid.primed = false;
+  followBaseStepsA = xAxis.currentSteps;
+  followBaseStepsB = yAxis.currentSteps;
+  if (encodersConfigured) {
+    readEncoderChannel(encoderA);
+    readEncoderChannel(encoderB);
+  }
+  followBaseCountsA = encoderAccumulatedCounts(encoderA);
+  followBaseCountsB = encoderAccumulatedCounts(encoderB);
+}
+
 // One control-loop tick: read both encoders, update following-error stats,
 // apply PID correction to the per-motor step accumulators. Called periodically
 // from inside the stepping loop below, not from a separate timer - see the
@@ -765,8 +793,10 @@ bool applyPidCorrectionTick(
   // A motor step is ENCODER_COUNTS_PER_REV / stepsPerRevolution counts, so a
   // step-space error compares directly against the encoder-space one.
   float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
-  float measuredA = (float)encoderAccumulatedCounts(encoderA) / countsPerStep;
-  float measuredB = (float)encoderAccumulatedCounts(encoderB) / countsPerStep;
+  float measuredA = (float)(encoderAccumulatedCounts(encoderA) - followBaseCountsA) / countsPerStep;
+  float measuredB = (float)(encoderAccumulatedCounts(encoderB) - followBaseCountsB) / countsPerStep;
+  commandedA -= followBaseStepsA;
+  commandedB -= followBaseStepsB;
 
   float errorA = (float)commandedA - measuredA;
   float errorB = (float)commandedB - measuredB;
@@ -844,14 +874,7 @@ bool runCoreXYCartesianMove(
   bool &yBlocked,
   bool &stopRequested
 ) {
-  xyFollowErrorTripped = false;
-  xyLastFollowErrorA = 0.0f;
-  xyLastFollowErrorB = 0.0f;
-  xyPeakFollowErrorA = 0.0f;
-  xyPeakFollowErrorB = 0.0f;
-  xyPid.integralA = 0.0f;
-  xyPid.integralB = 0.0f;
-  xyPid.primed = false;
+  beginFollowTracking();
   long deltaA = deltaXSteps + deltaYSteps;
   long deltaB = deltaXSteps - deltaYSteps;
   long absA = labs(deltaA);
@@ -2514,6 +2537,7 @@ bool moveGantryXYTo(
     return true;
   }
 
+  beginFollowTracking();
   long accumulatorA = 0;
   long accumulatorB = 0;
   long accumulatorX = 0;
@@ -2583,6 +2607,19 @@ bool moveGantryXYTo(
       currentYSteps += ySign;
     }
 
+    // Same following-error monitoring as runCoreXYCartesianMove: GOTOXY is
+    // what the Move XY block sends, so this is where it has to run.
+    if (encodersConfigured && (iteration % PID_CHECK_EVERY_N_ITERATIONS) == 0) {
+      if (!applyPidCorrectionTick(xAxis.currentSteps, yAxis.currentSteps, accumulatorA, accumulatorB, totalIterations)) {
+        saveXCalibrationState();
+        Serial.print("ERR FOLLOW ERROR XY ");
+        Serial.print(xyLastFollowErrorA, 2);
+        Serial.print(" ");
+        Serial.println(xyLastFollowErrorB, 2);
+        return false;
+      }
+    }
+
     if (stepA || stepB) {
       int activeRpm = rpmForTrapezoidIteration(iteration, totalIterations, rpm, trapezoidalSpeed, accelerationRpmPerSecond);
       unsigned long intervalMicros = stepIntervalMicrosForRPM(activeRpm);
@@ -2601,6 +2638,12 @@ bool moveGantryXYTo(
   Serial.print(stepsToCm(currentXSteps, stepsPerCm), 3);
   Serial.print(" ");
   Serial.println(stepsToCm(currentYSteps, stepsPerCm), 3);
+  if (encodersConfigured) {
+    Serial.print("FOLLOW ERROR PEAK ");
+    Serial.print(xyPeakFollowErrorA, 2);
+    Serial.print(" ");
+    Serial.println(xyPeakFollowErrorB, 2);
+  }
   Serial.println("OK MOVE XY");
   return true;
 }

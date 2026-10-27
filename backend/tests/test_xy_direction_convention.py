@@ -33,5 +33,29 @@ class DirectionConventionTests(unittest.TestCase):
         self.assertIn("digitalWrite(yAxis.dirPin, towardMin ? XY_DIR_TOWARD_X_MAX : XY_DIR_TOWARD_X_MIN);", self.source)
 
 
+class FollowErrorMonitoringTests(unittest.TestCase):
+    """GOTOXY (what the Move XY block sends) must be monitored, against a
+    per-move baseline - step counts run from calibration, encoder counts from
+    setup, so comparing absolute numbers would trip the first move."""
+
+    def setUp(self) -> None:
+        self.source = FIRMWARE.read_text()
+
+    def _body(self, signature: str) -> str:
+        start = self.source.index(signature)
+        return self.source[start:self.source.index("\n}\n", start)]
+
+    def test_gotoxy_runs_the_monitoring_tick(self) -> None:
+        body = self._body("bool moveGantryXYTo(")
+        self.assertIn("beginFollowTracking();", body)
+        self.assertIn("applyPidCorrectionTick(", body)
+        self.assertIn("FOLLOW ERROR PEAK", body)
+
+    def test_the_tick_compares_against_the_move_baseline(self) -> None:
+        body = self._body("bool applyPidCorrectionTick(")
+        self.assertIn("- followBaseCountsA", body)
+        self.assertIn("commandedA -= followBaseStepsA", body)
+
+
 if __name__ == "__main__":
     unittest.main()

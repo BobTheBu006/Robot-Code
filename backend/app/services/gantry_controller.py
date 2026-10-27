@@ -606,6 +606,23 @@ class GantryControllerService:
             return request
         return request.model_copy(update=pins)
 
+    def _encoder_setup_commands(self, request: GantryXYMoveRequest) -> list[tuple[str, tuple[str, ...]]]:
+        """Encoder pins, scale, PID and follow limit - nothing when no encoders
+        are wired, so an open-loop machine behaves exactly as before."""
+        commands: list[tuple[str, tuple[str, ...]]] = []
+        encoder_command = self._build_encoder_pin_command(request)
+        if encoder_command is None:
+            return commands
+        commands.append((encoder_command, ("OK ENCODER PINS",)))
+        commands.append((self._build_encoder_scale_command(request), ("OK ENCODER SCALE",)))
+        pid_command = self._build_xy_pid_command(request)
+        if pid_command is not None:
+            commands.append((pid_command, ("OK XY PID",)))
+        follow_limit_command = self._build_xy_follow_limit_command(request)
+        if follow_limit_command is not None:
+            commands.append((follow_limit_command, ("OK XY FOLLOW LIMIT",)))
+        return commands
+
     def move_xy(self, request: GantryXYMoveRequest) -> GantryXYMoveResponse:
         request = self._with_map_encoders(request)
         port = self._selected_port(request.tool_port)
@@ -619,17 +636,7 @@ class GantryControllerService:
             abs(request.z_cm) * Z_STEPS_PER_CM,
         )
 
-        extra_commands: list[tuple[str, tuple[str, ...]]] = []
-        encoder_command = self._build_encoder_pin_command(request)
-        if encoder_command is not None:
-            extra_commands.append((encoder_command, ("OK ENCODER PINS",)))
-            extra_commands.append((self._build_encoder_scale_command(request), ("OK ENCODER SCALE",)))
-        pid_command = self._build_xy_pid_command(request)
-        if pid_command is not None:
-            extra_commands.append((pid_command, ("OK XY PID",)))
-        follow_limit_command = self._build_xy_follow_limit_command(request)
-        if follow_limit_command is not None:
-            extra_commands.append((follow_limit_command, ("OK XY FOLLOW LIMIT",)))
+        extra_commands = self._encoder_setup_commands(request)
 
         pin_reply, limit_reply, move_reply = self._send_config_and_action(
             port=port,
@@ -808,16 +815,23 @@ class GantryControllerService:
             GANTRY_WORKSPACE_X_CM * XY_STEPS_PER_CM * 8.0,
             _effective_move_rpm(request),
         )
+        # The Move XY block sends GOTOXY, so the encoders are set up here as
+        # well; their pins come from the Hardware Map, the rest from the
+        # measured defaults on GantryXYMoveRequest.
+        encoder_request = self._with_map_encoders(GantryXYMoveRequest.model_construct())
+        extra_commands = self._encoder_setup_commands(encoder_request)
         pin_reply, limit_reply, move_reply = self._send_config_and_action(
             port=port,
             baud_rate=baud_rate,
             pin_command=pin_command,
             enable_command=self._build_xy_enable_command(request),
+            extra_commands=extra_commands or None,
             limit_command=limit_command,
             action_command=move_command,
             action_prefix="OK MOVE XY",
             action_deadline=action_deadline,
         )
+        follow_error_peak_a, follow_error_peak_b, follow_error_tripped = self._parse_follow_error_reply(move_reply)
 
         return GantryGotoXYResponse(
             port=port,
@@ -836,6 +850,10 @@ class GantryControllerService:
             move_command_sent=move_command,
             move_reply=move_reply,
             move_applied=True,
+            encoder_commands_sent=[command for command, _ in extra_commands],
+            follow_error_peak_a=follow_error_peak_a,
+            follow_error_peak_b=follow_error_peak_b,
+            follow_error_tripped=follow_error_tripped,
             configured_pins={
                 "x_step_pin": request.x_step_pin,
                 "x_dir_pin": request.x_dir_pin,

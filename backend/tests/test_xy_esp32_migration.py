@@ -33,7 +33,11 @@ class RecordingController(GantryControllerService):
             ("SET XY PINS", "OK XY PINS"),
             ("SET XY ENABLE", "OK XY ENABLE"),
             ("SET XY LIMITS", "OK XY LIMITS"),
-            ("GOTOXY", "OK MOVE XY"),
+            ("SET ENCODER PINS", "OK ENCODER PINS"),
+            ("SET ENCODER SCALE", "OK ENCODER SCALE"),
+            ("SET XY PID", "OK XY PID"),
+            ("SET XY FOLLOW LIMIT", "OK XY FOLLOW LIMIT"),
+            ("GOTOXY", "XY POSITION CM 10.100 5.100\nFOLLOW ERROR PEAK 1.50 2.25\nOK MOVE XY"),
             ("CALIBRATE XY", "OK CALIBRATE XY"),
         ):
             if command.startswith(prefix):
@@ -74,9 +78,17 @@ class XYMigrationTests(unittest.TestCase):
              patch.object(module, "planned_move_xy_result", side_effect=AssertionError("Must not drive Pi GPIO")):
             result = module.execute(context, inputs)
         self.assertEqual(controller.port, "/dev/ttyUSB7")
-        self.assertEqual(controller.sent[:3], ["SET XY PINS 25 26 27 14", "SET XY ENABLE 13 13 1", "SET XY LIMITS 4 32 33 4 -1"])
+        self.assertEqual(controller.sent[:2], ["SET XY PINS 25 26 27 14", "SET XY ENABLE 13 13 1"])
+        self.assertIn("SET XY LIMITS 4 32 33 4 -1", controller.sent[:-1])
         self.assertTrue(controller.sent[-1].startswith("GOTOXY 10.000 5.000 "))
-        self.assertFalse(any("ENCODER" in c or " Z " in c for c in controller.sent))
+        self.assertFalse(any(" Z " in c for c in controller.sent))
+        # The encoders are enabled in the map, so the Move XY block (GOTOXY)
+        # is monitored: setup before the move, the peaks in the result.
+        self.assertIn("SET ENCODER PINS 21 22 19 18", controller.sent)
+        self.assertIn("SET ENCODER SCALE 1600 1 0", controller.sent)
+        self.assertLess(controller.sent.index("SET ENCODER PINS 21 22 19 18"), len(controller.sent) - 1)
+        self.assertEqual((result["follow_error_peak_a"], result["follow_error_peak_b"]), (1.5, 2.25))
+        self.assertFalse(result["follow_error_tripped"])
         self.assertTrue(result["move_applied"])
 
     def test_calibration_preserves_cm_park_and_clearances(self):

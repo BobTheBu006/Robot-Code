@@ -322,6 +322,12 @@ class GantryGotoXYResponse(BaseModel):
     move_command_sent: str
     move_reply: str | None = None
     move_applied: bool = False
+    # Encoder monitoring: commands sent before the move, and the peak lag per
+    # motor in steps (None when no encoders are enabled in the Hardware Map).
+    encoder_commands_sent: list[str] = Field(default_factory=list)
+    follow_error_peak_a: float | None = None
+    follow_error_peak_b: float | None = None
+    follow_error_tripped: bool = False
     configured_pins: dict[str, int]
     configured_limits: dict[str, int | str]
 
