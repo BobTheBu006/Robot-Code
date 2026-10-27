@@ -862,8 +862,13 @@ bool runCoreXYCartesianMove(
   int xSign = deltaXSteps > 0 ? 1 : deltaXSteps < 0 ? -1 : 0;
   int ySign = deltaYSteps > 0 ? 1 : deltaYSteps < 0 ? -1 : 0;
 
-  digitalWrite(xAxis.dirPin, aPositive ? HIGH : LOW);
-  digitalWrite(yAxis.dirPin, bPositive ? HIGH : LOW);
+  // Measured on the machine (2026-10-27): DIR LOW on motor A alone moves
+  // the carriage X+Y+, on both motors pure +X. So a positive A (= X+Y) or B
+  // (= X-Y) delta is LOW, i.e. XY_DIR_TOWARD_X_MAX - the same convention as
+  // TEST MOTOR, driveXAxis and the circle chords. This line used HIGH, which
+  // sent every Move XY the opposite way.
+  digitalWrite(xAxis.dirPin, aPositive ? XY_DIR_TOWARD_X_MAX : XY_DIR_TOWARD_X_MIN);
+  digitalWrite(yAxis.dirPin, bPositive ? XY_DIR_TOWARD_X_MAX : XY_DIR_TOWARD_X_MIN);
   delayMicroseconds(20);
 
   xBlocked = false;
@@ -1899,12 +1904,13 @@ bool driveYAxis(
   bool &limitHit
 ) {
   bool towardMin = positionStep < 0;
-  // CoreXY cartesian Y is A - B. With this machine's direction levels, -Y
-  // (toward Y-min) therefore needs A toward X-max and B toward X-min. Keep
-  // this mapping aligned with runCoreXYCartesianMove(deltaX=0, deltaY), whose
-  // -Y direction is A=LOW/B=HIGH and +Y is A=HIGH/B=LOW.
-  digitalWrite(xAxis.dirPin, towardMin ? XY_DIR_TOWARD_X_MAX : XY_DIR_TOWARD_X_MIN);
-  digitalWrite(yAxis.dirPin, towardMin ? XY_DIR_TOWARD_X_MIN : XY_DIR_TOWARD_X_MAX);
+  // CoreXY: A = X + Y, B = X - Y, and a positive A or B is DIR LOW
+  // (XY_DIR_TOWARD_X_MAX) - measured on the machine, see
+  // runCoreXYCartesianMove. -Y (toward Y-min) is therefore A negative and
+  // B positive: A toward X-min, B toward X-max. The mapping here used to be
+  // the other way round and homed Y into +Y.
+  digitalWrite(xAxis.dirPin, towardMin ? XY_DIR_TOWARD_X_MIN : XY_DIR_TOWARD_X_MAX);
+  digitalWrite(yAxis.dirPin, towardMin ? XY_DIR_TOWARD_X_MAX : XY_DIR_TOWARD_X_MIN);
   delayMicroseconds(20);
 
   stepsTaken = 0;
