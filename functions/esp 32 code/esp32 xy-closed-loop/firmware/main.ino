@@ -2924,6 +2924,20 @@ void probeEncoderChannel(const char *name, EncoderChannel &channel) {
       Serial.print(" STATUS ");
       Serial.print(channel.bus->read(), HEX);
     }
+    // AGC (0x1A) then MAGNITUDE (0x1B high nibble, 0x1C low byte) in one
+    // read: how hard the chip is working to see the magnet. On 3.3 V the AGC
+    // spans 0-128; aim for the middle when setting the gap. High AGC = magnet
+    // too far, low AGC = too close.
+    channel.bus->beginTransmission(AS5600_ADDRESS);
+    channel.bus->write((uint8_t)0x1A);
+    if (channel.bus->endTransmission(false) == 0 && channel.bus->requestFrom(AS5600_ADDRESS, (uint8_t)3) == 3) {
+      uint8_t agc = channel.bus->read();
+      uint16_t magnitude = ((uint16_t)(channel.bus->read() & 0x0F) << 8) | channel.bus->read();
+      Serial.print(" AGC ");
+      Serial.print(agc);
+      Serial.print(" MAG ");
+      Serial.print(magnitude);
+    }
   }
 }
 
