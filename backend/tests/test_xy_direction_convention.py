@@ -51,9 +51,18 @@ class FollowErrorMonitoringTests(unittest.TestCase):
         self.assertIn("applyPidCorrectionTick(", body)
         self.assertIn("FOLLOW ERROR PEAK", body)
 
+    def test_the_stepping_loop_never_waits_on_the_i2c_bus(self) -> None:
+        # Encoder reads inside the tick stalled the pulse train and made the
+        # motors rough; the tick must only copy the core-0 reader's snapshot.
+        for signature in ("bool applyPidCorrectionTick(", "void beginFollowTracking("):
+            body = self._body(signature)
+            self.assertNotIn("readEncoderChannel(", body, signature)
+            self.assertIn("readEncoderSnapshot(", body, signature)
+        self.assertIn("xTaskCreatePinnedToCore(encoderReaderTask", self.source)
+
     def test_the_tick_compares_against_the_move_baseline(self) -> None:
         body = self._body("bool applyPidCorrectionTick(")
-        self.assertIn("- followBaseCountsA", body)
+        self.assertIn("countsA - followBaseCountsA", body)
         self.assertIn("commandedA -= followBaseStepsA", body)
 
 

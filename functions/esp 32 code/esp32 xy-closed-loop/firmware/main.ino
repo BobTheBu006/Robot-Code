@@ -478,6 +478,47 @@ long xyIntegralClampCounts = 1024;    // +-1/4 revolution; anti-windup
 // conservative; the achievable rate is a hardware question, not a code one.
 const int PID_CHECK_EVERY_N_ITERATIONS = 8;
 
+// ---- Encoder reading on the second core ---------------------------------
+//
+// Reading both encoders takes about 1 ms at 100 kHz. Doing that inside the
+// stepping loop every few steps stalled the pulse train and made the motors
+// audibly rough at any speed. A task on core 0 now reads them continuously and
+// publishes a snapshot; the stepping loop on core 1 only copies the snapshot,
+// which takes microseconds. The I2C buses are guarded by a recursive mutex so
+// the task, reconfiguration and the diagnostic commands never interleave.
+
+SemaphoreHandle_t encoderBusMutexHandle = nullptr;
+
+SemaphoreHandle_t encoderBusMutex() {
+  if (encoderBusMutexHandle == nullptr) {
+    encoderBusMutexHandle = xSemaphoreCreateRecursiveMutex();
+  }
+  return encoderBusMutexHandle;
+}
+
+void lockEncoderBus() {
+  xSemaphoreTakeRecursive(encoderBusMutex(), portMAX_DELAY);
+}
+
+void unlockEncoderBus() {
+  xSemaphoreGiveRecursive(encoderBusMutex());
+}
+
+portMUX_TYPE encoderSnapshotMux = portMUX_INITIALIZER_UNLOCKED;
+volatile long encoderSnapshotCountsA = 0;
+volatile long encoderSnapshotCountsB = 0;
+volatile bool encoderSnapshotOkA = false;
+volatile bool encoderSnapshotOkB = false;
+
+void readEncoderSnapshot(long &countsA, long &countsB, bool &okA, bool &okB) {
+  portENTER_CRITICAL(&encoderSnapshotMux);
+  countsA = encoderSnapshotCountsA;
+  countsB = encoderSnapshotCountsB;
+  okA = encoderSnapshotOkA;
+  okB = encoderSnapshotOkB;
+  portEXIT_CRITICAL(&encoderSnapshotMux);
+}
+
 void configureEncoderChannel(EncoderChannel &channel, TwoWire &bus, int sdaPin, int sclPin) {
   if (channel.bus != nullptr && (channel.sdaPin != sdaPin || channel.sclPin != sclPin)) {
     channel.bus->end();
@@ -498,9 +539,11 @@ void configureEncoderChannel(EncoderChannel &channel, TwoWire &bus, int sdaPin, 
 }
 
 void configureEncoderPins(int sdaA, int sclA, int sdaB, int sclB) {
+  lockEncoderBus();
   configureEncoderChannel(encoderA, Wire, sdaA, sclA);
   configureEncoderChannel(encoderB, Wire1, sdaB, sclB);
   encodersConfigured = (encoderA.bus != nullptr && encoderB.bus != nullptr);
+  unlockEncoderBus();
 }
 
 // Reads STATUS and RAW ANGLE in one transaction and folds the angle into the
@@ -509,7 +552,7 @@ void configureEncoderPins(int sdaA, int sclA, int sdaB, int sclB) {
 // range, or a jump of close to half a revolution since the last read - that
 // last one means the channel was not polled often enough for the speed the
 // axis was moving at, which is a fault, not a value to silently accept.
-bool readEncoderChannel(EncoderChannel &channel) {
+bool readEncoderChannelLocked(EncoderChannel &channel) {
   if (channel.bus == nullptr) {
     return false;
   }
@@ -563,8 +606,34 @@ bool readEncoderChannel(EncoderChannel &channel) {
   return !channel.faulted;
 }
 
+bool readEncoderChannel(EncoderChannel &channel) {
+  lockEncoderBus();
+  bool ok = readEncoderChannelLocked(channel);
+  unlockEncoderBus();
+  return ok;
+}
+
 long encoderAccumulatedCounts(const EncoderChannel &channel) {
   return channel.turns;
+}
+
+// Core 0: read both encoders back to back, publish, yield for one tick. At
+// ~1 ms per pass the wrap check (never miss half a revolution) holds far past
+// this machine's top speed.
+void encoderReaderTask(void *) {
+  for (;;) {
+    if (encodersConfigured) {
+      bool okA = readEncoderChannel(encoderA);
+      bool okB = readEncoderChannel(encoderB);
+      portENTER_CRITICAL(&encoderSnapshotMux);
+      encoderSnapshotCountsA = encoderA.turns;
+      encoderSnapshotCountsB = encoderB.turns;
+      encoderSnapshotOkA = okA;
+      encoderSnapshotOkB = okB;
+      portEXIT_CRITICAL(&encoderSnapshotMux);
+    }
+    vTaskDelay(1);
+  }
 }
 
 long cmToSteps(float centimeters, float stepsPerCm) {
@@ -757,12 +826,11 @@ void beginFollowTracking() {
   xyPid.primed = false;
   followBaseStepsA = xAxis.currentSteps;
   followBaseStepsB = yAxis.currentSteps;
-  if (encodersConfigured) {
-    readEncoderChannel(encoderA);
-    readEncoderChannel(encoderB);
-  }
-  followBaseCountsA = encoderAccumulatedCounts(encoderA);
-  followBaseCountsB = encoderAccumulatedCounts(encoderB);
+  // The motors are standing still here, so the latest snapshot from the
+  // reader task is the start position.
+  bool okA = false;
+  bool okB = false;
+  readEncoderSnapshot(followBaseCountsA, followBaseCountsB, okA, okB);
 }
 
 // One control-loop tick: read both encoders, update following-error stats,
@@ -787,14 +855,19 @@ bool applyPidCorrectionTick(
     return true;
   }
 
-  bool okA = readEncoderChannel(encoderA);
-  bool okB = readEncoderChannel(encoderB);
+  // From the core-0 reader's snapshot: no I2C here, so the stepping loop
+  // never stalls waiting on the bus.
+  long countsA = 0;
+  long countsB = 0;
+  bool okA = false;
+  bool okB = false;
+  readEncoderSnapshot(countsA, countsB, okA, okB);
 
   // A motor step is ENCODER_COUNTS_PER_REV / stepsPerRevolution counts, so a
   // step-space error compares directly against the encoder-space one.
   float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
-  float measuredA = (float)(encoderAccumulatedCounts(encoderA) - followBaseCountsA) / countsPerStep;
-  float measuredB = (float)(encoderAccumulatedCounts(encoderB) - followBaseCountsB) / countsPerStep;
+  float measuredA = (float)(countsA - followBaseCountsA) / countsPerStep;
+  float measuredB = (float)(countsB - followBaseCountsB) / countsPerStep;
   commandedA -= followBaseStepsA;
   commandedB -= followBaseStepsB;
 
@@ -3028,11 +3101,13 @@ bool handleEncoderScanCommand(const String &cmd) {
   if (cmd != "ENCODER SCAN") {
     return false;
   }
+  lockEncoderBus();
   Serial.print("OK ENCODER SCAN ");
   scanEncoderBus("A", encoderA);
   Serial.print(" B");
   scanEncoderBus("", encoderB);
   Serial.println();
+  unlockEncoderBus();
   return true;
 }
 
@@ -3040,11 +3115,13 @@ bool handleEncoderProbeCommand(const String &cmd) {
   if (cmd != "ENCODER PROBE") {
     return false;
   }
+  lockEncoderBus();
   Serial.print("OK ENCODER PROBE ");
   probeEncoderChannel("A", encoderA);
   Serial.print(" ");
   probeEncoderChannel("B", encoderB);
   Serial.println();
+  unlockEncoderBus();
   return true;
 }
 
@@ -3349,6 +3426,11 @@ void setup() {
   applyXYLimits(xyLimitSwitchMode, xAxis.minLimitPin, xAxis.maxLimitPin, yAxis.minLimitPin, yAxis.maxLimitPin);
 
   loadXCalibrationState();
+
+  // Encoder reads live on core 0 so they never interrupt step generation,
+  // which runs in loop() on core 1.
+  encoderBusMutex();
+  xTaskCreatePinnedToCore(encoderReaderTask, "encoders", 4096, nullptr, 1, nullptr, 0);
 
   Serial.println("READY");
 }
