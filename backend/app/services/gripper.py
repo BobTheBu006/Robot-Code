@@ -9,14 +9,22 @@ really are closed when the tool is picked up, nothing ever snaps.
 Pulses keep running after a move so the claws hold what they grip; a servo
 without pulses goes limp. `release()` stops them, which is what a drop wants.
 
-Pulses come from lgpio, which times them in software on any GPIO. The PIO
-based `pwm-pio` overlay would give hardware-timed pulses on the same pins;
-switching is contained to `_LgpioServos`.
+Pulses come from the Pi 5's PIO block through the `pwm-pio` overlay: hardware
+timed, so the width does not wobble with CPU load. Software-timed pulses from
+lgpio made the servos jitter visibly while holding; the PIO pulses did not
+(measured on the gripper, 2026-10-27). lgpio stays as the fallback when the
+overlay cannot be set up, and the result says which one ran.
+
+GPIO 2/3 are the Pi's I2C1 pins, and with I2C enabled the kernel owns them,
+so the PIO driver cannot claim them. Setting up detaches the I2C controller
+from its pins; tearing down (on park, i.e. drop) removes the overlays and
+reattaches I2C so the pogo pins are ordinary again for the next tool.
 """
 
 from __future__ import annotations
 
 import os
+import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
@@ -61,6 +69,137 @@ class _LgpioServos:
         self._claimed.clear()
 
 
+PWM_SYSFS = "/sys/class/pwm"
+# The Pi 5's I2C1 controller (pins GPIO 2/3) and its platform driver.
+I2C1_DEVICE = "1f00074000.i2c"
+I2C1_DRIVER = "/sys/bus/platform/drivers/i2c_designware"
+
+
+def _sudo(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["sudo", "-n", *args], capture_output=True, text=True, timeout=10)
+
+
+class PioPwmServos:
+    """Hardware-timed servo pulses via one `pwm-pio` overlay per GPIO."""
+
+    def __init__(self, run=_sudo, sysfs: str = PWM_SYSFS, i2c_driver: str = I2C1_DRIVER,
+                 i2c_device: str = I2C1_DEVICE) -> None:
+        self._run = run
+        self._sysfs = sysfs
+        self._i2c_driver = i2c_driver
+        self._i2c_device = i2c_device
+        self._channels: dict[int, str] = {}
+        self._i2c_detached = False
+
+    def _chip_for(self, gpio: int) -> str | None:
+        if not os.path.isdir(self._sysfs):
+            return None
+        for name in sorted(os.listdir(self._sysfs)):
+            device = os.path.realpath(os.path.join(self._sysfs, name, "device"))
+            if device.endswith(f"pwm_pio@{gpio}"):
+                return os.path.join(self._sysfs, name)
+        return None
+
+    def _check(self, result: subprocess.CompletedProcess, what: str) -> None:
+        if result.returncode != 0:
+            raise RuntimeError(f"{what} failed: {(result.stderr or result.stdout).strip()}")
+
+    def _setup(self, gpio: int) -> str:
+        chip = self._chip_for(gpio)
+        if chip is None:
+            if gpio in (2, 3) and os.path.exists(os.path.join(self._i2c_driver, self._i2c_device)):
+                # The I2C driver holds the pins; the overlay would load and
+                # then fail to claim them, leaving no PWM channel behind.
+                self._check(self._run("sh", "-c", f"echo {self._i2c_device} > {self._i2c_driver}/unbind"),
+                            "Detaching I2C from GPIO 2/3")
+                self._i2c_detached = True
+            self._check(self._run("dtoverlay", "pwm-pio", f"gpio={gpio}"), f"Loading pwm-pio on GPIO {gpio}")
+            for _ in range(20):
+                chip = self._chip_for(gpio)
+                if chip:
+                    break
+                time.sleep(0.05)
+            if chip is None:
+                raise RuntimeError(f"pwm-pio did not create a PWM channel for GPIO {gpio}.")
+        channel = os.path.join(chip, "pwm0")
+        if not os.path.isdir(channel):
+            self._check(self._run("sh", "-c", f"echo 0 > {chip}/export"), f"Exporting PWM for GPIO {gpio}")
+            for _ in range(20):
+                if os.path.isdir(channel):
+                    break
+                time.sleep(0.05)
+        # One sudo for the permissions, so every later write - a ramp is tens
+        # of them - is a plain file write instead of a process per step.
+        self._check(self._run("chmod", "a+w", f"{channel}/period", f"{channel}/duty_cycle", f"{channel}/enable"),
+                    f"Opening PWM controls for GPIO {gpio}")
+        self._write(channel, "period", 1_000_000_000 // SERVO_FRAME_HZ)
+        return channel
+
+    @staticmethod
+    def _write(channel: str, name: str, value: int) -> None:
+        with open(os.path.join(channel, name), "w", encoding="ascii") as handle:
+            handle.write(str(value))
+
+    def pulse(self, gpio: int, width_us: int) -> None:
+        channel = self._channels.get(gpio)
+        if channel is None:
+            channel = self._setup(gpio)
+            self._channels[gpio] = channel
+            self._write(channel, "duty_cycle", width_us * 1000)
+            self._write(channel, "enable", 1)
+            return
+        self._write(channel, "duty_cycle", width_us * 1000)
+        self._write(channel, "enable", 1)
+
+    def stop(self) -> None:
+        for channel in self._channels.values():
+            try:
+                self._write(channel, "enable", 0)
+            except OSError:
+                pass
+
+    def teardown(self) -> None:
+        """Stop, remove the overlays and give GPIO 2/3 back to I2C."""
+        self.stop()
+        listing = self._run("dtoverlay", "-l").stdout
+        indexes = [line.split(":")[0].strip() for line in listing.splitlines() if "pwm-pio" in line]
+        for index in reversed(indexes):
+            self._run("dtoverlay", "-r", index)
+        self._channels.clear()
+        if self._i2c_detached:
+            self._run("sh", "-c", f"echo {self._i2c_device} > {self._i2c_driver}/bind")
+            self._i2c_detached = False
+
+
+class _FallbackServos:
+    """Hardware PWM when it can be set up, software pulses when it cannot."""
+
+    def __init__(self) -> None:
+        self.kind = "pio"
+        self._driver = PioPwmServos()
+
+    def pulse(self, gpio: int, width_us: int) -> None:
+        try:
+            self._driver.pulse(gpio, width_us)
+        except (RuntimeError, OSError, subprocess.SubprocessError):
+            if self.kind == "lgpio":
+                raise
+            # Loud in the result, not silent: the servos will jitter again.
+            self._driver.teardown()
+            self._driver = _LgpioServos()
+            self.kind = "lgpio"
+            self._driver.pulse(gpio, width_us)
+
+    def stop(self) -> None:
+        self._driver.stop()
+
+    def teardown(self) -> None:
+        if hasattr(self._driver, "teardown"):
+            self._driver.teardown()
+        else:
+            self._driver.stop()
+
+
 @dataclass
 class SimulatedServos:
     pulses: dict[int, list[int]] = field(default_factory=dict)
@@ -71,6 +210,9 @@ class SimulatedServos:
         self.pulses.setdefault(gpio, []).append(width_us)
 
     def stop(self) -> None:
+        self.stopped = True
+
+    def teardown(self) -> None:
         self.stopped = True
 
 
@@ -90,8 +232,13 @@ class GripperService:
 
     def _servos(self):
         if self._driver is None:
-            self._driver = SimulatedServos() if _simulating() else _LgpioServos()
+            self._driver = SimulatedServos() if _simulating() else _FallbackServos()
         return self._driver
+
+    @property
+    def pulse_source(self) -> str:
+        """Which pulse generator is driving the servos: pio, lgpio or simulated."""
+        return getattr(self._driver, "kind", "simulated" if isinstance(self._driver, SimulatedServos) else "unknown")
 
     def move(self, servos: list[ServoSettings], target: str, ramp_deg_per_s: float) -> dict[int, float]:
         """Ramp every servo to its open or closed angle together."""
@@ -139,7 +286,11 @@ class GripperService:
             return False
         servos, ramp = last
         self.move(servos, "close", ramp)
-        self.release()
+        with self._lock:
+            if self._driver is not None and hasattr(self._driver, "teardown"):
+                self._driver.teardown()
+            elif self._driver is not None:
+                self._driver.stop()
         self.forget_position()
         return True
 

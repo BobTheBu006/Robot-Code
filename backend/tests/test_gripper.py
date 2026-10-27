@@ -172,5 +172,118 @@ class HardwareMapTests(unittest.TestCase):
             self._service(set()).apply_function_defaults(self._manifest(), {})
 
 
+class _FakeSystem:
+    """A temp /sys/class/pwm plus an I2C driver dir; commands are recorded and
+    `dtoverlay pwm-pio gpio=N` creates the channel the kernel would."""
+
+    def __init__(self, root: Path) -> None:
+        import subprocess
+
+        self.subprocess = subprocess
+        self.pwm = root / "pwm"
+        self.pwm.mkdir()
+        self.i2c_driver = root / "i2c_designware"
+        self.i2c_driver.mkdir()
+        (self.i2c_driver / "1f00074000.i2c").mkdir()
+        self.devices = root / "devices"
+        self.devices.mkdir()
+        self.commands: list[tuple] = []
+        self.overlays: list[int] = []
+
+    def run(self, *args):
+        self.commands.append(args)
+        out = ""
+        if args[:2] == ("dtoverlay", "pwm-pio"):
+            gpio = int(args[2].split("=")[1])
+            if (self.i2c_driver / "1f00074000.i2c").exists() and gpio in (2, 3):
+                return self.subprocess.CompletedProcess(args, 0, "", "")  # loads, but no channel
+            device = self.devices / f"pwm_pio@{gpio}"
+            device.mkdir()
+            chip = self.pwm / f"pwmchip{len(self.overlays)}"
+            chip.mkdir()
+            (chip / "device").symlink_to(device)
+            self.overlays.append(gpio)
+        elif args[:2] == ("sh", "-c") and "unbind" in args[2]:
+            (self.i2c_driver / "1f00074000.i2c").rmdir()
+        elif args[:2] == ("sh", "-c") and args[2].endswith("/export"):
+            channel = Path(args[2].split("> ")[1]).parent / "pwm0"
+            channel.mkdir()
+            for name in ("period", "duty_cycle", "enable"):
+                (channel / name).write_text("0")
+        elif args[:2] == ("dtoverlay", "-l"):
+            out = "\n".join(f"{i}:  pwm-pio  gpio={g}" for i, g in enumerate(self.overlays))
+        return self.subprocess.CompletedProcess(args, 0, out, "")
+
+    def channel(self, gpio: int) -> Path:
+        index = self.overlays.index(gpio)
+        return self.pwm / f"pwmchip{index}" / "pwm0"
+
+
+class HardwarePwmTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from app.services.gripper import PioPwmServos
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.system = _FakeSystem(Path(directory.name))
+        self.servos = PioPwmServos(run=self.system.run, sysfs=str(self.system.pwm),
+                                   i2c_driver=str(self.system.i2c_driver))
+
+    def test_i2c_is_detached_before_the_overlay_claims_gpio_2(self) -> None:
+        # With I2C holding the pin, the overlay loads but yields no channel.
+        self.servos.pulse(2, 2500)
+        commands = [c[:2] for c in self.system.commands]
+        self.assertLess(commands.index(("sh", "-c")), commands.index(("dtoverlay", "pwm-pio")))
+        self.assertEqual(self.system.overlays, [2])
+
+    def test_the_pulse_is_written_in_nanoseconds_at_50_hz(self) -> None:
+        self.servos.pulse(3, 500)
+        channel = self.system.channel(3)
+        self.assertEqual((channel / "period").read_text(), "20000000")
+        self.assertEqual((channel / "duty_cycle").read_text(), "500000")
+        self.assertEqual((channel / "enable").read_text(), "1")
+
+    def test_later_pulses_are_plain_writes_without_more_commands(self) -> None:
+        self.servos.pulse(3, 500)
+        before = len(self.system.commands)
+        for width in (600, 700, 800):
+            self.servos.pulse(3, width)
+        self.assertEqual(len(self.system.commands), before, "a ramp must not spawn a process per step")
+        self.assertEqual((self.system.channel(3) / "duty_cycle").read_text(), "800000")
+
+    def test_teardown_removes_the_overlays_and_gives_the_pins_back_to_i2c(self) -> None:
+        self.servos.pulse(2, 2500)
+        self.servos.pulse(3, 500)
+        self.servos.teardown()
+        self.assertEqual((self.system.channel(2) / "enable").read_text(), "0")
+        removed = [c for c in self.system.commands if c[:2] == ("dtoverlay", "-r")]
+        self.assertEqual([c[2] for c in removed], ["1", "0"], "newest first")
+        self.assertTrue(any(c[:2] == ("sh", "-c") and c[2].endswith("/bind") for c in self.system.commands))
+
+
+class FallbackTests(unittest.TestCase):
+    def test_a_failed_hardware_setup_falls_back_to_software_pulses(self) -> None:
+        from app.services import gripper as gripper_module
+
+        recorded = SimulatedServos()
+
+        class _Broken:
+            def pulse(self, gpio, width):
+                raise RuntimeError("Loading pwm-pio failed")
+
+            def stop(self):
+                pass
+
+            def teardown(self):
+                pass
+
+        with mock.patch.object(gripper_module, "PioPwmServos", _Broken), \
+                mock.patch.object(gripper_module, "_LgpioServos", lambda: recorded):
+            servos = gripper_module._FallbackServos()
+            servos.pulse(3, 500)
+        self.assertEqual(servos.kind, "lgpio", "reported, so the jitter is explained")
+        self.assertEqual(recorded.pulses[3], [500])
+
+
 if __name__ == "__main__":
     unittest.main()

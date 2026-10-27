@@ -41,6 +41,7 @@ def execute(context: dict, inputs: dict) -> dict:
         "status": "completed",
         "action": action,
         "message": f"Gripper {'opened' if action == 'open' else 'closed'}; servos holding.",
+        "pulse_source": gripper_service.pulse_source,
         "left_deg": angles[servos[0].gpio],
         "right_deg": angles[servos[1].gpio],
         "mode": context.get("mode"),

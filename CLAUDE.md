@@ -38,7 +38,10 @@ as a fallback if the hardware is rewired and the map changed back.
 
 The **Gripper** block already exists: Open/Close, slot 6, left Pi GPIO3 (SCL),
 right Pi GPIO2 (SDA), closed -90/+90 degrees, open +30/-30 degrees. It requires
-the gripper tool to be connected, ramps both servos, and holds until release.
+the gripper tool to be connected, ramps both servos, and holds until release. Pulses come from the Pi 5's
+PIO block (`pwm-pio` overlay) - hardware-timed, no jitter; lgpio software
+pulses jittered and are only the fallback. Using it detaches I2C from GPIO 2/3;
+park (on drop) removes the overlays and reattaches I2C.
 
 The Z axis is deliberately **split**: motors on the ESP32, limit switches on
 the Pi (`hybrid_z_axis.py`). The Pi watches the switch and sends `STOP` over
@@ -66,7 +69,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-371 tests, stdlib `unittest`, no pytest.
+376 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
