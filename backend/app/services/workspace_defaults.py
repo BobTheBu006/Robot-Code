@@ -49,6 +49,8 @@ _TOOLHEAD_FUNCTION_IDS = ("pickup_toolhead", "drop_toolhead")
 # stays out - which tool to grab (toolhead_index) and how fast to approach
 # (approach_speed_rpm) legitimately differ between blocks. Hardware pins are
 # excluded: the Hardware Map owns those.
+SLOT_POSITION_KEYS = frozenset(f"tool_{index}_{axis}_cm" for index in range(1, 7) for axis in ("x", "y"))
+
 TOOLHEAD_DEFAULT_KEYS = frozenset(
     {f"tool_{index}_{axis}_cm" for index in range(1, 7) for axis in ("x", "y")}
     | {"pickup_clearance_cm", "drop_clearance_cm", "dip_depth_cm", "lift_cm", "release_cm"}
@@ -292,6 +294,11 @@ class WorkspaceDefaultsService:
                     parameters = node["data"].get("parameters")
                     if isinstance(parameters, dict):
                         for key, value in parameters.items():
+                            # Slot positions are owned by Teach Tool Positions.
+                            # A placed block's copy goes stale, and adopting it
+                            # here silently undid a teach on the next save.
+                            if key in SLOT_POSITION_KEYS:
+                                continue
                             if key in TOOLHEAD_DEFAULT_KEYS and isinstance(value, (int, float)):
                                 collected[key] = float(value)
                 for value in node.values():

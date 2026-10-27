@@ -398,6 +398,29 @@ function normalizeWorkflowNodes(nodesToNormalize: WorkflowFlowNode[]): WorkflowF
 // inputs arrive with their defaults, and values for inputs that still exist are
 // preserved. Compound blocks are skipped: they are defined inside the workflow
 // itself rather than by a manifest, so the saved copy *is* the source.
+// Rack slot positions are owned by Teach Tool Positions and shared by every
+// Pick Up / Drop block. A placed block's own copy goes stale, so it always
+// shows (and runs with) the catalog's current values instead.
+const SHARED_SLOT_POSITION_BLOCKS = new Set(["pickup_toolhead", "drop_toolhead"]);
+const SHARED_SLOT_POSITION_KEY = /^tool_[1-6]_[xy]_cm$/;
+
+function withSharedSlotPositions(
+  block: WorkflowBlockDefinition,
+  parameters: Record<string, WorkflowParameterValue>,
+): Record<string, WorkflowParameterValue> {
+  if (!SHARED_SLOT_POSITION_BLOCKS.has(block.id)) {
+    return parameters;
+  }
+  let next = parameters;
+  for (const input of getAllBlockInputs(block)) {
+    if (SHARED_SLOT_POSITION_KEY.test(input.key) && input.default != null && parameters[input.key] !== input.default) {
+      next = next === parameters ? { ...parameters } : next;
+      next[input.key] = input.default as WorkflowParameterValue;
+    }
+  }
+  return next;
+}
+
 function refreshNodeBlockDefinitions(
   nodesToRefresh: WorkflowFlowNode[],
   catalog: WorkflowBlockDefinition[],
@@ -419,8 +442,16 @@ function refreshNodeBlockDefinitions(
     // A block whose definition has gone (deleted custom block, renamed
     // function) keeps what it has, so the existing broken-reference handling
     // can show it rather than this quietly dropping it.
-    if (!latest || JSON.stringify(latest) === JSON.stringify(placed)) {
+    if (!latest) {
       return node;
+    }
+    if (JSON.stringify(latest) === JSON.stringify(placed)) {
+      const shared = withSharedSlotPositions(latest, node.data.parameters ?? {});
+      if (shared === (node.data.parameters ?? {})) {
+        return node;
+      }
+      changed = true;
+      return { ...node, data: { ...node.data, parameters: shared } };
     }
 
     changed = true;
@@ -429,7 +460,7 @@ function refreshNodeBlockDefinitions(
       data: {
         ...node.data,
         block: latest,
-        parameters: mergeParametersForBlock(latest, node.data.parameters ?? {}),
+        parameters: withSharedSlotPositions(latest, mergeParametersForBlock(latest, node.data.parameters ?? {})),
       },
     };
   });
