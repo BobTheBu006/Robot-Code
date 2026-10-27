@@ -60,6 +60,11 @@ class FollowErrorMonitoringTests(unittest.TestCase):
             self.assertIn("readEncoderSnapshot(", body, signature)
         self.assertIn("xTaskCreatePinnedToCore(encoderReaderTask", self.source)
 
+    def test_the_tick_compares_encoder_and_steps_from_the_same_moment(self) -> None:
+        # A snapshot ~2 ms old against the live step count read as ~10 steps
+        # of lag at 400 RPM and tripped a good move.
+        self.assertIn("readEncoderSnapshotSteps(commandedA, commandedB);", self._body("bool applyPidCorrectionTick("))
+
     def test_the_tick_compares_against_the_move_baseline(self) -> None:
         body = self._body("bool applyPidCorrectionTick(")
         self.assertIn("countsA - followBaseCountsA", body)

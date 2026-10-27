@@ -509,6 +509,13 @@ volatile long encoderSnapshotCountsA = 0;
 volatile long encoderSnapshotCountsB = 0;
 volatile bool encoderSnapshotOkA = false;
 volatile bool encoderSnapshotOkB = false;
+// Motor step counts sampled around each encoder read. The snapshot can be a
+// millisecond or two old by the time the stepping loop looks at it - ten
+// steps at 400 RPM - so comparing it with the *current* step count read as
+// lag and tripped the follow limit on a good move. Pairing each encoder
+// value with the step count from the moment it was read removes that.
+volatile long encoderSnapshotStepsA = 0;
+volatile long encoderSnapshotStepsB = 0;
 
 void readEncoderSnapshot(long &countsA, long &countsB, bool &okA, bool &okB) {
   portENTER_CRITICAL(&encoderSnapshotMux);
@@ -516,6 +523,13 @@ void readEncoderSnapshot(long &countsA, long &countsB, bool &okA, bool &okB) {
   countsB = encoderSnapshotCountsB;
   okA = encoderSnapshotOkA;
   okB = encoderSnapshotOkB;
+  portEXIT_CRITICAL(&encoderSnapshotMux);
+}
+
+void readEncoderSnapshotSteps(long &stepsA, long &stepsB) {
+  portENTER_CRITICAL(&encoderSnapshotMux);
+  stepsA = encoderSnapshotStepsA;
+  stepsB = encoderSnapshotStepsB;
   portEXIT_CRITICAL(&encoderSnapshotMux);
 }
 
@@ -623,13 +637,21 @@ long encoderAccumulatedCounts(const EncoderChannel &channel) {
 void encoderReaderTask(void *) {
   for (;;) {
     if (encodersConfigured) {
+      // The step counters are written by core 1; read them through volatile
+      // so each sample is a fresh load. Midpoint of before/after each read.
+      long beforeA = *(volatile long *)&xAxis.currentSteps;
       bool okA = readEncoderChannel(encoderA);
+      long afterA = *(volatile long *)&xAxis.currentSteps;
+      long beforeB = *(volatile long *)&yAxis.currentSteps;
       bool okB = readEncoderChannel(encoderB);
+      long afterB = *(volatile long *)&yAxis.currentSteps;
       portENTER_CRITICAL(&encoderSnapshotMux);
       encoderSnapshotCountsA = encoderA.turns;
       encoderSnapshotCountsB = encoderB.turns;
       encoderSnapshotOkA = okA;
       encoderSnapshotOkB = okB;
+      encoderSnapshotStepsA = (beforeA + afterA) / 2;
+      encoderSnapshotStepsB = (beforeB + afterB) / 2;
       portEXIT_CRITICAL(&encoderSnapshotMux);
     }
     vTaskDelay(1);
@@ -862,6 +884,9 @@ bool applyPidCorrectionTick(
   bool okA = false;
   bool okB = false;
   readEncoderSnapshot(countsA, countsB, okA, okB);
+  // Compare against the step count from when the encoders were read, not
+  // the live one passed in (see encoderSnapshotStepsA).
+  readEncoderSnapshotSteps(commandedA, commandedB);
 
   // A motor step is ENCODER_COUNTS_PER_REV / stepsPerRevolution counts, so a
   // step-space error compares directly against the encoder-space one.
