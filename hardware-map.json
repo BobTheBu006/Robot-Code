@@ -1301,7 +1301,7 @@
       "board_id": "xy-closed-loop",
       "name": "AS5600 Encoder (Motor A)",
       "kind": "sensor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": "rotary_position_encoder",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -1322,14 +1322,14 @@
           "notes": null
         }
       ],
-      "notes": "AS5600 on motor A, own I2C bus at 100 kHz. Verified detected 2026-10-27. Kept disabled until both encoders read valid: enabling feeds closed-loop monitoring on every move."
+      "notes": "AS5600 on motor A, own I2C bus at 100 kHz. Enabled 2026-10-27: every Move XY sends these pins and reports following error; the PID gains stay 0 (monitoring only) until tuned."
     },
     {
       "id": "xy-cl-encoder-b",
       "board_id": "xy-closed-loop",
       "name": "AS5600 Encoder (Motor B)",
       "kind": "sensor",
-      "enabled": false,
+      "enabled": true,
       "sensor_kind": "rotary_position_encoder",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -1350,7 +1350,7 @@
           "notes": null
         }
       ],
-      "notes": "AS5600 on motor B, own I2C bus at 100 kHz. Verified detected 2026-10-27. Kept disabled until both encoders read valid: enabling feeds closed-loop monitoring on every move."
+      "notes": "AS5600 on motor B, own I2C bus at 100 kHz. Enabled 2026-10-27: every Move XY sends these pins and reports following error; the PID gains stay 0 (monitoring only) until tuned."
     },
     {
       "id": "gripper-left-servo",

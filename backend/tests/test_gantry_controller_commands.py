@@ -1,5 +1,6 @@
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -187,6 +188,11 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
             def _acquire_connection(inner_self, serial, port, baud_rate):
                 return object()
 
+            def _with_map_encoders(inner_self, request):
+                # These tests set encoder pins themselves; the live Hardware
+                # Map must not decide whether a test move is closed-loop.
+                return request
+
             def _port_candidates(inner_self):
                 # The connection is faked, so the port must be too: these
                 # tests failed whenever no real ESP32 happened to be plugged in.
@@ -277,6 +283,47 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
             service.move_xy(self._request(encoder_a_sda_pin=32, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26))
         self.assertIn("FOLLOW ERROR", str(caught.exception))
 
+
+
+class MapEncoderTests(unittest.TestCase):
+    """Enabling the encoders in the Hardware Map is what turns monitoring on."""
+
+    def _map(self, enabled: bool):
+        from app.models.hardware_map import HardwareBoardMapping, HardwareDeviceMapping, HardwareMap, HardwarePinMapping
+
+        def encoder(side, sda, scl):
+            return HardwareDeviceMapping(
+                id=f"xy-cl-encoder-{side}", board_id="xy-closed-loop", name=f"Encoder {side}", kind="sensor",
+                sensor_kind="rotary_position_encoder", enabled=enabled,
+                pins=[HardwarePinMapping(id=f"{side}-sda", signal="sda", gpio=sda),
+                      HardwarePinMapping(id=f"{side}-scl", signal="scl", gpio=scl)],
+            )
+        return HardwareMap(
+            boards=[HardwareBoardMapping(id="xy-closed-loop", label="XY", usb_port="/dev/ttyUSB0")],
+            devices=[encoder("a", "21", "22"), encoder("b", "19", "18")],
+        )
+
+    def _resolved(self, enabled: bool):
+        from app.models.gantry import GantryXYMoveRequest
+        from app.services import hardware_map as hardware_map_module
+
+        request = GantryXYMoveRequest(
+            x_cm=1.0, y_cm=1.0, x_step_pin=25, x_dir_pin=26, y_step_pin=27, y_dir_pin=14,
+            x_min_limit_pin=32, x_max_limit_pin=33, y_min_limit_pin=4,
+        )
+        with mock.patch.object(hardware_map_module.hardware_map_service, "load_map", return_value=self._map(enabled)):
+            return GantryControllerService()._with_map_encoders(request)
+
+    def test_enabled_encoders_in_the_map_are_used(self) -> None:
+        request = self._resolved(True)
+        self.assertEqual(
+            (request.encoder_a_sda_pin, request.encoder_a_scl_pin, request.encoder_b_sda_pin, request.encoder_b_scl_pin),
+            (21, 22, 19, 18),
+        )
+        self.assertEqual(GantryControllerService()._build_encoder_pin_command(request), "SET ENCODER PINS 21 22 19 18")
+
+    def test_disabled_encoders_leave_the_move_open_loop(self) -> None:
+        self.assertFalse(self._resolved(False).encoders_wired)
 
 
 class ClosedLoopEncoderCommandTests(unittest.TestCase):

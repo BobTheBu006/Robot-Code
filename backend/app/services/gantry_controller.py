@@ -579,7 +579,35 @@ class GantryControllerService:
             f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)}"
         )
 
+    def _with_map_encoders(self, request: GantryXYMoveRequest) -> GantryXYMoveRequest:
+        """Fill the encoder pins from the Hardware Map when both encoders are
+        enabled there. No XY block carries encoder inputs, so without this the
+        map's enable switch would do nothing; with it, enabling the encoders
+        in the map is what turns following-error monitoring on."""
+        if request.encoders_wired:
+            return request
+        try:
+            from app.services.hardware_map import hardware_map_service
+
+            hardware_map = hardware_map_service.load_map()
+        except Exception:
+            return request
+        boards = {board.id: board for board in hardware_map.boards}
+        pins: dict[str, int] = {}
+        for side in ("a", "b"):
+            device = next((d for d in hardware_map.devices if d.id == f"xy-cl-encoder-{side}"), None)
+            board = boards.get(device.board_id) if device else None
+            if device is None or not device.enabled or board is None or not board.enabled:
+                return request
+            for pin in device.pins:
+                if pin.signal in ("sda", "scl") and pin.gpio.strip().isdigit():
+                    pins[f"encoder_{side}_{pin.signal}_pin"] = int(pin.gpio)
+        if len(pins) != 4:
+            return request
+        return request.model_copy(update=pins)
+
     def move_xy(self, request: GantryXYMoveRequest) -> GantryXYMoveResponse:
+        request = self._with_map_encoders(request)
         port = self._selected_port(request.tool_port)
         baud_rate = request.baud_rate or self._baud_rate()
         pin_command = [self._build_xy_pin_command(request), self._build_z_pin_command(request)]

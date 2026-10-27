@@ -30,8 +30,11 @@ Motor A STEP/DIR = 25/26; B = 27/14; active-low shared enable = 13;
 X-min/X-max/Y-min = 32/33/4; no Y-max (GPIO 16/17 read ~2.3 V unloaded on
 the first board - do not use them). The builder generates the boot pin
 header from the Hardware Map. Do not use the old generic ESP32 pin defaults.
-The encoders remain physically on 21/22 and 19/18 but are disabled; do not
-scan or enable them during motion bring-up. A fresh ESP32 XY calibration is
+Encoders: AS5600 A on SDA 21/SCL 22, B on SDA 19/SCL 18, 100 kHz I2C, enabled
+in the Hardware Map (2026-10-27): Move XY fills their pins from the map and
+reports following error. Measured 1600 steps/rev (256 counts per 100 steps);
+encoder A counts against its motor - SET ENCODER SCALE 1600 1 0. PID gains
+are 0 (monitoring only) until tuned. A fresh ESP32 XY calibration is
 required after the migration. Verified 2026-10-27: +X jog of 20 cm via
 alternating TEST MOTOR A/B (both DIR 1) moved the carriage the right way. The Pi motion implementation remains available
 as a fallback if the hardware is rewired and the map changed back.
@@ -69,7 +72,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-377 tests, stdlib `unittest`, no pytest.
+379 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
