@@ -482,6 +482,14 @@ class GantryControllerService:
             f"{request.encoder_b_sda_pin} {request.encoder_b_scl_pin}"
         )
 
+    def _build_encoder_scale_command(self, request: GantryXYMoveRequest) -> str:
+        # Sent with the pins, every move: a freshly reset ESP32 would
+        # otherwise run on its compiled-in defaults.
+        return (
+            f"SET ENCODER SCALE {request.encoder_steps_per_rev} "
+            f"{1 if request.encoder_a_inverted else 0} {1 if request.encoder_b_inverted else 0}"
+        )
+
     def _build_xy_pid_command(self, request: GantryXYMoveRequest) -> str | None:
         if not request.encoders_wired:
             return None
@@ -587,6 +595,7 @@ class GantryControllerService:
         encoder_command = self._build_encoder_pin_command(request)
         if encoder_command is not None:
             extra_commands.append((encoder_command, ("OK ENCODER PINS",)))
+            extra_commands.append((self._build_encoder_scale_command(request), ("OK ENCODER SCALE",)))
         pid_command = self._build_xy_pid_command(request)
         if pid_command is not None:
             extra_commands.append((pid_command, ("OK XY PID",)))

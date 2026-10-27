@@ -227,6 +227,7 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
         service, sent = self._service({
             "SET XY PINS": "OK XY PINS", "SET Z PINS": "OK Z PINS",
             "SET ENCODER PINS": "OK ENCODER PINS 5 27",
+            "SET ENCODER SCALE": "OK ENCODER SCALE 1600 1 0",
             "SET XY PID": "OK XY PID 0.0000 0.0000 0.0000",
             "SET XY FOLLOW LIMIT": "OK XY FOLLOW LIMIT 205.00",
             "SET XY LIMITS": "OK XY LIMITS", "SET Z LIMITS": "OK Z LIMITS",
@@ -246,6 +247,7 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
         service, sent = self._service({
             "SET XY PINS": "OK XY PINS", "SET Z PINS": "OK Z PINS",
             "SET ENCODER PINS": "OK ENCODER PINS 5 27",
+            "SET ENCODER SCALE": "OK ENCODER SCALE 1600 1 0",
             "SET XY PID": "OK XY PID 0.0000 0.0000 0.0000",
             "SET XY FOLLOW LIMIT": "OK XY FOLLOW LIMIT 205.00",
             "SET XY LIMITS": "OK XY LIMITS", "SET Z LIMITS": "OK Z LIMITS",
@@ -262,6 +264,7 @@ class MoveXYWithEncodersIntegrationTests(unittest.TestCase):
         service, sent = self._service({
             "SET XY PINS": "OK XY PINS", "SET Z PINS": "OK Z PINS",
             "SET ENCODER PINS": "OK ENCODER PINS 5 27",
+            "SET ENCODER SCALE": "OK ENCODER SCALE 1600 1 0",
             "SET XY PID": "OK XY PID 0.0000 0.0000 0.0000",
             "SET XY FOLLOW LIMIT": "OK XY FOLLOW LIMIT 205.00",
             "SET XY LIMITS": "OK XY LIMITS", "SET Z LIMITS": "OK Z LIMITS",
@@ -311,8 +314,13 @@ class ClosedLoopEncoderCommandTests(unittest.TestCase):
             self._request(encoder_a_sda_pin=21, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26)
 
     def test_the_default_follow_limit_is_ten_steps_of_as5600_counts(self) -> None:
-        # 4096 counts / 800 steps = 5.12 counts per step.
-        self.assertAlmostEqual(self._request().xy_follow_limit_counts / (4096 / 800), 10.0, delta=0.1)
+        # 4096 counts / 1600 steps (measured) = 2.56 counts per step.
+        self.assertAlmostEqual(self._request().xy_follow_limit_counts / (4096 / 1600), 10.0, delta=0.2)
+
+    def test_the_encoder_scale_matches_the_measured_machine(self) -> None:
+        service = GantryControllerService()
+        command = service._build_encoder_scale_command(self._request())
+        self.assertEqual(command, "SET ENCODER SCALE 1600 1 0", "1600 steps/rev, A mirrored, B normal")
 
     def test_encoder_pin_command_names_both_i2c_buses(self) -> None:
         service = GantryControllerService()

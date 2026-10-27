@@ -433,6 +433,7 @@ struct EncoderChannel {
   bool primed = false;           // false until the first read establishes lastRaw
   bool faulted = false;          // set on a bus error, a magnet fault or a missed wrap
   uint8_t lastStatus = 0;        // AS5600 STATUS from the last read
+  bool inverted = false;         // counts run opposite to the motor's step direction
 };
 
 EncoderChannel encoderA;   // on the A motor shaft (xAxis.stepPin/dirPin), I2C bus 0
@@ -459,7 +460,14 @@ XYPidState xyPid;
 
 // Encoder counts, not steps: correcting in the same units the sensor reports
 // avoids a lossy round trip through cm on every control tick.
-float xyFollowLimitCounts = 51.0f;    // ~10 full steps at 5.12 counts/step
+float xyFollowLimitCounts = 26.0f;    // ~10 steps at 2.56 counts/step (1600 steps/rev)
+
+// Motor steps per revolution as the encoder sees them. Kept apart from
+// stepsPerRevolution, which also drives the RPM maths: measured on the
+// machine (2026-10-27) the TB6600s make 1600 steps/rev - 256 encoder counts
+// per 100 steps - while the speed settings were tuned against 800. Using the
+// wrong ratio would make every move look half a move behind.
+int encoderStepsPerRevolution = 1600;
 long xyIntegralClampCounts = 1024;    // +-1/4 revolution; anti-windup
 
 // How often (in step iterations) the loop reads encoders and applies
@@ -546,7 +554,9 @@ bool readEncoderChannel(EncoderChannel &channel) {
   // A reading taken without a good magnet is noise; keep the last position
   // rather than integrate it.
   if (magnetOk) {
-    channel.turns += delta;
+    // A mirrored mount counts the other way; flip it here so everything above
+    // this layer sees counts that rise with the motor's own step count.
+    channel.turns += channel.inverted ? -delta : delta;
     channel.lastRaw = raw;
   }
   channel.faulted = !magnetOk || ambiguousWrap;
@@ -754,7 +764,7 @@ bool applyPidCorrectionTick(
 
   // A motor step is ENCODER_COUNTS_PER_REV / stepsPerRevolution counts, so a
   // step-space error compares directly against the encoder-space one.
-  float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)stepsPerRevolution;
+  float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
   float measuredA = (float)encoderAccumulatedCounts(encoderA) / countsPerStep;
   float measuredB = (float)encoderAccumulatedCounts(encoderB) / countsPerStep;
 
@@ -3061,6 +3071,32 @@ bool handleXYPidQueryCommand(const String &cmd) {
   return true;
 }
 
+// SET ENCODER SCALE <stepsPerRev> <invertA> <invertB>: how many motor steps
+// make one encoder revolution, and which encoders count against their motor.
+bool handleSetEncoderScaleCommand(const String &cmd) {
+  int stepsPerRev = 0;
+  int invertA = 0;
+  int invertB = 0;
+  int parsed = sscanf(cmd.c_str(), "SET ENCODER SCALE %d %d %d", &stepsPerRev, &invertA, &invertB);
+  if (parsed != 3) {
+    return false;
+  }
+  if (stepsPerRev <= 0) {
+    Serial.println("ERR ENCODER SCALE RANGE");
+    return true;
+  }
+  encoderStepsPerRevolution = stepsPerRev;
+  encoderA.inverted = invertA != 0;
+  encoderB.inverted = invertB != 0;
+  Serial.print("OK ENCODER SCALE ");
+  Serial.print(encoderStepsPerRevolution);
+  Serial.print(" ");
+  Serial.print(encoderA.inverted ? 1 : 0);
+  Serial.print(" ");
+  Serial.println(encoderB.inverted ? 1 : 0);
+  return true;
+}
+
 bool handleSetXYFollowLimitCommand(const String &cmd) {
   float limitCounts = 0.0f;
   int parsed = sscanf(cmd.c_str(), "SET XY FOLLOW LIMIT %f", &limitCounts);
@@ -3321,6 +3357,8 @@ void loop() {
   else if (handleXYPidQueryCommand(cmd)) {
   }
   else if (handleSetXYFollowLimitCommand(cmd)) {
+  }
+  else if (handleSetEncoderScaleCommand(cmd)) {
   }
   else if (handleSetXYLimitsCommand(cmd)) {
   }

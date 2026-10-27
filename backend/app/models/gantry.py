@@ -87,9 +87,15 @@ class GantryXYMoveRequest(BaseModel):
     xy_pid_ki: float = Field(default=0.0, ge=0.0)
     xy_pid_kd: float = Field(default=0.0, ge=0.0)
     # Following-error fault threshold, in encoder counts (AS5600: 4096/rev).
-    # ~51 counts is ~10 full steps at 800 steps/rev - generous enough not to
+    # ~26 counts is ~10 steps at 1600 steps/rev - generous enough not to
     # trip on ordinary motion, tight enough to catch a real stall.
-    xy_follow_limit_counts: float = Field(default=51.0, gt=0.0)
+    xy_follow_limit_counts: float = Field(default=26.0, gt=0.0)
+    # Motor steps per encoder revolution, measured on the machine: 256 counts
+    # per 100 steps, so the TB6600s run 1600 steps/rev.
+    encoder_steps_per_rev: int = Field(default=1600, ge=1)
+    # Encoder A is mounted mirrored: its counts fall as motor A steps forward.
+    encoder_a_inverted: bool = True
+    encoder_b_inverted: bool = False
 
     @property
     def encoders_wired(self) -> bool:
