@@ -335,6 +335,14 @@ export function fetchConnectorStatus(): Promise<ConnectorStatus[]> {
   return request<ConnectorStatus[]>("/api/hardware-map/connectors/status");
 }
 
+export function activateConnectorTool(groupId: string): Promise<unknown> {
+  return request<unknown>(`/api/hardware-map/connectors/activate/${encodeURIComponent(groupId)}`, { method: "POST" });
+}
+
+export function deactivateConnectorTools(): Promise<unknown> {
+  return request<unknown>("/api/hardware-map/connectors/deactivate", { method: "POST" });
+}
+
 export function fetchAccessDoor(): Promise<AccessDoorState> {
   return request<AccessDoorState>("/api/safety/access-door");
 }

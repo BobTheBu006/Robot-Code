@@ -32,6 +32,8 @@ import {
   fetchAccessDoor,
   xyTeach,
   fetchConnectorStatus,
+  activateConnectorTool,
+  deactivateConnectorTools,
   setAccessDoorOverride,
   startRunSession,
   endRunSession,
@@ -1119,6 +1121,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // already correct, so skipping it by hand is no longer a thing anyone needs.
   const [accessDoor, setAccessDoor] = useState<AccessDoorState | null>(null);
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([]);
+  const [connectorMenu, setConnectorMenu] = useState<string | null>(null);
   const [workflowDrawer, setWorkflowDrawer] = useState<WorkflowDrawerMode>(null);
   const [quickAddSource, setQuickAddSource] = useState<QuickAddSource>(null);
   const [workflowRunState, setWorkflowRunState] = useState<WorkflowRunState>({
@@ -3211,6 +3214,27 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     return Array.from(itemsByKey.values()).filter((item) => hardwareBoardIds.has(item.board_id));
   }
 
+  // Tell the machine which tool is on the head. A rack tool is recorded as the
+  // held tool - the same route as the uncertain-tool dialog, which also moves
+  // the connector to that tool and verifies it. A hand-connected tool only
+  // switches the connector. "Nothing" clears both.
+  async function chooseHeadTool(group: ConnectorStatus["groups"][number] | null) {
+    setConnectorMenu(null);
+    try {
+      if (group === null) {
+        await confirmPhysicalState("toolhead.held", null);
+        await deactivateConnectorTools();
+      } else if (group.toolhead_index != null) {
+        await confirmPhysicalState("toolhead.held", group.toolhead_index);
+      } else {
+        await activateConnectorTool(group.id);
+      }
+    } catch (error) {
+      setFunctionsError(error instanceof Error ? error.message : "Could not change the tool on the head.");
+    }
+    void refreshConnectors();
+  }
+
   async function refreshConnectors() {
     try {
       setConnectors(await fetchConnectorStatus());
@@ -3689,13 +3713,34 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         {connectors.map((connector) => {
           const state = !connector.active_group_id ? "empty" : connector.verified ? "verified" : "unverified";
           return (
-            <span
-              className={`workflow-editor__connector workflow-editor__connector--${state}`}
-              key={connector.connector_id}
-              title={connector.message}
-            >
-              {connector.label}: {connector.active_group_name ?? "empty"}
-              {state === "verified" ? " ✓" : state === "unverified" ? " (unverified)" : ""}
+            <span className="workflow-editor__connector-wrap" key={connector.connector_id}>
+              <button
+                aria-expanded={connectorMenu === connector.connector_id}
+                aria-haspopup="menu"
+                className={`workflow-editor__connector workflow-editor__connector--${state}`}
+                disabled={workflowRunState.isRunning}
+                onClick={() => setConnectorMenu((open) => (open === connector.connector_id ? null : connector.connector_id))}
+                title={`${connector.message} - click to set which tool is on the head`}
+                type="button"
+              >
+                {connector.label}: {connector.active_group_name ?? "empty"}
+                {state === "verified" ? " ✓" : state === "unverified" ? " (unverified)" : ""} ▾
+              </button>
+              {connectorMenu === connector.connector_id ? (
+                <div className="workflow-editor__connector-menu" role="menu">
+                  <button onClick={() => void chooseHeadTool(null)} role="menuitem" type="button">
+                    Nothing on the head
+                  </button>
+                  {[...connector.groups]
+                    .sort((a, b) => (a.toolhead_index ?? 99) - (b.toolhead_index ?? 99))
+                    .map((group) => (
+                      <button key={group.id} onClick={() => void chooseHeadTool(group)} role="menuitem" type="button">
+                        {group.toolhead_index != null ? `Slot ${group.toolhead_index} · ` : "Hand-connected · "}{group.name}
+                        {group.id === connector.active_group_id ? " (current)" : ""}
+                      </button>
+                    ))}
+                </div>
+              ) : null}
             </span>
           );
         })}

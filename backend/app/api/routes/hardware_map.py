@@ -52,3 +52,22 @@ def check_connector_contact() -> dict:
     except HardwareMapError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": ok, "message": message}
+
+
+@router.post("/connectors/activate/{group_id}")
+def activate_connector_tool(group_id: str) -> dict:
+    """Switch the connector to this tool (verified like Connect Tool)."""
+    from app.services.pogo_connector import ConnectorError, pogo_connector_service
+
+    try:
+        return pogo_connector_service.activate(group_id).as_dict()
+    except (ConnectorError, HardwareMapError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/connectors/deactivate")
+def deactivate_connector_tools() -> list[dict]:
+    """Mark every connector empty and park its pins."""
+    from app.services.pogo_connector import pogo_connector_service
+
+    return [result.as_dict() for result in pogo_connector_service.deactivate()]

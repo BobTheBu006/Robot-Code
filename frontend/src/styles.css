@@ -1528,6 +1528,48 @@ body {
   background: #eef3f1;
 }
 
+button.workflow-editor__connector {
+  border: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflow-editor__connector-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.workflow-editor__connector-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  min-width: 240px;
+  padding: 6px;
+  border: 1px solid rgba(23, 50, 42, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(34, 69, 58, 0.16);
+}
+
+.workflow-editor__connector-menu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #17322a;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflow-editor__connector-menu button:hover {
+  background: #f4f8f6;
+}
+
 .workflow-editor__connector--verified {
   color: #0f6f45;
   background: #e1f5ea;
