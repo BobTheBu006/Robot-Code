@@ -360,9 +360,12 @@ class ClosedLoopEncoderCommandTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "distinct GPIO"):
             self._request(encoder_a_sda_pin=21, encoder_a_scl_pin=33, encoder_b_sda_pin=25, encoder_b_scl_pin=26)
 
-    def test_the_default_follow_limit_is_ten_steps_of_as5600_counts(self) -> None:
-        # 4096 counts / 1600 steps (measured) = 2.56 counts per step.
-        self.assertAlmostEqual(self._request().xy_follow_limit_counts / (4096 / 1600), 10.0, delta=0.2)
+    def test_the_default_follow_limit_sits_between_running_lag_and_one_slip(self) -> None:
+        # 2.56 counts per step, 8 steps per full step (measured 1600/rev).
+        counts_per_full_step = 4096 / 1600 * 8
+        limit = self._request().xy_follow_limit_counts
+        self.assertGreater(limit, 2 * counts_per_full_step, "above normal load-angle lag")
+        self.assertLess(limit, 4 * counts_per_full_step, "below one stepper slip")
 
     def test_the_encoder_scale_matches_the_measured_machine(self) -> None:
         service = GantryControllerService()

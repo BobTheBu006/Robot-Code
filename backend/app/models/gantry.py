@@ -86,10 +86,13 @@ class GantryXYMoveRequest(BaseModel):
     xy_pid_kp: float = Field(default=0.0, ge=0.0)
     xy_pid_ki: float = Field(default=0.0, ge=0.0)
     xy_pid_kd: float = Field(default=0.0, ge=0.0)
-    # Following-error fault threshold, in encoder counts (AS5600: 4096/rev).
-    # ~26 counts is ~10 steps at 1600 steps/rev - generous enough not to
-    # trip on ordinary motion, tight enough to catch a real stall.
-    xy_follow_limit_counts: float = Field(default=26.0, gt=0.0)
+    # Following-error fault threshold, in encoder counts (AS5600: 4096/rev,
+    # 1600 steps/rev = 8 microsteps per full step, 2.56 counts per step).
+    # A running stepper lags by up to ~2 full steps (16 steps, ~41 counts) as
+    # a matter of course; a real slip jumps by 4 full steps (32 steps, ~82
+    # counts) and keeps growing. 80 sits between: 26 (10 steps, less than
+    # one full step plus normal lag) tripped good moves on the machine.
+    xy_follow_limit_counts: float = Field(default=80.0, gt=0.0)
     # Motor steps per encoder revolution, measured on the machine: 256 counts
     # per 100 steps, so the TB6600s run 1600 steps/rev.
     encoder_steps_per_rev: int = Field(default=1600, ge=1)

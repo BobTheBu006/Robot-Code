@@ -33,7 +33,8 @@ header from the Hardware Map. Do not use the old generic ESP32 pin defaults.
 Encoders: AS5600 A on SDA 21/SCL 22, B on SDA 19/SCL 18, 100 kHz I2C, enabled
 in the Hardware Map (2026-10-27): Move XY fills their pins from the map and
 reports following error. Measured 1600 steps/rev (256 counts per 100 steps);
-encoder A counts against its motor - SET ENCODER SCALE 1600 1 0. PID gains
+encoder A counts against its motor - SET ENCODER SCALE 1600 1 0. Follow limit 80 counts (normal lag is ~2 full
+steps = ~41 counts; one slip is 4 full steps = ~82). PID gains
 are 0 (monitoring only) until tuned. A fresh ESP32 XY calibration is
 required after the migration. Verified 2026-10-27: +X jog of 20 cm via
 alternating TEST MOTOR A/B (both DIR 1) moved the carriage the right way. The Pi motion implementation remains available

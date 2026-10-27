@@ -460,7 +460,9 @@ XYPidState xyPid;
 
 // Encoder counts, not steps: correcting in the same units the sensor reports
 // avoids a lossy round trip through cm on every control tick.
-float xyFollowLimitCounts = 26.0f;    // ~10 steps at 2.56 counts/step (1600 steps/rev)
+// Just under one stepper slip (4 full steps = 32 steps = ~82 counts), well
+// above the normal running lag of ~2 full steps (~41 counts).
+float xyFollowLimitCounts = 80.0f;
 
 // Motor steps per revolution as the encoder sees them. Kept apart from
 // stepsPerRevolution, which also drives the RPM maths: measured on the
