@@ -4,7 +4,7 @@
   "display_name": "Move Gantry Circle",
   "category": "Robot Actions",
   "description": "Trace a full circle with the CoreXY gantry around a given center (X, Y) position with a given radius, using trapezoidal acceleration over the whole lap. Moves to the circle start point first. Requires a prior Calibrate Gantry XY run. Errors and stops immediately if the circle does not fit the workspace or a limit switch is hit.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "inputs": [
     {
       "key": "tool_port",
@@ -106,7 +106,7 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the CoreXY A driver.",
       "required": false,
-      "default": 16.0,
+      "default": 25,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -117,7 +117,7 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the CoreXY A driver.",
       "required": false,
-      "default": 17.0,
+      "default": 26,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -128,7 +128,7 @@
       "type": "number",
       "description": "Runtime GPIO step pin for the CoreXY B driver.",
       "required": false,
-      "default": 18.0,
+      "default": 27,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -139,7 +139,7 @@
       "type": "number",
       "description": "Runtime GPIO direction pin for the CoreXY B driver.",
       "required": false,
-      "default": 19.0,
+      "default": 14,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -150,7 +150,7 @@
       "type": "number",
       "description": "GPIO pin for the X minimum/home limit switch.",
       "required": false,
-      "default": 21.0,
+      "default": 16,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -161,7 +161,7 @@
       "type": "number",
       "description": "GPIO pin for the X maximum limit switch.",
       "required": false,
-      "default": 22.0,
+      "default": 17,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -172,7 +172,7 @@
       "type": "number",
       "description": "GPIO pin for the Y minimum limit switch.",
       "required": false,
-      "default": 23.0,
+      "default": 4,
       "placeholder": null,
       "advanced": true,
       "options": []
@@ -186,6 +186,17 @@
       "default": -1.0,
       "placeholder": null,
       "advanced": true,
+      "options": []
+    },
+    {
+      "key": "gantry_enable_pin",
+      "label": "Shared Driver Enable Pin",
+      "type": "number",
+      "description": "Shared XY enable GPIO, resolved from the Hardware Map.",
+      "required": false,
+      "default": 13,
+      "advanced": true,
+      "min": -1,
       "options": []
     }
   ],
@@ -202,7 +213,7 @@
       "id": "x-axis-motor",
       "name": "CoreXY A Motor",
       "kind": "stepper_motor",
-      "board_id": "raspberry-pi",
+      "board_id": "xy-closed-loop",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -211,16 +222,23 @@
         {
           "id": "x-dir",
           "signal": "direction",
-          "gpio": null,
+          "gpio": "26",
           "function_input_key": "x_dir_pin",
           "notes": null
         },
         {
           "id": "x-step",
           "signal": "step",
-          "gpio": null,
+          "gpio": "25",
           "function_input_key": "x_step_pin",
           "notes": null
+        },
+        {
+          "id": "x-axis-motor-enable",
+          "signal": "enable",
+          "gpio": "13",
+          "function_input_key": "gantry_enable_pin",
+          "notes": "Shared active-low TB6600 enable."
         }
       ],
       "basic_block_id": "basic-stepper-x-axis-motor",
@@ -230,7 +248,7 @@
       "id": "y-axis-motor",
       "name": "CoreXY B Motor",
       "kind": "stepper_motor",
-      "board_id": "raspberry-pi",
+      "board_id": "xy-closed-loop",
       "sensor_kind": null,
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -239,14 +257,14 @@
         {
           "id": "y-dir",
           "signal": "direction",
-          "gpio": null,
+          "gpio": "14",
           "function_input_key": "y_dir_pin",
           "notes": null
         },
         {
           "id": "y-step",
           "signal": "step",
-          "gpio": null,
+          "gpio": "27",
           "function_input_key": "y_step_pin",
           "notes": null
         }
@@ -258,7 +276,7 @@
       "id": "x-min-limit-switch",
       "name": "X Min Limit Switch",
       "kind": "sensor",
-      "board_id": "raspberry-pi",
+      "board_id": "xy-closed-loop",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -267,7 +285,7 @@
         {
           "id": "x-min-limit",
           "signal": "signal",
-          "gpio": null,
+          "gpio": "16",
           "function_input_key": "x_min_limit_pin",
           "notes": null
         }
@@ -279,7 +297,7 @@
       "id": "x-max-limit-switch",
       "name": "X Max Limit Switch",
       "kind": "sensor",
-      "board_id": "raspberry-pi",
+      "board_id": "xy-closed-loop",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -288,7 +306,7 @@
         {
           "id": "x-max-limit",
           "signal": "signal",
-          "gpio": null,
+          "gpio": "17",
           "function_input_key": "x_max_limit_pin",
           "notes": null
         }
@@ -300,7 +318,7 @@
       "id": "y-min-limit-switch",
       "name": "Y Min Limit Switch",
       "kind": "sensor",
-      "board_id": "raspberry-pi",
+      "board_id": "xy-closed-loop",
       "sensor_kind": "position_limit_switch",
       "rotation_min_deg": null,
       "rotation_max_deg": null,
@@ -309,7 +327,7 @@
         {
           "id": "y-min-limit",
           "signal": "signal",
-          "gpio": null,
+          "gpio": "4",
           "function_input_key": "y_min_limit_pin",
           "notes": null
         }
@@ -318,8 +336,23 @@
       "notes": null
     }
   ],
-  "firmware_requirements": [],
-  "builder_board_id": null,
+  "firmware_requirements": [
+    {
+      "routine_id": "move_gantry_circle",
+      "controller_role": "device_board",
+      "source": "firmware/main.ino",
+      "protocol": "serial",
+      "entry_point": "CIRCLE XY",
+      "required_device_ids": [
+        "x-axis-motor",
+        "y-axis-motor",
+        "x-min-limit-switch",
+        "x-max-limit-switch",
+        "y-min-limit-switch"
+      ]
+    }
+  ],
+  "builder_board_id": "xy-closed-loop",
   "builder_source_path": null,
   "builder_workspace_path": "/home/robot/robot control/Robot-Code/functions/esp 32 code/esp32 ttyUSB0",
   "builder_firmware_entry_file": "firmware/main.ino",

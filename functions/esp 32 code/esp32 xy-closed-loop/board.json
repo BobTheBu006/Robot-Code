@@ -1,10 +1,10 @@
 {
   "board_id": "xy-closed-loop",
   "display_name": "CoreXY closed-loop controller",
-  "port": "/dev/ttyUSB2",
-  "description": "CoreXY steppers, AS5600 encoders (one I2C bus each) and the four XY limit switches. Placeholder id and port - not yet built, no serial number recorded. Rename to the real controller id once flashed and identified.",
-  "hardware_id": null,
-  "serial_number": null,
+  "port": "/dev/ttyUSB0",
+  "description": "Dedicated CoreXY controller: motors and three limits on ESP32; open-loop until encoder bring-up is complete. Boot pins generated from hardware-map.json.",
+  "hardware_id": "USB VID:PID=10C4:EA60 SER=2ebcd7b203bdf0119170167148e9de0f",
+  "serial_number": "2ebcd7b203bdf0119170167148e9de0f",
   "firmware_entry_file": "firmware/main.ino",
   "fqbn": "esp32:esp32:esp32"
 }

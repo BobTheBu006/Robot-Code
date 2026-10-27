@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "controller_identity.h"
+#include "xy_board_config.h"
 #include <Preferences.h>
 // Included up here, not beside the encoder code, because the Arduino builder
 // inserts function prototypes right after the first include block - and the
@@ -38,12 +39,11 @@ const int XY_SLOW_HOMING_RPM = 10;
 // per calibration and persisted, because every later move maps user coordinates
 // through it: changing it without re-reading it would silently shift the origin.
 const float DEFAULT_XY_LIMIT_BUFFER_CM = 0.5f;
-// How far the gantry parks clear of the Y-min switch, in motor rotations,
-// while X calibrates. Rotations convert to steps with nothing but the
-// steps-per-rotation setting, so the distance is exact even before any
-// steps-per-cm has been measured. Sweeping X with the carriage still resting on
-// the Y switch loads the frame against its stop, so calibration steps off first.
-const float DEFAULT_X_CALIBRATION_Y_ROTATIONS = 1.6f;
+// Y park and X clearances use centimetres, matching the app/Pi calibration.
+// The estimated Y park is corrected after X measures the actual steps-per-cm.
+const float DEFAULT_X_CALIBRATION_Y_CM = 3.2f;
+const float DEFAULT_X_START_CLEAR_CM = 2.0f;
+const float DEFAULT_X_END_CLEAR_CM = 2.0f;
 // Freeing a limit switch that is already pressed when calibration starts reuses
 // the homing back-off distance of one full motor rotation, which is already
 // known to release a switch. The nudge repeats up to this many rotations and
@@ -66,10 +66,12 @@ struct AxisChannel {
   float trackLengthCm;
 };
 
-AxisChannel xAxis = {16, 17, 21, 22, 0, DEFAULT_X_WORKSPACE_CM};
-AxisChannel yAxis = {18, 19, 23, 25, 0, DEFAULT_Y_WORKSPACE_CM};
-AxisChannel zLeftAxis = {32, 33, 12, 13, 0, DEFAULT_Z_WORKSPACE_CM};
-AxisChannel zRightAxis = {32, 33, 12, 13, 0, DEFAULT_Z_WORKSPACE_CM};
+AxisChannel xAxis = {XY_A_STEP, XY_A_DIR, XY_X_MIN, XY_X_MAX, 0, DEFAULT_X_WORKSPACE_CM};
+AxisChannel yAxis = {XY_B_STEP, XY_B_DIR, XY_Y_MIN, -1, 0, DEFAULT_Y_WORKSPACE_CM};
+// This board owns only XY. Never initialize spare Z pins on its encoder or
+// shared enable wires; Z remains on its separate controller.
+AxisChannel zLeftAxis = {-1, -1, -1, -1, 0, DEFAULT_Z_WORKSPACE_CM};
+AxisChannel zRightAxis = {-1, -1, -1, -1, 0, DEFAULT_Z_WORKSPACE_CM};
 
 long currentXSteps = 0;
 long currentYSteps = 0;
@@ -91,15 +93,16 @@ bool yPositionKnown = false;
 // wired" (driver is hardwired enabled), in which case all enable handling is a
 // no-op. Most A4988/DRV8825/TMC carriers enable on a LOW level, so default to
 // active-low.
-int xEnablePin = -1;
-int yEnablePin = -1;
+int xEnablePin = XY_ENABLE;
+int yEnablePin = XY_ENABLE;
 bool xyMotorsEnableActiveLow = true;
+bool xyMotorsEnabled = false;
+unsigned long xyLastCommandMs = 0;
+const unsigned long XY_IDLE_DISABLE_MS = 3000;
 
-// Bumped whenever the meaning of the saved calibration changes, so a record
-// written by older firmware is discarded instead of misread. Version 1 never
-// probed Y and saved it as "assumed parked at Y max"; version 2 homes Y against
-// the Y-min switch, so a version 1 Y position is wrong by the length of the axis.
-const int GANTRY_STATE_VERSION = 2;
+// Version 3 requires a fresh calibration after migrating the motors/limits
+// and changing the calibration park from rotations to centimetres.
+const int GANTRY_STATE_VERSION = 3;
 
 void saveXCalibrationState() {
   gantryPrefs.begin("gantry", false);
@@ -273,19 +276,37 @@ void writeEnablePin(int pin, bool enabled) {
 }
 
 void setXYMotorsEnabled(bool enabled) {
+  bool wasEnabled = xyMotorsEnabled;
   writeEnablePin(xEnablePin, enabled);
   writeEnablePin(yEnablePin, enabled);
+  xyMotorsEnabled = enabled;
+  if (enabled && !wasEnabled) {
+    // Let the existing TB6600 drivers settle before the first step.
+    delay(1000);
+  }
+  xyLastCommandMs = millis();
 }
 
 void applyXYEnable(int nextAEnablePin, int nextBEnablePin, bool activeLow) {
+  bool changed = nextAEnablePin != xEnablePin || nextBEnablePin != yEnablePin
+    || activeLow != xyMotorsEnableActiveLow;
+  if (changed) {
+    setXYMotorsEnabled(false);
+  }
   xEnablePin = nextAEnablePin;
   yEnablePin = nextBEnablePin;
   xyMotorsEnableActiveLow = activeLow;
-  prepareOutputPin(xEnablePin);
-  prepareOutputPin(yEnablePin);
-  // Energize both CoreXY drivers immediately so single-axis moves still turn
-  // both motors. A CoreXY axis requires both A and B drivers enabled.
-  setXYMotorsEnabled(true);
+  // Preload the disabled level before making a pin an output. Configuration
+  // alone must never energize a driver or briefly drive active-low enable LOW.
+  if (changed || !xyMotorsEnabled) {
+    for (int pin : {xEnablePin, yEnablePin}) {
+      if (pin >= 0) {
+        writeEnablePin(pin, false);
+        pinMode(pin, OUTPUT);
+      }
+    }
+    setXYMotorsEnabled(false);
+  }
 
   Serial.print("OK XY ENABLE ");
   Serial.print(xEnablePin);
@@ -308,6 +329,7 @@ bool consumeStopCommandIfPresent() {
   pending.trim();
   pending.toUpperCase();
   if (pending == "STOP") {
+    setXYMotorsEnabled(false);
     Serial.println("OK STOP");
     return true;
   }
@@ -1183,7 +1205,11 @@ bool calibrateXY(
   bool trapezoidalSpeed,
   int accelerationRpmPerSecond,
   int nextStepsPerRotation,
-  int maxProbeRotations
+  int maxProbeRotations,
+  float xCalibrationYCm,
+  float limitBufferCm,
+  float xStartClearCm,
+  float xEndClearCm
 );
 bool calibrateZ(float leftTrackLengthCm, float rightTrackLengthCm, int calibrationRPM, bool trapezoidalSpeed, int accelerationRpmPerSecond);
 
@@ -1301,8 +1327,10 @@ bool checkCoreXYAxisCalibration(
       accelerationRpmPerSecond,
       stepsPerRevolution,
       DEFAULT_MAX_PROBE_ROTATIONS,
-      DEFAULT_X_CALIBRATION_Y_ROTATIONS,
-      xyLimitBufferCm
+      DEFAULT_X_CALIBRATION_Y_CM,
+      xyLimitBufferCm,
+      DEFAULT_X_START_CLEAR_CM,
+      DEFAULT_X_END_CLEAR_CM
     )) {
       return false;
     }
@@ -2125,8 +2153,10 @@ bool calibrateXY(
   int accelerationRpmPerSecond,
   int nextStepsPerRotation,
   int maxProbeRotations,
-  float xCalibrationYRotations,
-  float limitBufferCm
+  float xCalibrationYCm,
+  float limitBufferCm,
+  float xStartClearCm,
+  float xEndClearCm
 ) {
   // Adopt the buffer before anything converts cm to steps: it sets where user
   // coordinate 0 sits, so the park, the X walk-back and every later move all
@@ -2162,6 +2192,21 @@ bool calibrateXY(
 
   setXYMotorsEnabled(true);
 
+  // Clear the tool holders in +X before starting the Y home, matching the
+  // existing Pi calibration block. X-max stops this clearance hop normally.
+  long clearSteps = lroundf(xStartClearCm * xStepsPerCm);
+  if (clearSteps > 0) {
+    long moved = 0;
+    bool stopped = false;
+    bool limitHit = false;
+    driveXAxis(calibrationRPM, clearSteps, XY_DIR_TOWARD_X_MAX, +1, xAxis.maxLimitPin,
+               trapezoidalSpeed, accelerationRpmPerSecond, moved, stopped, limitHit);
+    if (stopped) {
+      Serial.println("ERR STOP CALIBRATE XY");
+      return false;
+    }
+  }
+
   // If a switch is already pressed, nudge the carriage off it instead of
   // refusing. Only a switch that stays pressed after the nudge is an error.
   if (!nudgeAwayFromPressedLimits(calibrationRPM, trapezoidalSpeed, accelerationRpmPerSecond)) {
@@ -2184,9 +2229,8 @@ bool calibrateXY(
   Serial.println(yMinSlowSteps);
 
   // Park clear of the Y switch so X is swept at a safe Y rather than hard against
-  // the Y stop. The park is in motor rotations, so it is exact in steps with no
-  // dependence on a measured (or guessed) steps-per-cm.
-  long yParkTargetSteps = lroundf(xCalibrationYRotations * (float)stepsPerRevolution);
+  // the Y stop. Use the previous steps-per-cm estimate, then correct it below.
+  long yParkTargetSteps = lroundf(xCalibrationYCm * xStepsPerCm);
   if (yParkTargetSteps < 1) {
     yParkTargetSteps = 1;
   }
@@ -2202,8 +2246,8 @@ bool calibrateXY(
   }
   Serial.print("COREXY Y PARKED STEPS ");
   Serial.print(currentYSteps);
-  Serial.print(" ROTATIONS ");
-  Serial.println(xCalibrationYRotations, 3);
+  Serial.print(" CM ");
+  Serial.println(xCalibrationYCm, 3);
 
   // ---- Home X-min: the refined slow touch defines X = 0. The Y position set
   //      above is preserved (pure-X moves do not change currentYSteps). ----
@@ -2246,19 +2290,33 @@ bool calibrateXY(
 
   xAxis.trackLengthCm = xTrackLengthCm;
   xStepsPerCm = ((float)measuredXSteps) / xTrackLengthCm;
-  xyCalibrated = true;
-  // Y was homed against its Y-min switch and parked at +XY_CALIBRATION_Y_PARK_STEPS,
+  // Y was homed against its Y-min switch and parked using the estimated scale,
   // so currentYSteps already holds the real position. Y reuses the X steps-per-cm
   // and takes its track length from the calibrate input.
   yAxis.trackLengthCm = yTrackLengthCm;
   yStepsPerCm = xStepsPerCm;
   yPositionKnown = true;
 
+  // Correct the estimated Y park using the newly measured steps-per-cm.
+  long yCorrection = lroundf(xCalibrationYCm * yStepsPerCm) - currentYSteps;
+  if (yCorrection != 0) {
+    long moved = 0;
+    bool stopped = false;
+    bool limitHit = false;
+    int sign = yCorrection > 0 ? +1 : -1;
+    driveYAxis(calibrationRPM, labs(yCorrection), sign,
+               sign < 0 ? yAxis.minLimitPin : yAxis.maxLimitPin,
+               trapezoidalSpeed, accelerationRpmPerSecond, moved, stopped, limitHit);
+    if (stopped || limitHit) {
+      Serial.println(stopped ? "ERR STOP CALIBRATE XY" : "ERR Y PARK LIMIT");
+      return false;
+    }
+  }
+
   // Homing deliberately leaves the carriage resting on the X-max switch. Walk it
-  // back by one buffer so calibration never finishes with a limit pressed: this
-  // releases the switch and lands exactly on the usable max (physical
-  // trackLength - buffer), which is the highest X a later move can ask for.
-  long xMaxBackoffSteps = lroundf(xyLimitBufferCm * xStepsPerCm);
+  // back by the requested end clearance (at least one buffer), matching the
+  // Pi block and leaving space at the end of the rail.
+  long xMaxBackoffSteps = lroundf(max(xyLimitBufferCm, xEndClearCm) * xStepsPerCm);
   if (xMaxBackoffSteps > 0) {
     long backedOffSteps = 0;
     bool backoffStopRequested = false;
@@ -2284,6 +2342,7 @@ bool calibrateXY(
     }
   }
 
+  xyCalibrated = true;
   saveXCalibrationState();
 
   Serial.print("COREXY X MAX HOMED FAST_STEPS ");
@@ -2381,7 +2440,7 @@ bool moveGantryXYTo(
   // moves to 0 or to the max clear of the switches.
   float usableXMaxCm = xAxis.trackLengthCm - 2.0f * xyLimitBufferCm;
   float usableYMaxCm = yTrackCm - 2.0f * xyLimitBufferCm;
-  if (targetXCm < 0.0f || targetXCm > usableXMaxCm
+  if (targetXCm < -2.0f || targetXCm > usableXMaxCm
       || targetYCm < 0.0f || targetYCm > usableYMaxCm) {
     Serial.print("ERR XY TARGET RANGE X ");
     Serial.print(targetXCm, 3);
@@ -2828,7 +2887,7 @@ bool handleSetEncoderPinsCommand(const String &cmd) {
     return false;
   }
   configureEncoderPins(sdaA, sclA, sdaB, sclB);
-  if (!encodersConfigured) {
+  if (!encodersConfigured && !(sdaA < 0 && sclA < 0 && sdaB < 0 && sclB < 0)) {
     Serial.println("ERR ENCODER I2C BEGIN FAILED");
     return true;
   }
@@ -3061,11 +3120,13 @@ bool handleCalibrateXYCommand(const String &cmd) {
   int maxProbeRotations = DEFAULT_MAX_PROBE_ROTATIONS;
   // Appended last so a command from an older host still parses, falling back to
   // the defaults.
-  float xCalibrationYRotations = DEFAULT_X_CALIBRATION_Y_ROTATIONS;
+  float xCalibrationYCm = DEFAULT_X_CALIBRATION_Y_CM;
   float limitBufferCm = DEFAULT_XY_LIMIT_BUFFER_CM;
+  float xStartClearCm = DEFAULT_X_START_CLEAR_CM;
+  float xEndClearCm = DEFAULT_X_END_CLEAR_CM;
   int parsed = sscanf(
     cmd.c_str(),
-    "CALIBRATE XY %f %f %15s %d %d %d %d %f %f",
+    "CALIBRATE XY %f %f %15s %d %d %d %d %f %f %f %f",
     &xTrackLengthCm,
     &yTrackLengthCm,
     speedBuffer,
@@ -3073,8 +3134,10 @@ bool handleCalibrateXYCommand(const String &cmd) {
     &accelerationRpmPerSecond,
     &nextStepsPerRotation,
     &maxProbeRotations,
-    &xCalibrationYRotations,
-    &limitBufferCm
+    &xCalibrationYCm,
+    &limitBufferCm,
+    &xStartClearCm,
+    &xEndClearCm
   );
   if (parsed < 2) {
     return false;
@@ -3091,8 +3154,10 @@ bool handleCalibrateXYCommand(const String &cmd) {
     parsed >= 5 ? accelerationRpmPerSecond : 300,
     parsed >= 6 ? nextStepsPerRotation : DEFAULT_STEPS_PER_REVOLUTION,
     parsed >= 7 ? maxProbeRotations : DEFAULT_MAX_PROBE_ROTATIONS,
-    parsed >= 8 ? xCalibrationYRotations : DEFAULT_X_CALIBRATION_Y_ROTATIONS,
-    parsed >= 9 ? limitBufferCm : DEFAULT_XY_LIMIT_BUFFER_CM
+    parsed >= 8 ? xCalibrationYCm : DEFAULT_X_CALIBRATION_Y_CM,
+    parsed >= 9 ? limitBufferCm : DEFAULT_XY_LIMIT_BUFFER_CM,
+    parsed >= 10 ? xStartClearCm : DEFAULT_X_START_CLEAR_CM,
+    parsed >= 11 ? xEndClearCm : DEFAULT_X_END_CLEAR_CM
   );
   return true;
 }
@@ -3179,10 +3244,9 @@ bool handleCalibrateZCommand(const String &cmd) {
 void setup() {
   Serial.begin(115200);
 
+  applyXYEnable(xEnablePin, yEnablePin, xyMotorsEnableActiveLow);
   applyXYPins(xAxis.stepPin, xAxis.dirPin, yAxis.stepPin, yAxis.dirPin);
   applyXYLimits(xyLimitSwitchMode, xAxis.minLimitPin, xAxis.maxLimitPin, yAxis.minLimitPin, yAxis.maxLimitPin);
-  applyZPins(zLeftAxis.stepPin, zLeftAxis.dirPin, zRightAxis.stepPin, zRightAxis.dirPin);
-  applyZLimits(zLimitSwitchMode, zLeftAxis.minLimitPin, zLeftAxis.maxLimitPin, zRightAxis.minLimitPin, zRightAxis.maxLimitPin);
 
   loadXCalibrationState();
 
@@ -3190,6 +3254,9 @@ void setup() {
 }
 
 void loop() {
+  if (xyMotorsEnabled && (millis() - xyLastCommandMs >= XY_IDLE_DISABLE_MS)) {
+    setXYMotorsEnabled(false);
+  }
   if (!Serial.available()) {
     return;
   }
@@ -3207,7 +3274,18 @@ void loop() {
     Serial.println("PONG");
   }
   else if (cmd == "STOP") {
+    setXYMotorsEnabled(false);
     Serial.println("OK STOP");
+  }
+  else if (cmd == "XY STATUS?") {
+    printXYMotorPinState("STATUS");
+    printXYLimitState("STATUS");
+    Serial.print("OK XY STATUS CALIBRATED ");
+    Serial.print(xyCalibrated ? 1 : 0);
+    Serial.print(" ENABLED ");
+    Serial.print(xyMotorsEnabled ? 1 : 0);
+    Serial.print(" ENCODERS ");
+    Serial.println(encodersConfigured ? 1 : 0);
   }
   else if (handleTestMotorCommand(cmd)) {
   }
@@ -3254,4 +3332,5 @@ void loop() {
   else {
     Serial.println("ERR UNKNOWN CMD");
   }
+  xyLastCommandMs = millis();
 }

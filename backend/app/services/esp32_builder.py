@@ -1146,8 +1146,45 @@ class Esp32BuilderService:
         # read as "cannot verify" - so every controller would be reflashed
         # before every run, which is the behaviour the handshake exists to end.
         self._write_identity_header(sketch_dir, board_id, workspace_dir, metadata)
+        if (sketch_dir / "xy_board_config.h").exists():
+            self._write_xy_board_config(sketch_dir, board_id)
 
         return sketch_dir, str(firmware_entry_path)
+
+    def _write_xy_board_config(self, sketch_dir: Path, board_id: str) -> None:
+        """Boot on the real XY pins, without briefly claiming encoder/Z pins."""
+        devices = hardware_map_service.load_map().devices
+        shared_enable_pins = {p.gpio for d in devices
+                              if d.board_id == board_id and d.enabled
+                              for p in d.pins if p.function_input_key == "gantry_enable_pin"}
+        if len(shared_enable_pins) != 1:
+            raise Esp32BuilderError("Both XY drivers must agree on their shared enable GPIO.")
+        definitions = {
+            "XY_A_STEP": ("x-axis-motor", "x_step_pin"),
+            "XY_A_DIR": ("x-axis-motor", "x_dir_pin"),
+            "XY_B_STEP": ("y-axis-motor", "y_step_pin"),
+            "XY_B_DIR": ("y-axis-motor", "y_dir_pin"),
+            "XY_ENABLE": ("x-axis-motor", "gantry_enable_pin"),
+            "XY_X_MIN": ("x-min-limit-switch", "x_min_limit_pin"),
+            "XY_X_MAX": ("x-max-limit-switch", "x_max_limit_pin"),
+            "XY_Y_MIN": ("y-min-limit-switch", "y_min_limit_pin"),
+        }
+        lines = ["// Generated from hardware-map.json. Do not edit.", "#pragma once"]
+        values = []
+        for macro, (device_id, key) in definitions.items():
+            matches = [p.gpio for d in devices if d.id == device_id
+                       and d.board_id == board_id and d.enabled
+                       for p in d.pins if p.function_input_key == key]
+            if len(matches) != 1 or not matches[0].isdigit():
+                raise Esp32BuilderError(f"Missing active XY pin assignment: {key}.")
+            pin = int(matches[0])
+            if pin not in {4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33}:
+                raise Esp32BuilderError(f"Unsupported XY GPIO for {key}: {pin}.")
+            values.append(pin)
+            lines.append(f"#define {macro} {pin}")
+        if len(values) != len(set(values)):
+            raise Esp32BuilderError("XY motor, enable and limit pins must be distinct.")
+        self._write_text_atomic(sketch_dir / "xy_board_config.h", "\n".join(lines) + "\n")
 
     def build_firmware_bundle(self, board_id: str, workspace_dir: Path, metadata: dict) -> FirmwareBundle:
         """Everything that decides what should be running on this controller.

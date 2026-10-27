@@ -454,6 +454,11 @@ class GantryControllerService:
         )
 
     def _build_xy_enable_command(self, request: GantryXYMoveRequest | GantryXYCalibrationRequest | GantryCircleXYRequest) -> str | None:
+        if request.gantry_enable_pin >= 0:
+            return (
+                f"SET XY ENABLE {request.gantry_enable_pin} {request.gantry_enable_pin} "
+                f"{1 if request.enable_active_low else 0}"
+            )
         # Only configure driver enable pins when at least one is wired. When both
         # are unassigned (-1) the drivers are assumed hardwired-enabled, and we
         # skip the command entirely so older firmware without SET XY ENABLE keeps
@@ -531,7 +536,8 @@ class GantryControllerService:
             f"CALIBRATE XY {request.x_track_length_cm:.3f} {request.y_track_length_cm:.3f} "
             f"{_effective_calibration_rpm(request)} {_trapezoid_flag(request)} {_acceleration_rpm_per_s(request)} "
             f"{request.steps_per_rotation} {request.max_probe_rotations} "
-            f"{request.x_calibration_y_cm:.3f} {request.limit_buffer_cm:.3f}"
+            f"{request.x_calibration_y_cm:.3f} {request.limit_buffer_cm:.3f} "
+            f"{request.x_start_clear_cm:.3f} {request.x_end_clear_cm:.3f}"
         )
 
     def _build_z_pin_command(self, request: GantryXYMoveRequest | GantryZMoveRequest | GantryZCalibrationRequest) -> str:

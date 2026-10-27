@@ -301,6 +301,20 @@ class HardwareMapService:
             if board:
                 resolved_inputs["tool_port"] = board.usb_port
 
+        # The dedicated XY board moved from the Pi. Old workflow blocks still
+        # carry ttyUSB0, which can now belong to a different controller. Resolve
+        # this board by USB identity even when a block supplied a stale port.
+        if "tool_port" in input_keys:
+            board = self._board_for_manifest(hardware_map, manifest)
+            if board and board.id == "xy-closed-loop":
+                if not board.expected_serial_number:
+                    raise HardwareMapError("The XY controller has no recorded USB identity.")
+                port = next((p for p in list_serial_ports()
+                             if p.serial_number == board.expected_serial_number), None)
+                if port is None:
+                    raise HardwareMapError("The configured XY controller is not connected.")
+                resolved_inputs["tool_port"] = port.device
+
         pins_by_input_key = {
             pin.function_input_key: self._resolve_gpio(hardware_map, device, pin.gpio)
             for device in self._resolved_manifest_devices(hardware_map, manifest)

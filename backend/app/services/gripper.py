@@ -117,6 +117,9 @@ class GripperService:
                     driver.pulse(servo.gpio, servo.pulse_us(angle))
                 self._sleep(RAMP_STEP_SECONDS)
             for servo in servos:
+                # Also reassert a stationary target: release/cancel can have
+                # stopped PWM since the last command at this same angle.
+                driver.pulse(servo.gpio, servo.pulse_us(goals[servo.gpio]))
                 self._angles[servo.gpio] = goals[servo.gpio]
             self._last = (list(servos), ramp_deg_per_s)
             return dict(self._angles)

@@ -82,6 +82,16 @@ class MoveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.move([LEFT, RIGHT], "wiggle", 180.0)
 
+    def test_same_position_resumes_holding_after_cancel(self) -> None:
+        service, driver = _service()
+        service.move([LEFT, RIGHT], "close", 180.0)
+        service.release()
+        self.assertTrue(driver.stopped)
+        service.move([LEFT, RIGHT], "close", 180.0)
+        self.assertFalse(driver.stopped)
+        self.assertEqual(driver.pulses[3][-1], 500)
+        self.assertEqual(driver.pulses[2][-1], 2500)
+
 
 class ParkTests(unittest.TestCase):
     def test_parking_closes_stops_and_forgets(self) -> None:

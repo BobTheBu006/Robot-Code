@@ -19,10 +19,26 @@ coordinates; ESP32 controllers do low-level motor work.
 
 | Controller | Owns |
 | --- | --- |
-| **Raspberry Pi GPIO** | CoreXY A/B motors, XY limit switches, all four Z limit switches, access-door switch, gantry driver enable |
+| **Raspberry Pi GPIO** | All four Z limit switches, access-door switch, pogo connector and gripper servos |
 | **`controller-ykkl80`** | Both Z motors, 5 peristaltic pumps, their shared driver enable |
 | **`controller-x83xnc`** | 7-syringe pump |
-| **`xy-closed-loop`** | Not built. Disabled in the Hardware Map. Planned home for closed-loop XY. |
+| **`xy-closed-loop`** | CoreXY A/B motors, shared enable, X-min/X-max/Y-min limits. Open-loop for now; encoder feedback disabled. |
+
+XY migration (2026-10-06, board replaced 2026-10-27): USB serial
+`2ebcd7b203bdf0119170167148e9de0f`.
+Motor A STEP/DIR = 25/26; B = 27/14; active-low shared enable = 13;
+X-min/X-max/Y-min = 32/33/4; no Y-max (GPIO 16/17 read ~2.3 V unloaded on
+the first board - do not use them). The builder generates the boot pin
+header from the Hardware Map. Do not use the old generic ESP32 pin defaults.
+The encoders remain physically on 21/22 and 19/18 but are disabled; do not
+scan or enable them during motion bring-up. A fresh ESP32 XY calibration is
+required after the migration. Verified 2026-10-27: +X jog of 20 cm via
+alternating TEST MOTOR A/B (both DIR 1) moved the carriage the right way. The Pi motion implementation remains available
+as a fallback if the hardware is rewired and the map changed back.
+
+The **Gripper** block already exists: Open/Close, slot 6, left Pi GPIO3 (SCL),
+right Pi GPIO2 (SDA), closed -90/+90 degrees, open +30/-30 degrees. It requires
+the gripper tool to be connected, ramps both servos, and holds until release.
 
 The Z axis is deliberately **split**: motors on the ESP32, limit switches on
 the Pi (`hybrid_z_axis.py`). The Pi watches the switch and sends `STOP` over
@@ -50,7 +66,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-365 tests, stdlib `unittest`, no pytest.
+370 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
@@ -114,8 +130,8 @@ backend-side where it is tested.
 - **The step rate has a ceiling** set by the step pulse width
   (`ROBOT_GPIO_STEP_PULSE_SECONDS`, currently 15 µs → ~2500 RPM). Requests
   above it are silently clamped; moves now report requested vs achieved.
-- **Python bit-bangs the CoreXY steps.** That, not the electrical ceiling, is
-  usually the real speed limit.
+- The Pi fallback bit-bangs CoreXY steps in Python. The active XY controller
+  now generates steps on the dedicated ESP32.
 
 ## Working style the owner expects
 
