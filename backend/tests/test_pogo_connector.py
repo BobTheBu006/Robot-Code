@@ -133,8 +133,10 @@ class LoopbackTests(unittest.TestCase):
             rig.service.activate("camera-tool")
 
         self.assertIsNone(rig.store.active_group_id("pogo-connector"))
-        for gpio in ("2", "3", "14", "15"):
+        for gpio in ("14", "15"):
             self.assertEqual(rig.pins.state[gpio], ("input", "none"), f"GPIO {gpio} parked")
+        for gpio in ("2", "3"):
+            self.assertEqual(rig.pins.state[gpio], ("output", 0), f"GPIO {gpio} held LOW (board pull-up)")
 
     def test_a_failure_forgets_the_previous_tool(self) -> None:
         # The accident to prevent: tool A stays "connected" after B failed.
@@ -179,7 +181,7 @@ class PinModeTests(unittest.TestCase):
 
         rig.service.deactivate()
 
-        self.assertEqual(rig.pins.state["2"], ("input", "none"))
+        self.assertEqual(rig.pins.state["2"], ("output", 0), "held LOW, never floating up to its pull-up")
         self.assertEqual(rig.store.active_group_ids(), set())
 
     def test_a_disabled_tool_cannot_be_connected(self) -> None:
@@ -484,6 +486,58 @@ class ContactEndpointTests(unittest.TestCase):
             rig.pins.shorted.clear()
             self.assertFalse(routes.check_connector_contact()["ok"])
         self.assertEqual(rig.store.read(), {}, "a check is not a connection")
+
+
+class ServoSafetyTests(unittest.TestCase):
+    """Docking the gripper with GPIO 2/3 idle swung its left claw fully open:
+    the Pi's pull-ups made the signal a constant HIGH, which a servo reads as
+    "drive to the end". Idle is LOW, and a connected gripper holds closed."""
+
+    def _gripper_map(self):
+        servo = lambda side, pin: HardwareDeviceMapping(
+            id=f"gripper-{side}-servo", board_id="pogo-connector", name=f"Gripper {side}", kind="servo",
+            pins=[HardwarePinMapping(id=f"{side}-signal", signal="signal", gpio=pin)],
+        )
+        return _map(_group("gripper-tool", member_ids=["gripper-left-servo", "gripper-right-servo"], toolhead_index=6),
+                    devices=[servo("left", "SCL"), servo("right", "SDA")])
+
+    def _rig_with_gripper(self):
+        from app.services import gripper as gripper_module
+
+        rig = _Rig(self._gripper_map())
+        self.addCleanup(rig.close)
+        servos = gripper_module.SimulatedServos()
+        service = gripper_module.GripperService(driver=servos, sleep=lambda _s: None)
+        patcher = mock.patch.object(gripper_module, "gripper_service", service)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        gripper_module.register_connector_hooks(rig.service)
+        return rig, servos
+
+    def test_an_empty_connector_holds_the_servo_pins_low(self) -> None:
+        rig, _ = self._rig_with_gripper()
+        rig.service.deactivate()
+        self.assertEqual((rig.pins.state["2"], rig.pins.state["3"]), (("output", 0), ("output", 0)))
+
+    def test_connecting_the_gripper_holds_it_closed_at_once(self) -> None:
+        rig, servos = self._rig_with_gripper()
+        rig.service.connect_for_toolhead(6)
+        # Left on GPIO 3 closes at -90 (500 us), right on GPIO 2 at +90 (2500 us).
+        self.assertEqual(set(servos.pulses[3]), {500}, "closed, and no other angle on the way")
+        self.assertEqual(set(servos.pulses[2]), {2500})
+        self.assertFalse(servos.stopped, "held, not limp")
+
+    def test_disconnecting_the_gripper_releases_it(self) -> None:
+        rig, servos = self._rig_with_gripper()
+        rig.service.connect_for_toolhead(6)
+        rig.service.deactivate()
+        self.assertTrue(servos.stopped)
+
+    def test_reassert_restores_the_safe_idle_after_a_start(self) -> None:
+        rig, _ = self._rig_with_gripper()
+        rig.pins.state["2"] = ("alt", "a3")   # what boot leaves: I2C, idle HIGH
+        rig.service.reassert()
+        self.assertEqual(rig.pins.state["2"], ("output", 0))
 
 
 if __name__ == "__main__":

@@ -55,6 +55,15 @@ class ConnectorError(RuntimeError):
     pass
 
 
+# GPIO 2/3 carry fixed 1.8 kOhm pull-ups to 3.3 V on the Pi board, so "parked
+# as an input" still reads HIGH. A hobby servo takes a constant HIGH as an
+# endless pulse and drives to its end stop: docking the gripper with these
+# pins idle swung its left claw fully open into the neighbouring tool
+# (2026-10-27). Idle for these pins is therefore driven LOW - no pulse, the
+# servo stays put - which costs < 2 mA against the pull-up.
+GPIOS_WITH_BOARD_PULLUPS = frozenset({"2", "3"})
+
+
 # ---- pins ---------------------------------------------------------------
 
 
@@ -232,6 +241,43 @@ class PogoConnectorService:
         self._load_map = load_map
         self._usb_settle_seconds = usb_settle_seconds
         self._lock = RLock()
+        # Tools that must act the moment they are connected or let go of -
+        # the gripper holds its servos closed. Registered by those services.
+        self._on_connected: list = []
+        self._on_disconnected: list = []
+
+    def add_tool_hooks(self, on_connected=None, on_disconnected=None) -> None:
+        if on_connected is not None:
+            self._on_connected.append(on_connected)
+        if on_disconnected is not None:
+            self._on_disconnected.append(on_disconnected)
+
+    def _notify_disconnected(self, connector_id: str) -> None:
+        previous = self._state_store.active_group_id(connector_id)
+        if previous is None:
+            return
+        for hook in self._on_disconnected:
+            try:
+                hook(previous)
+            except Exception:  # letting go of a tool must not fail the change
+                pass
+
+    def reassert(self) -> None:
+        """Put the pins back into the recorded state after a backend start.
+
+        Boot leaves GPIO 2/3 with the I2C controller (idle HIGH) whatever the
+        connector state says. No verification and no tool hooks: nothing is
+        driven beyond the idle levels until a block asks for it.
+        """
+        with self._lock:
+            hardware_map = self._map()
+            for connector in hardware_map.connectors:
+                group_id = self._state_store.active_group_id(connector.id)
+                group = next((g for g in hardware_map.groups if g.id == group_id), None)
+                if group is None:
+                    self._park_all(connector)
+                else:
+                    self._apply_pin_modes(hardware_map, connector, group)
 
     # -- collaborators, resolved late so tests and the simulate flag apply --
 
@@ -307,6 +353,7 @@ class PogoConnectorService:
 
             # Forget the previous tool before touching anything, so a failure
             # below can never leave it recorded as still docked.
+            self._notify_disconnected(connector.id)
             self._park_all(connector)
             self._state_store.set(connector.id, None)
 
@@ -344,6 +391,13 @@ class PogoConnectorService:
                     "updated_at": time.time(),
                 },
             )
+            for hook in self._on_connected:
+                try:
+                    hook(group, hardware_map)
+                except Exception as exc:
+                    # Connected, but the tool could not be put into its safe
+                    # state - say so loudly rather than fail the connection.
+                    result.warnings.append(f"{group.name}: {exc}")
             return result
 
     def deactivate(self, connector_id: str | None = None) -> list[ConnectorResult]:
@@ -357,6 +411,7 @@ class PogoConnectorService:
             )
             results = []
             for connector in connectors:
+                self._notify_disconnected(connector.id)
                 self._park_all(connector)
                 self._state_store.set(connector.id, None)
                 results.append(
@@ -366,7 +421,7 @@ class PogoConnectorService:
                         group_name=None,
                         verification="none",
                         verified=False,
-                        message=f"{connector.label} is empty; all pins parked as inputs.",
+                        message=f"{connector.label} is empty; all pins idle (inputs, GPIO 2/3 held LOW).",
                     )
                 )
             return results
@@ -490,10 +545,15 @@ class PogoConnectorService:
             None,
         )
 
+    def _idle(self, gpio: str) -> None:
+        if gpio in GPIOS_WITH_BOARD_PULLUPS:
+            self._pins().drive(gpio, 0)
+        else:
+            self._pins().park(gpio)
+
     def _park_all(self, connector: HardwareConnectorMapping) -> None:
-        pins = self._pins()
         for pin in connector.pins:
-            pins.park(pin.gpio)
+            self._idle(pin.gpio)
 
     def _effective_pin_modes(
         self, hardware_map: HardwareMap, connector: HardwareConnectorMapping, group: HardwareGroupMapping
@@ -513,9 +573,9 @@ class PogoConnectorService:
                     raise ConnectorError(f"{connector.label} pin {pin.name} has no alternate function recorded for {mode}.")
                 pins.set_alt(pin.gpio, pin.alt_function)
             else:
-                # GPIO pins are left as inputs for the tool's functions to
-                # claim; nothing is driven until a block asks for it.
-                pins.park(pin.gpio)
+                # GPIO pins idle until the tool's functions claim them (see
+                # _idle: LOW where the board pulls the pin up).
+                self._idle(pin.gpio)
 
     def _verify(
         self,

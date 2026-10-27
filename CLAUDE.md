@@ -80,7 +80,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-401 tests, stdlib `unittest`, no pytest.
+406 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
@@ -95,6 +95,11 @@ a time: verify first, then set pin functions with `pinctrl`, then record it in
 functions, with a reason. Pick-up activates the slot's group (or empties the
 connector for a tool with no connector); drop and Disconnect Tool park the pins.
 A failed verification leaves the connector empty — never the old tool.
+**Idle GPIO 2/3 are driven LOW**, never left as inputs: the Pi's 1.8 kOhm
+pull-ups make a floating pin a constant HIGH, which a servo reads as "drive to
+the end" - docking the gripper that way swung a claw into the next tool. A
+connected gripper immediately holds closed; the backend re-applies the
+connector state at start-up (boot leaves 2/3 with I2C, idle HIGH).
 
 ## Safety architecture
 

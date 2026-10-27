@@ -52,3 +52,15 @@ app.include_router(xy_teach_router)
 
 # Motor drivers power down when an E-Stop finishes halting everything.
 register_safety_hooks()
+
+# The pogo connector: tools react to being connected (the gripper holds its
+# servos closed), and the pins go back to their recorded state - boot leaves
+# GPIO 2/3 with I2C, idle HIGH, which a servo reads as "drive to the end".
+from app.services.gripper import register_connector_hooks
+from app.services.pogo_connector import pogo_connector_service
+
+register_connector_hooks()
+try:
+    pogo_connector_service.reassert()
+except Exception:
+    pass

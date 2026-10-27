@@ -301,4 +301,71 @@ class GripperService:
             self._last = None
 
 
+    def detach(self) -> None:
+        """The tool is leaving the connector: stop driving the servos, hand
+        GPIO 2/3 back, and start from 'parked closed' next time. No move."""
+        with self._lock:
+            if self._driver is not None:
+                if hasattr(self._driver, "teardown"):
+                    self._driver.teardown()
+                else:
+                    self._driver.stop()
+            self._angles.clear()
+            self._last = None
+
+
 gripper_service = GripperService()
+
+GRIPPER_SERVO_IDS = {"left": "gripper-left-servo", "right": "gripper-right-servo"}
+
+
+def _block_defaults() -> dict:
+    import json
+    from pathlib import Path
+
+    manifest = json.loads((Path(__file__).resolve().parents[1] / "functions/gripper/manifest.json").read_text())
+    return {item["key"]: item.get("default") for item in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]}
+
+
+def gripper_servos_for(group, hardware_map) -> list[ServoSettings] | None:
+    """The two servo settings for a tool group, or None if it is not the gripper."""
+    devices = {device.id: device for device in hardware_map.devices}
+    if not all(device_id in group.member_ids and device_id in devices for device_id in GRIPPER_SERVO_IDS.values()):
+        return None
+    connector = next((c for c in hardware_map.connectors if c.id == group.connector_id), None)
+    pin_gpio = {pin.name: pin.gpio for pin in connector.pins} if connector else {}
+    defaults = _block_defaults()
+    servos = []
+    for side, device_id in GRIPPER_SERVO_IDS.items():
+        signal = next((pin for pin in devices[device_id].pins if pin.signal == "signal"), None)
+        if signal is None or signal.gpio == "-":
+            return None
+        gpio = pin_gpio.get(signal.gpio, signal.gpio)
+        servos.append(ServoSettings(
+            gpio=int(gpio),
+            open_deg=float(defaults[f"{side}_open_deg"]),
+            closed_deg=float(defaults[f"{side}_closed_deg"]),
+            pulse_min_us=float(defaults[f"{side}_pulse_min_us"]),
+            pulse_max_us=float(defaults[f"{side}_pulse_max_us"]),
+        ))
+    return servos
+
+
+def _on_tool_connected(group, hardware_map) -> None:
+    # A docked gripper sits closed in the rack: hold it there at once, so its
+    # servos are never left without a defined pulse.
+    servos = gripper_servos_for(group, hardware_map)
+    if servos is None:
+        return
+    gripper_service.forget_position()
+    gripper_service.move(servos, "close", float(_block_defaults()["ramp_deg_per_s"]))
+
+
+def _on_tool_disconnected(group_id: str) -> None:
+    gripper_service.detach()
+
+
+def register_connector_hooks(connector_service=None) -> None:
+    if connector_service is None:
+        from app.services.pogo_connector import pogo_connector_service as connector_service
+    connector_service.add_tool_hooks(_on_tool_connected, _on_tool_disconnected)
