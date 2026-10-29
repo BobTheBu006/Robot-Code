@@ -57,6 +57,31 @@ TOOLHEAD_DEFAULT_KEYS = frozenset(
 )
 
 
+# Calibrate XY settings that become the block's default as soon as a changed
+# value is saved in a workflow.
+CALIBRATE_XY_ADOPTED_KEYS = frozenset({"x_calibration_y_cm"})
+
+
+def _block_parameters(workflow: object, function_id: str) -> dict[str, dict]:
+    """Parameters of every placed block of this function, by node id."""
+    found: dict[str, dict] = {}
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            data = node.get("data")
+            block = data.get("block") if isinstance(data, dict) else None
+            if isinstance(block, dict) and block.get("id") == function_id and isinstance(data.get("parameters"), dict):
+                found[str(node.get("id"))] = data["parameters"]
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(workflow)
+    return found
+
+
 def usable_max_cm(track_length_cm: float, buffer_cm: float = DEFAULT_XY_LIMIT_BUFFER_CM) -> float:
     """Highest coordinate a move may request on a track of this length."""
     return round(track_length_cm - 2.0 * buffer_cm, 3)
@@ -311,6 +336,44 @@ class WorkspaceDefaultsService:
         if not collected:
             return []
         return self.apply_toolhead_defaults(collected)
+
+    def adopt_calibrate_defaults_from_workflow(self, workflow: dict, previous: dict | None) -> list[str]:
+        """Make an edited Calibrate XY setting the block's new default.
+
+        Only a value that changed since the previous save of the same block
+        (or that a newly placed block carries) is adopted. An untouched old
+        block still holds the value it was placed with, and adopting that
+        would quietly undo the edit made on another block."""
+        before = _block_parameters(previous or {}, "calibrate_xy")
+        manifest_path = self._app_functions_dir / "calibrate_xy" / "manifest.json"
+        if not manifest_path.exists():
+            return []
+        manifest = self._read_json(manifest_path)
+        definitions = {
+            definition.get("key"): definition
+            for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]
+            if definition.get("key") in CALIBRATE_XY_ADOPTED_KEYS
+        }
+        wanted: dict[str, float] = {}
+        for node_id, parameters in _block_parameters(workflow, "calibrate_xy").items():
+            for key in CALIBRATE_XY_ADOPTED_KEYS:
+                value = parameters.get(key)
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    continue
+                reference = before[node_id].get(key) if node_id in before else definitions.get(key, {}).get("default")
+                if value != reference:
+                    wanted[key] = round(float(value), 3)
+
+        changed: list[str] = []
+        with self._lock:
+            for key, value in wanted.items():
+                definition = definitions.get(key)
+                if definition is not None and definition.get("default") != value:
+                    definition["default"] = value
+                    changed.append(f"calibrate_xy.{key} default -> {value}")
+            if changed:
+                self._write_json_atomic(manifest_path, manifest)
+        return changed
 
     def current_toolhead_defaults(self) -> dict[str, float]:
         """The latest stored defaults for every shared tool-change setting.

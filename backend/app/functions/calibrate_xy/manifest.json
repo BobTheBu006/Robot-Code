@@ -64,7 +64,7 @@
       "type": "number",
       "description": "Y position in cm the gantry parks at, clear of the Y-min switch, while X is calibrated. Parked using the carried-over steps-per-cm estimate, then corrected onto this exact value once X measures the true steps per cm.",
       "required": false,
-      "default": 3.2,
+      "default": 2.5,
       "placeholder": null,
       "advanced": false,
       "min": null,

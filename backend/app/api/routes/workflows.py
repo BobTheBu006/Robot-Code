@@ -46,6 +46,16 @@ def load_workflow_file(filename: str) -> WorkflowFileResponse:
 
 @router.put("/default", response_model=WorkflowSaveResponse)
 def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
+    # The previous save, to tell an edited value from one left as it was.
+    previous = None
+    try:
+        if not request.path:
+            previous = workflow_storage_service.load_workflow(
+                request.filename or workflow_storage_service._default_filename()
+            ).workflow
+    except (WorkflowNotFoundError, WorkflowStorageError):
+        previous = None
+
     try:
         if request.filename or request.path:
             response = workflow_storage_service.save_workflow(
@@ -61,6 +71,7 @@ def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
     # Values edited on any tool block become the shared defaults as soon as the
     # workflow is saved, so a newly placed block starts from them.
     workspace_defaults_service.adopt_toolhead_defaults_from_workflow(request.workflow)
+    workspace_defaults_service.adopt_calibrate_defaults_from_workflow(request.workflow, previous)
     return response
 
 

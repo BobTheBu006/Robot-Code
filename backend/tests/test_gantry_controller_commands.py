@@ -42,7 +42,7 @@ class GantryControllerCommandTests(unittest.TestCase):
 
         self.assertEqual(
             service._build_calibrate_xy_command(request),
-            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 3.200 0.500 2.000 2.000",
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 2.500 0.500 2.000 2.000",
         )
 
     def test_xy_calibration_command_sends_requested_limit_buffer(self) -> None:
@@ -61,7 +61,7 @@ class GantryControllerCommandTests(unittest.TestCase):
         # The firmware persists this buffer and maps every later move through it.
         self.assertEqual(
             service._build_calibrate_xy_command(request),
-            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 3.200 1.000 2.000 2.000",
+            "CALIBRATE XY 111.000 55.500 500 1 2000 800 90 2.500 1.000 2.000 2.000",
         )
 
     def test_xy_calibration_command_sends_requested_calibration_y(self) -> None:
