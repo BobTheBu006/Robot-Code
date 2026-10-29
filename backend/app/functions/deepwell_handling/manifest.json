@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "id": "deepwell_handling",
+  "display_name": "Deepwell Handling",
+  "category": "Robot Actions",
+  "description": "Moves a deepwell's lid or the whole deepwell plate with the gripper. The 24 wells sit on the right Z platform (columns A-D along X, rows 1-6 along Y; positions from Teach Deepwell Positions). Take: the right Z lifts the object into the open claws, they grip, the right Z lowers, the gantry carries it to the target, the left Z lifts to the target height, the claws release and the left Z lowers. Put back is the same in reverse. Picks up the gripper first if it is not on the head. Claw angles and grab heights for the lid and the plate are in the advanced settings and must be set before the first run.",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "action",
+      "label": "Action",
+      "type": "select",
+      "description": "What to move, and which way.",
+      "required": true,
+      "default": "take_lid",
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "Take lid off",
+          "value": "take_lid"
+        },
+        {
+          "label": "Put lid back on",
+          "value": "put_lid"
+        },
+        {
+          "label": "Take deepwell to target",
+          "value": "take_plate"
+        },
+        {
+          "label": "Put deepwell back",
+          "value": "return_plate"
+        }
+      ]
+    },
+    {
+      "key": "well",
+      "label": "Deepwell",
+      "type": "select",
+      "description": "Grid position: column A-D (X), row 1-6 (Y).",
+      "required": true,
+      "default": "A1",
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "A1",
+          "value": "A1"
+        },
+        {
+          "label": "A2",
+          "value": "A2"
+        },
+        {
+          "label": "A3",
+          "value": "A3"
+        },
+        {
+          "label": "A4",
+          "value": "A4"
+        },
+        {
+          "label": "A5",
+          "value": "A5"
+        },
+        {
+          "label": "A6",
+          "value": "A6"
+        },
+        {
+          "label": "B1",
+          "value": "B1"
+        },
+        {
+          "label": "B2",
+          "value": "B2"
+        },
+        {
+          "label": "B3",
+          "value": "B3"
+        },
+        {
+          "label": "B4",
+          "value": "B4"
+        },
+        {
+          "label": "B5",
+          "value": "B5"
+        },
+        {
+          "label": "B6",
+          "value": "B6"
+        },
+        {
+          "label": "C1",
+          "value": "C1"
+        },
+        {
+          "label": "C2",
+          "value": "C2"
+        },
+        {
+          "label": "C3",
+          "value": "C3"
+        },
+        {
+          "label": "C4",
+          "value": "C4"
+        },
+        {
+          "label": "C5",
+          "value": "C5"
+        },
+        {
+          "label": "C6",
+          "value": "C6"
+        },
+        {
+          "label": "D1",
+          "value": "D1"
+        },
+        {
+          "label": "D2",
+          "value": "D2"
+        },
+        {
+          "label": "D3",
+          "value": "D3"
+        },
+        {
+          "label": "D4",
+          "value": "D4"
+        },
+        {
+          "label": "D5",
+          "value": "D5"
+        },
+        {
+          "label": "D6",
+          "value": "D6"
+        }
+      ]
+    },
+    {
+      "key": "target_x_cm",
+      "label": "Target X (cm)",
+      "type": "number",
+      "description": "Gantry X over the target location on the left Z platform.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": -2,
+      "max": 120,
+      "options": []
+    },
+    {
+      "key": "target_y_cm",
+      "label": "Target Y (cm)",
+      "type": "number",
+      "description": "Gantry Y over the target location.",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": -2,
+      "max": 120,
+      "options": []
+    },
+    {
+      "key": "target_z_cm",
+      "label": "Target Z (cm)",
+      "type": "number",
+      "description": "Left Z height at which the object is released (take) or gripped (put back).",
+      "required": true,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": false,
+      "min": 0,
+      "max": null,
+      "options": []
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "lid_open_deg",
+      "label": "Lid Claw Open (deg)",
+      "type": "number",
+      "description": "Claw angle around the lid before gripping. Left servo gets +angle, right -angle (+ opens).",
+      "required": false,
+      "default": 30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "lid_grip_deg",
+      "label": "Lid Claw Grip (deg)",
+      "type": "number",
+      "description": "Claw angle that holds the lid. Tune on the machine.",
+      "required": false,
+      "default": -30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "lid_grab_z_cm",
+      "label": "Lid Grab Height, Right Z (cm)",
+      "type": "number",
+      "description": "Right Z height that puts the lid between the claws. Must be above the travel height.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "plate_open_deg",
+      "label": "Deepwell Claw Open (deg)",
+      "type": "number",
+      "description": "Claw angle around the deepwell before gripping.",
+      "required": false,
+      "default": 30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "plate_grip_deg",
+      "label": "Deepwell Claw Grip (deg)",
+      "type": "number",
+      "description": "Claw angle that holds the deepwell. Tune on the machine.",
+      "required": false,
+      "default": -30.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": -90,
+      "max": 90,
+      "options": []
+    },
+    {
+      "key": "plate_grab_z_cm",
+      "label": "Deepwell Grab Height, Right Z (cm)",
+      "type": "number",
+      "description": "Right Z height that puts the deepwell between the claws. Must be above the travel height.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "travel_z_left_cm",
+      "label": "Travel Height, Left Z (cm)",
+      "type": "number",
+      "description": "Left Z height while the gantry travels - low enough to clear the claws and their load.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "travel_z_right_cm",
+      "label": "Travel Height, Right Z (cm)",
+      "type": "number",
+      "description": "Right Z height while the gantry travels.",
+      "required": false,
+      "default": 0.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 0,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "xy_speed_rpm",
+      "label": "XY Speed (RPM)",
+      "type": "number",
+      "description": "Gantry speed; lower is gentler with a load in the claws.",
+      "required": false,
+      "default": 400.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "z_speed_rpm",
+      "label": "Z Speed (RPM)",
+      "type": "number",
+      "description": "Z platform speed.",
+      "required": false,
+      "default": 240.0,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": null,
+      "options": []
+    },
+    {
+      "key": "gripper_slot",
+      "label": "Gripper Rack Slot",
+      "type": "number",
+      "description": "Rack slot the gripper is picked up from.",
+      "required": false,
+      "default": 6,
+      "placeholder": null,
+      "advanced": true,
+      "min": 1,
+      "max": 6,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow"
+    }
+  ],
+  "hardware_devices": []
+}

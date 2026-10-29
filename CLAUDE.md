@@ -47,6 +47,16 @@ stores a slot, Finish ends the teach - the gantry adopts the pushed-to
 position, so calibration survives - and writes tool_N_x/y_cm into the
 toolhead defaults. Endpoints: POST /api/robot/xy-teach/{start,position,end}.
 
+**Deepwells** (`services/deepwell_positions.py`, `deepwell-positions.json`):
+24 wells on the right Z platform, columns A-D along X, rows 1-6 along Y.
+**Teach Deepwell Positions** uses the same hand-teach dialog: 3 corners (A1,
+A6, D1) span the grid, or individual wells override it; a new corner teach
+drops old overrides. **Deepwell Handling** takes/puts back a lid or a whole
+plate: it runs Move Z / Gripper / Move XY / Pick Up through
+`function_discovery_service.test_function` (right Z lifts at the well, left Z
+at the target), picks up the gripper if the head is empty, and refuses to
+start while a grab height is not above the travel height (the defaults).
+
 The **Gripper** block already exists: Open/Close, slot 6, left Pi GPIO3 (SCL),
 right Pi GPIO2 (SDA), closed -90/+90 degrees, open +30/-30 degrees. It requires
 the gripper tool to be connected, ramps both servos, and holds until release. Pulses come from the Pi 5's
@@ -80,7 +90,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-406 tests, stdlib `unittest`, no pytest.
+429 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
