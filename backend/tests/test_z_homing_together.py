@@ -26,7 +26,10 @@ class FakeZBoard:
     """Serial-port stand-in. Positions are physical steps; the min switch is
     pressed at or below 0, the max switch at or above `max_at`."""
 
-    def __init__(self, positions: dict, max_at: dict, *, stop_sources: bool = True, step: int = 50) -> None:
+    def __init__(self, positions: dict, max_at: dict, *, stop_sources: bool = True, step: int = 50,
+                 stalled_up: set | None = None) -> None:
+        # Sides that stop turning 2000 steps up while still being stepped.
+        self.stalled_up = stalled_up or set()
         self.pos = dict(positions)
         self.max_at = dict(max_at)
         self.stop_sources = stop_sources
@@ -110,7 +113,8 @@ class FakeZBoard:
             if remaining == 0 or side in self.move["held"]:
                 continue
             count = min(self.step, abs(remaining)) * (1 if remaining > 0 else -1)
-            self.pos[side] += count
+            if not (count > 0 and side in self.stalled_up and self.pos[side] >= 2000):
+                self.pos[side] += count
             self.move["done"][side] += count
             self.move["remaining"][side] -= count
         self._finish_if_done()
@@ -214,6 +218,27 @@ class HomingTogetherTests(SimulatedBoardCase):
         self.assertTrue(all(int(parts[2]) != 0 and int(parts[3]) != 0 for parts in seeks), seeks)
         lengths = result["workspace"]
         self.assertAlmostEqual(lengths["z_left_track_length_cm"] / lengths["z_right_track_length_cm"], 5000 / 4700, places=1)
+
+    def test_a_side_that_stalls_on_the_way_up_stops_everything(self) -> None:
+        # The left stops turning 2000 steps up; the right reaches its switch.
+        board = FakeZBoard({"left": 3000, "right": 700}, {"left": 5000, "right": 4700},
+                           stalled_up={"left"}, step=5)
+        service = self._service(board)
+        # The window is in seconds, so give the run a clock that moves with
+        # the simulated board instead of with this fast test.
+        clock = {"now": 0.0}
+
+        def monotonic():
+            clock["now"] += 0.01
+            return clock["now"]
+
+        with mock.patch.object(hybrid_z_axis, "FOLLOW_SLACK_S", 0.0), \
+                mock.patch.object(hybrid_z_axis.time, "monotonic", monotonic):
+            with self.assertRaisesRegex(HybridZAxisError, "Z right reached its max switch, but Z left did not"):
+                self._calibrate(service)
+        self.assertIn("STOP Z_RIGHT_MAX", board.log)
+        self.assertEqual(board.log[-1], "STOP", "everything stopped")
+        self.assertIsNone(board.move)
 
     def test_old_firmware_falls_back_to_one_side_after_the_other(self) -> None:
         board = FakeZBoard({"left": 3000, "right": 700}, {"left": 5000, "right": 4700}, stop_sources=False)

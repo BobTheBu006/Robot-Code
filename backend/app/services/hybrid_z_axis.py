@@ -51,6 +51,12 @@ MIN_SWITCH_ARRIVAL_CM = 0.2
 # its end; a real press holds for far longer than these reads take.
 SWITCH_CONFIRM_READS = 4
 SWITCH_CONFIRM_INTERVAL_S = 0.0005
+# Homing up together, both sides start on their min switch, so once one side
+# reaches its max the other is at most (difference in track length + this)
+# away. Taking longer means that motor is not moving - a stalled stepper
+# keeps receiving steps without turning - so everything stops instead.
+FOLLOW_MARGIN_CM = 3.0
+FOLLOW_SLACK_S = 1.0
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -567,7 +573,7 @@ class HybridZAxisService:
     def _seek_switches(
         self, serial_port, gpio: Any, limit_pins: dict[str, int], direction: int,
         max_steps: int, rpm: float, trapezoidal: bool, acceleration_rpm_per_s: float,
-        steps_per_rotation: int,
+        steps_per_rotation: int, follow_steps: int | None = None,
     ) -> dict[str, tuple[int, bool]]:
         """Drive the given sides toward their switches in one continuous move,
         stopping each the instant this Pi's own GPIO sees its switch trip.
@@ -579,6 +585,9 @@ class HybridZAxisService:
         on in the same move. The last side moving gets a plain STOP, which
         ends the move. Two sides need firmware with stop sources - see
         _supports_stop_sources. A side already on its switch does not move.
+        With `follow_steps`, once one side has stopped the others get that
+        many steps' worth of time to reach their own switch; then everything
+        stops and the seek fails, naming the side that never arrived.
         Returns per side (steps travelled, whether the switch tripped).
         """
         end = "MAX" if direction > 0 else "MIN"
@@ -611,6 +620,7 @@ class HybridZAxisService:
         started = time.monotonic()
         held: set[str] = set()
         stop_sent = False
+        follow_deadline: float | None = None
         buffer = b""
 
         while time.monotonic() < deadline:
@@ -620,6 +630,21 @@ class HybridZAxisService:
                     serial_port.flush()
                     stop_sent = True
                 raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
+
+            if follow_deadline is not None and not stop_sent and time.monotonic() > follow_deadline:
+                serial_port.write(b"STOP\n")
+                serial_port.flush()
+                stop_sent = True
+                late = [side for side in moving if side not in held]
+                first = next(iter(held))
+                margin_cm = follow_steps / max(self._steps_per_cm, 1.0)
+                self._homing_log(f"seek {end}: {', '.join(late)} did not follow within {margin_cm:.1f} cm -> sent STOP")
+                raise HybridZAxisError(
+                    f"Z {first} reached its {end.lower()} switch, but Z {' and '.join(late)} did not reach "
+                    f"its own within about {margin_cm:.1f} cm more travel, so both were stopped. That motor "
+                    "has probably stalled (common when both sides climb together at high speed - try a lower "
+                    "speed), or its switch is not being reached. Calibrate that side alone to check."
+                )
 
             if not stop_sent:
                 for side in moving:
@@ -631,6 +656,8 @@ class HybridZAxisService:
                         stop_sent = True
                     else:
                         stop = f"STOP Z_{side.upper()}_{end}"
+                        if follow_steps is not None and follow_deadline is None:
+                            follow_deadline = time.monotonic() + follow_steps / steps_per_second + FOLLOW_SLACK_S
                     serial_port.write((stop + "\n").encode("utf-8"))
                     serial_port.flush()
                     self._homing_log(
@@ -719,7 +746,7 @@ class HybridZAxisService:
     def _probe_sides(
         self, serial_port, gpio: Any, pins: _ZPinPlan, sides: tuple[str, ...], direction: int,
         max_probe_steps: int, steps_per_rotation: int, fast_rpm: float,
-        trapezoidal: bool, acceleration_rpm_per_s: float,
+        trapezoidal: bool, acceleration_rpm_per_s: float, follow_steps: int | None = None,
     ) -> dict[str, int]:
         limit_pins = {
             side: {
@@ -736,6 +763,7 @@ class HybridZAxisService:
         fast = self._seek_switches(
             serial_port, gpio, limit_pins, direction, max_probe_steps,
             fast_rpm, trapezoidal, acceleration_rpm_per_s, steps_per_rotation,
+            follow_steps=follow_steps,
         )
         for side in sides:
             travelled, tripped = fast[side]
@@ -910,9 +938,16 @@ class HybridZAxisService:
                     )
                     for side in group:
                         self._set_axis_steps(side, 0)
+                    # Both sides start this climb on their min switch, so they
+                    # should reach their max within the track-length difference.
+                    follow_steps = None
+                    if len(group) == 2:
+                        follow_cm = abs(request.z_left_track_length_cm - request.z_right_track_length_cm) + FOLLOW_MARGIN_CM
+                        follow_steps = round(follow_cm * budget_steps_per_cm)
                     measured_steps.update(self._probe_sides(
                         serial_port, gpio, pins, group, 1, max_probe_steps, steps_per_rotation,
                         request.speed_rpm, request.trapezoidal_speed, request.acceleration_rpm_per_s,
+                        follow_steps=follow_steps,
                     ))
                 for side in sides:
                     if measured_steps[side] <= 0:
