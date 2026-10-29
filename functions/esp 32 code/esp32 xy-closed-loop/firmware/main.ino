@@ -872,6 +872,17 @@ void beginFollowTracking() {
 // trusted as its position: an abrupt stop from speed can carry it on a few
 // steps, and the reader task needs a fresh snapshot after that.
 const unsigned long RESYNC_SETTLE_MS = 150;
+// Off while calibrating: homing stops on the limit switches on purpose and
+// sets the position itself, so a resync there would only slow every probe.
+bool resyncOnEarlyExit = true;
+
+// Holds the resync off for as long as it exists - one at the top of
+// calibrateXY covers every way out of it, on-the-fly recalibration included.
+struct ResyncPause {
+  bool previous;
+  ResyncPause() : previous(resyncOnEarlyExit) { resyncOnEarlyExit = false; }
+  ~ResyncPause() { resyncOnEarlyExit = previous; }
+};
 
 // After a move ends early - E-Stop/STOP, a limit switch, a following error -
 // the step counters say where the motors were *told* to go, not where they
@@ -881,7 +892,7 @@ const unsigned long RESYNC_SETTLE_MS = 150;
 // cost a little calibration, and a later move to the rack aimed at the wrong
 // place (2026-10-29: a drop tripped ERR FOLLOW ERROR after a few E-Stops).
 void resyncPositionFromEncoders(const char *reason) {
-  if (!encodersConfigured) {
+  if (!encodersConfigured || !resyncOnEarlyExit) {
     return;
   }
   delay(RESYNC_SETTLE_MS);
@@ -908,6 +919,11 @@ void resyncPositionFromEncoders(const char *reason) {
   // CoreXY: A = X + Y and B = X - Y, so X = (A + B) / 2 and Y = (A - B) / 2.
   currentXSteps = followBaseCartesianX + (movedA + movedB) / 2;
   currentYSteps = followBaseCartesianY + (movedA - movedB) / 2;
+
+  // Saved at once: after a failed or cancelled command the host closes the
+  // port, and reopening it resets this board, which reloads the position
+  // from flash - not every caller saves on its own early exit.
+  saveXCalibrationState();
 
   Serial.print("XY POSITION RESYNCED ");
   Serial.print(reason);
@@ -2363,6 +2379,7 @@ bool calibrateXY(
   float xStartClearCm,
   float xEndClearCm
 ) {
+  ResyncPause resyncPause;
   // Adopt the buffer before anything converts cm to steps: it sets where user
   // coordinate 0 sits, so the park, the X walk-back and every later move all
   // have to agree on it.
