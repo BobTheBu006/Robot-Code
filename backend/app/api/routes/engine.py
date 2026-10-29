@@ -88,18 +88,21 @@ def submit_node_result(run_id: str, payload: NodeResultRequest) -> dict:
             detail=f"Block '{payload.node_id}' is not part of the running workflow.",
         )
 
-    run_session_service.submit(
-        session,
-        payload.node_id,
-        NodeOutcome(ok=payload.ok, result=payload.result, error=payload.error),
-    )
+    # Blocks on paths that do not share hardware run side by side, so their
+    # results can arrive together.
+    with session.lock:
+        run_session_service.submit(
+            session,
+            payload.node_id,
+            NodeOutcome(ok=payload.ok, result=payload.result, error=payload.error),
+        )
 
-    due = run_session_service.due_payload(session)
-    events = run_session_service.new_events(session)
-    finished = session.runner.finished
-    report = session.runner.report.as_dict()
-    if finished:
-        run_session_service.end(run_id)
+        due = run_session_service.due_payload(session)
+        events = run_session_service.new_events(session)
+        finished = session.runner.finished
+        report = session.runner.report.as_dict()
+        if finished:
+            run_session_service.end(run_id)
 
     return {
         "ok": session.runner.report.ok,

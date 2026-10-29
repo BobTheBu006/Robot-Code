@@ -3697,24 +3697,56 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
     try {
       applyEngineEvents(step);
-      while (!step.finished && step.due.length > 0) {
-        // Blocks due at the same moment are independent branches. They are run
-        // one at a time on purpose: they share one gantry, and nothing yet
-        // stops two of them reaching for it at once. Resource locks are what
-        // would make this safe to overlap.
-        let next: EngineRunStep = step;
-        for (const due of step.due) {
-          if (alreadyCompleted.delete(due.node_id)) {
-            next = await reportCompletedNode(runId, due.node_id, resultsByNodeId);
-          } else {
-            next = await executeAndReportNode(runId, due, resultsByNodeId);
-          }
-          applyEngineEvents(next);
-          if (next.finished || !next.ok) {
-            break;
-          }
+      // Every block the engine hands out is started at once: the engine only
+      // hands out blocks whose path holds its hardware, so two blocks never
+      // reach for the same board. Each result can make more blocks due -
+      // those are started as it comes back, not after the rest of the batch
+      // (waiting for the batch dropped them, and the run ended early).
+      type Settled = { nodeId: string; step: EngineRunStep | null; error: unknown };
+      const inFlight = new Map<string, Promise<Settled>>();
+      let firstError: unknown = null;
+      let stopping = step.finished || !step.ok;
+
+      const launch = (due: EngineDueNode) => {
+        const work = alreadyCompleted.delete(due.node_id)
+          ? reportCompletedNode(runId, due.node_id, resultsByNodeId)
+          : executeAndReportNode(runId, due, resultsByNodeId);
+        inFlight.set(
+          due.node_id,
+          work.then(
+            (next) => ({ nodeId: due.node_id, step: next, error: null }),
+            (error: unknown) => ({ nodeId: due.node_id, step: null, error }),
+          ),
+        );
+      };
+
+      if (!stopping) {
+        step.due.forEach(launch);
+      }
+      // After a failure or a stop nothing new starts, but blocks already
+      // moving are waited for - abandoning them would leave hardware running.
+      while (inFlight.size > 0) {
+        const settled = await Promise.race(inFlight.values());
+        inFlight.delete(settled.nodeId);
+        if (settled.error !== null || !settled.step) {
+          firstError ??= settled.error ?? new Error("A block did not report back.");
+          stopping = true;
+          continue;
         }
-        step = next;
+        if (stopping) {
+          continue;
+        }
+        step = settled.step;
+        applyEngineEvents(step);
+        if (step.finished || !step.ok) {
+          stopping = true;
+          continue;
+        }
+        step.due.forEach(launch);
+      }
+
+      if (firstError !== null && step.ok && !step.finished) {
+        throw firstError;
       }
     } finally {
       engineRunIdRef.current = null;

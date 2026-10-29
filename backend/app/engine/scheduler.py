@@ -13,6 +13,14 @@ Here a node becomes ready only when every incoming edge that was actually
 *activated* has delivered, control blocks activate exactly one outgoing handle,
 and a loop is a re-entrant scope with an iteration guard.
 
+Paths run side by side unless they need the same hardware. A path is a
+straight run of blocks - each feeding exactly one next block that nothing else
+feeds. When its first block is due, the path claims the hardware of every
+block on it; a path needing hardware another path holds waits until that whole
+path has finished, then starts. Claiming the path rather than the block is
+what keeps a second Z calibration from slipping in between the first one and
+the Move Z that follows it.
+
 Execution itself is injected: the scheduler calls a `run_node` callable and
 only interprets its result. That keeps this module pure and testable without
 hardware, and keeps the hardware drivers untouched.
@@ -37,6 +45,10 @@ from app.engine.plan import (
 # A loop that never stops would hold the machine forever. The guard is high
 # enough not to interfere with real work and low enough to end a runaway.
 DEFAULT_MAX_ITERATIONS = 10_000
+
+# A block whose hardware cannot be told claims this, which conflicts with
+# every other claim: it runs alone.
+ALL_HARDWARE = "*"
 
 # Edge states. See the comment in run_plan: DEAD is what lets a join proceed
 # when one of the branches feeding it was never taken.
@@ -170,10 +182,20 @@ class PlanRunner:
         *,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         resolve_loop_items: Callable[[PlanNode, dict], list] | None = None,
+        hardware_for: Callable[[PlanNode], frozenset[str]] | None = None,
     ) -> None:
         self.plan = plan
         self.max_iterations = max_iterations
         self._resolve_loop_items = resolve_loop_items
+        self._hardware_for = hardware_for or (lambda _node: frozenset())
+        # Paths holding hardware: claim id -> (the path's nodes in order, the
+        # hardware). Each path node maps to its claim; heads that could not
+        # claim wait in `_blocked`, first come first served.
+        self._claims: dict[int, tuple[list[str], frozenset[str]]] = {}
+        self._claim_of: dict[str, int] = {}
+        self._next_claim = 0
+        self._blocked: list[str] = []
+        self._reported_waiting: set[str] = set()
         self.report = RunReport(ok=True)
 
         self._results: dict[str, dict | None] = {}
@@ -215,7 +237,7 @@ class PlanRunner:
 
     @property
     def finished(self) -> bool:
-        return self._halted or (not self._ready and not self._outstanding)
+        return self._halted or (not self._ready and not self._outstanding and not self._blocked)
 
     @property
     def results(self) -> dict[str, dict | None]:
@@ -260,7 +282,7 @@ class PlanRunner:
         return "dead"
 
     def _enqueue(self, node_id: str) -> None:
-        if node_id not in self._queued and node_id not in self._outstanding:
+        if node_id not in self._queued and node_id not in self._outstanding and node_id not in self._blocked:
             self._queued.add(node_id)
             self._ready.append(node_id)
 
@@ -304,6 +326,85 @@ class PlanRunner:
         self._ready.clear()
         self._queued.clear()
         self._outstanding.clear()
+        self._blocked.clear()
+
+    # ---- hardware claims ----
+
+    def _path_from(self, head_id: str) -> list[str]:
+        """The straight run of blocks starting at `head_id`: it continues
+        while the current block has exactly one way out and the block it leads
+        to has no other input. Loops end a path (they are settled here, not
+        executed), and so does anything with a second way out - an `if`, an
+        error edge - because which way it goes is not known yet."""
+        path = [head_id]
+        current = head_id
+        while True:
+            outgoing = [
+                edge for edge in self.plan.outgoing.get(current, [])
+                if edge.edge_id not in self.plan.loop_back_edge_ids
+            ]
+            if len(outgoing) != 1:
+                return path
+            following = outgoing[0].target
+            following_node = self.plan.nodes.get(following)
+            if (
+                following_node is None
+                or following_node.is_loop
+                or following in path
+                or len(self._barrier_edges(following)) != 1
+            ):
+                return path
+            path.append(following)
+            current = following
+
+    def _held_hardware(self) -> set[str]:
+        held: set[str] = set()
+        for _nodes, hardware in self._claims.values():
+            held |= hardware
+        return held
+
+    def _try_claim(self, node_id: str) -> bool:
+        """Let a block run if its path's hardware is free; False means wait."""
+        if node_id in self._claim_of:
+            return True  # already part of a path that holds its hardware
+        path = self._path_from(node_id)
+        hardware: set[str] = set()
+        for member in path:
+            hardware |= self._hardware_for(self.plan.nodes[member])
+        if not hardware:
+            return True
+        held = self._held_hardware()
+        if held and (hardware & held or ALL_HARDWARE in hardware or ALL_HARDWARE in held):
+            return False
+        claim = self._next_claim
+        self._next_claim += 1
+        self._claims[claim] = (path, frozenset(hardware))
+        for member in path:
+            self._claim_of[member] = claim
+        return True
+
+    def _release_if_path_ended(self, node_id: str) -> None:
+        """Free the path's hardware once its last block is done - or once the
+        path turns out not to continue (its next edge was not taken)."""
+        claim = self._claim_of.get(node_id)
+        if claim is None:
+            return
+        path, _hardware = self._claims[claim]
+        index = path.index(node_id)
+        if index + 1 < len(path):
+            following = path[index + 1]
+            onward = [edge for edge in self.plan.outgoing.get(node_id, []) if edge.target == following]
+            if any(self._edge_state[edge.edge_id] == LIVE for edge in onward):
+                return
+        del self._claims[claim]
+        for member in path:
+            if self._claim_of.get(member) == claim:
+                del self._claim_of[member]
+        # Waiting paths get the first look at the freed hardware.
+        waiting, self._blocked = self._blocked, []
+        for blocked_id in reversed(waiting):
+            self._queued.add(blocked_id)
+            self._ready.insert(0, blocked_id)
 
     # ---- stepping ----
 
@@ -328,10 +429,20 @@ class PlanRunner:
                 self.report.events.append(RunEvent("skipped", node_id, "block is deactivated"))
                 self._results[node_id] = None
                 self._activate(node_id, [DEFAULT_HANDLE])
+                self._release_if_path_ended(node_id)
                 continue
 
             if node.is_loop:
                 self._step_loop(node)
+                continue
+
+            if not self._try_claim(node_id):
+                self._blocked.append(node_id)
+                if node_id not in self._reported_waiting:
+                    self._reported_waiting.add(node_id)
+                    self.report.events.append(
+                        RunEvent("waiting", node_id, "its hardware is in use by another path")
+                    )
                 continue
 
             self._outstanding.add(node_id)
@@ -411,6 +522,7 @@ class PlanRunner:
 
         self.report.events.append(RunEvent("ran", node_id, why))
         self._activate(node_id, handles)
+        self._release_if_path_ended(node_id)
 
     def stop(self, reason: str = "Run stopped.") -> None:
         self._fail(None, reason)

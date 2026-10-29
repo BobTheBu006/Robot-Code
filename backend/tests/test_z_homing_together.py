@@ -14,9 +14,9 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.models.gantry import GantryZCalibrationRequest
+from app.models.gantry import GantryZCalibrationRequest, GantryZMoveRequest
 from app.services import hybrid_z_axis
-from app.services.hybrid_z_axis import HybridZAxisService
+from app.services.hybrid_z_axis import HybridZAxisError, HybridZAxisService
 
 SIDES = ("left", "right")
 SWITCH_SIDE = {"Z_LEFT_MIN": "left", "Z_LEFT_MAX": "left", "Z_RIGHT_MIN": "right", "Z_RIGHT_MAX": "right"}
@@ -128,7 +128,7 @@ class FakeZBoard:
 PINS = {12: ("left", "min"), 13: ("left", "max"), 14: ("right", "min"), 15: ("right", "max")}
 
 
-class HomingTogetherTests(unittest.TestCase):
+class SimulatedBoardCase(unittest.TestCase):
     def _service(self, board: FakeZBoard) -> HybridZAxisService:
         service = HybridZAxisService()
         patches = [
@@ -146,6 +146,8 @@ class HomingTogetherTests(unittest.TestCase):
             self.addCleanup(patch.stop)
         return service
 
+
+class HomingTogetherTests(SimulatedBoardCase):
     def _calibrate(self, service: HybridZAxisService, axes: str = "both") -> dict:
         request = GantryZCalibrationRequest(
             z_left_track_length_cm=5.0, z_right_track_length_cm=5.0, steps_per_cm_estimate=1000.0,
@@ -204,6 +206,55 @@ class HomingTogetherTests(unittest.TestCase):
         self.assertFalse(result["homed_together"])
         self.assertNotIn("FEATURES?", board.log)
         self.assertEqual(board.pos["right"], 700)
+
+
+class MoveZWatchesSwitchesTests(SimulatedBoardCase):
+    """Move Z watches the switch each side is heading toward."""
+
+    def _calibrated(self, board: FakeZBoard) -> HybridZAxisService:
+        service = self._service(board)
+        service._steps_per_cm = 1000.0
+        service._left_track_length_cm = service._right_track_length_cm = 5.0
+        service._limit_buffer_cm = 0.0
+        service._left_calibrated = service._right_calibrated = service._calibrated = True
+        service._left_steps, service._right_steps = board.pos["left"], board.pos["right"]
+        return service
+
+    def _move(self, service, left_cm, right_cm):
+        return service.move_z({"mode": "test"}, GantryZMoveRequest(z_left_cm=left_cm, z_right_cm=right_cm, speed_rpm=100))
+
+    def test_a_clear_move_just_moves(self) -> None:
+        board = FakeZBoard({"left": 1000, "right": 1000}, {"left": 5000, "right": 5000})
+        service = self._calibrated(board)
+        self._move(service, 3.0, 2.0)
+        self.assertEqual((board.pos["left"], board.pos["right"]), (3000, 2000))
+        self.assertFalse([command for command in board.log if command.startswith("STOP")])
+
+    def test_a_switch_inside_the_range_stops_only_that_motor(self) -> None:
+        # The left max switch is physically at 2.5 cm: left has lost steps.
+        board = FakeZBoard({"left": 1000, "right": 1000}, {"left": 2500, "right": 5000})
+        service = self._calibrated(board)
+        with self.assertRaisesRegex(HybridZAxisError, "left max switch tripped at 2.5"):
+            self._move(service, 4.0, 4.0)
+        self.assertIn("STOP Z_LEFT_MAX", board.log)
+        self.assertLess(board.pos["left"], 2600)
+        self.assertEqual(board.pos["right"], 4000, "the right side finished its move")
+        self.assertFalse(service._left_calibrated)
+        self.assertTrue(service._right_calibrated)
+
+    def test_old_firmware_stops_both_motors(self) -> None:
+        board = FakeZBoard({"left": 1000, "right": 1000}, {"left": 2500, "right": 5000}, stop_sources=False)
+        service = self._calibrated(board)
+        with self.assertRaises(HybridZAxisError):
+            self._move(service, 4.0, 4.0)
+        self.assertFalse([command for command in board.log if command.startswith("STOP Z_")])
+        self.assertLess(board.pos["right"], 4000)
+
+    def test_arriving_at_the_bottom_is_not_a_fault(self) -> None:
+        board = FakeZBoard({"left": 1000, "right": 1000}, {"left": 5000, "right": 5000})
+        service = self._calibrated(board)
+        self._move(service, 0.0, 1.0)
+        self.assertTrue(service._left_calibrated)
 
 
 if __name__ == "__main__":

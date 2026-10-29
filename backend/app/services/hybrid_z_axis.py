@@ -41,6 +41,10 @@ SLOW_PROBE_CHUNK_STEPS = 4
 # in seconds with a clear message instead of grinding for minutes.
 PROBE_BUDGET_MARGIN = 2.0
 SLOW_HOMING_RPM = 10.0
+# Zero sits on the min switch's trip point, so a move to (nearly) 0 ends on
+# the switch by design. Within this distance of the bottom, the min switch
+# tripping means "arrived", not "something is wrong".
+MIN_SWITCH_ARRIVAL_CM = 0.2
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -99,6 +103,10 @@ class HybridZAxisService:
         self._limit_buffer_cm = 0.5
         self._serial_port_path: str | None = None
         self._serial_port: Any = None
+        # Whether the open port's firmware understands "STOP <source>",
+        # asked once per opened port (a reflash reopens it).
+        self._stop_sources_port: Any = None
+        self._stop_sources = False
         # Shared by reference with every other motion driver - see
         # app/core/safety.py. One latch, not one per service.
         self._stop_requested = safety_controller.motion_blocked
@@ -443,12 +451,90 @@ class HybridZAxisService:
     def _supports_stop_sources(self, serial_port) -> bool:
         """Whether the board understands "STOP <source>" (firmware with
         FEATURES?). Older firmware ignores a sourced stop mid-move, which
-        would leave a motor driving into its switch, so both sides only
-        home together when this says yes."""
+        would leave a motor driving into its switch, so a single motor is
+        only ever stopped by source when this says yes."""
+        if self._stop_sources_port is serial_port:
+            return self._stop_sources
         reply, _completed = self._send(
             serial_port, "FEATURES?", terminal_prefixes=("OK FEATURES", "ERR"), deadline_seconds=2.0,
         )
-        return bool(reply) and "STOP_SOURCE" in reply.upper()
+        self._stop_sources_port = serial_port
+        self._stop_sources = bool(reply) and "STOP_SOURCE" in reply.upper()
+        return self._stop_sources
+
+    def _step_watching_limits(
+        self, serial_port, gpio: Any, pins: _ZPinPlan, left_delta: int, right_delta: int, rpm: float,
+        trapezoidal: bool, acceleration_rpm_per_s: float, steps_per_rotation: int, *, stop_sources: bool,
+    ) -> list[tuple[str, str]]:
+        """One STEP Z burst with the Pi watching, for each moving side, the
+        switch it is heading toward. A switch that trips stops its own motor
+        at once ("STOP Z_LEFT_MIN"; the other side finishes its move), or
+        both motors on firmware without stop sources. Positions adopt what
+        the firmware reports it actually did. Returns the (side, end)
+        switches that tripped."""
+        deltas = {"left": left_delta, "right": right_delta}
+        switch_pins = {
+            ("left", "min"): pins.left_min_limit_pin, ("left", "max"): pins.left_max_limit_pin,
+            ("right", "min"): pins.right_min_limit_pin, ("right", "max"): pins.right_max_limit_pin,
+        }
+        watched = {
+            side: ("max" if delta > 0 else "min") for side, delta in deltas.items() if delta != 0
+        }
+        if not watched:
+            return []
+
+        command = f"STEP Z {left_delta} {right_delta} {int(rpm)} {1 if trapezoidal else 0} {int(acceleration_rpm_per_s)}"
+        serial_port.reset_input_buffer()
+        serial_port.reset_output_buffer()
+        serial_port.write((command + "\n").encode("utf-8"))
+        serial_port.flush()
+
+        max_steps = max(abs(left_delta), abs(right_delta))
+        steps_per_second = max(1.0, rpm * steps_per_rotation / 60.0)
+        deadline = time.monotonic() + max(3.0, (max_steps / steps_per_second) * 2.0 + 2.0)
+        tripped: list[tuple[str, str]] = []
+        held: set[str] = set()
+        stop_sent = False
+        buffer = b""
+
+        while time.monotonic() < deadline:
+            if self._stop_requested.is_set():
+                if not stop_sent:
+                    serial_port.write(b"STOP\n")
+                    serial_port.flush()
+                    stop_sent = True
+                raise HybridZAxisStoppedError(f"Z axis motion is blocked. {self._blocked_reason()}")
+
+            if not stop_sent:
+                for side, end in watched.items():
+                    if side in held or not self._limit_active(gpio, switch_pins[(side, end)]):
+                        continue
+                    held.add(side)
+                    tripped.append((side, end))
+                    if stop_sources and len(held) < len(watched):
+                        serial_port.write(f"STOP Z_{side.upper()}_{end.upper()}\n".encode("utf-8"))
+                    else:
+                        serial_port.write(b"STOP\n")
+                        stop_sent = True
+                    serial_port.flush()
+
+            waiting = serial_port.in_waiting
+            if waiting:
+                buffer += serial_port.read(waiting)
+                if b"\n" in buffer:
+                    for raw_line in buffer.split(b"\n"):
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        upper = line.upper()
+                        if upper.startswith("ERR"):
+                            raise HybridZAxisError(f"ESP32 rejected a Z step command: {line}")
+                        if not upper.startswith(("OK STEP Z", "OK STOP STEP Z")):
+                            continue
+                        parts = line.split()
+                        self._left_steps += int(parts[-2])
+                        self._right_steps += int(parts[-1])
+                        return tripped
+
+        raise HybridZAxisError("Timed out waiting for the Z-axis ESP32 to finish a step burst.")
 
     def _seek_switches(
         self, serial_port, gpio: Any, limit_pins: dict[str, int], direction: int,
@@ -553,6 +639,31 @@ class HybridZAxisService:
         active_low = _bool_env("ROBOT_GPIO_LIMIT_ACTIVE_LOW", True)
         value = gpio.input(pin)
         return value == gpio.LOW if active_low else value == gpio.HIGH
+
+    def _raise_for_unexpected_switches(self, tripped: list[tuple[str, str]], request: GantryZMoveRequest) -> None:
+        """A limit switch inside the calibrated range means that side's
+        position is not what the machine believes - steps were lost, or the
+        switch moved. That side's calibration is dropped, so nothing moves it
+        again on a guessed position. Arriving at the bottom is not a fault:
+        zero sits on the min switch."""
+        faults = []
+        for side, end in tripped:
+            target_cm = request.z_left_cm if side == "left" else request.z_right_cm
+            if end == "min" and target_cm <= MIN_SWITCH_ARRIVAL_CM:
+                continue
+            steps = self._left_steps if side == "left" else self._right_steps
+            faults.append((side, end, steps / self._steps_per_cm, target_cm))
+        if not faults:
+            return
+        self._invalidate_calibration(tuple(side for side, *_rest in faults))
+        details = "; ".join(
+            f"the {side} {end} switch tripped at {at_cm:.2f} cm on the way to {target_cm:g} cm"
+            for side, end, at_cm, target_cm in faults
+        )
+        raise HybridZAxisError(
+            f"Z move stopped: {details}. That motor was stopped there and its calibration is no longer "
+            "trusted - run Calibrate Z Axis before moving it again."
+        )
 
     def _assert_limits_clear(self, gpio: Any, pins: _ZPinPlan) -> None:
         active = [name for name, pin in (
@@ -875,12 +986,14 @@ class HybridZAxisService:
 
                 self._assert_sides_calibrated(delta_left, delta_right)
 
-                self._send_step(
-                    serial_port, delta_left, delta_right, request.speed_rpm,
+                tripped = self._step_watching_limits(
+                    serial_port, gpio, pins, delta_left, delta_right, request.speed_rpm,
                     request.trapezoidal_speed, request.acceleration_rpm_per_s,
                     getattr(request, "steps_per_rotation", 800),
+                    stop_sources=self._supports_stop_sources(serial_port),
                 )
                 self._save_state()
+                self._raise_for_unexpected_switches(tripped, request)
             finally:
                 self._cleanup_limit_gpio(gpio, pins)
 

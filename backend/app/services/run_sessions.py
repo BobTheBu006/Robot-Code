@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from app.engine.journal import RunJournal, prune_old_runs
 from app.engine.plan import ExecutionPlan, PlanNode, compile_plan
-from app.engine.scheduler import NodeOutcome, PlanRunner
+from app.engine.scheduler import ALL_HARDWARE, NodeOutcome, PlanRunner
 
 # A session the browser walked away from (tab closed, machine slept) would
 # otherwise sit in memory forever.
@@ -47,6 +47,71 @@ class RunSession:
     # only when the caller happens to ask is a loop decision easily lost.
     journaled_events: int = 0
     journal: RunJournal | None = None
+    # Blocks of one run may now execute side by side, so their results can
+    # arrive together; the engine state is only ever touched under this.
+    lock: threading.RLock = field(default_factory=threading.RLock)
+
+
+# Blocks that change what is on the toolhead without listing hardware.
+_TOOLHEAD_BLOCKS = {"pickup_toolhead", "drop_toolhead", "connect_tool", "disconnect_tool"}
+
+
+def _hardware_resolver():
+    """Map a block to the hardware it occupies, for running paths side by side.
+
+    An ESP32 board is one resource (it runs one command at a time - the Z
+    board's pumps and Z motors included). A Raspberry Pi device is its own
+    resource. Everything on the pogo connector - the tool on the head, and
+    the USB controller of a tool group - is "toolhead", as are the blocks
+    that change the tool. A function block whose hardware is unknown, and a
+    compound block, claim everything and so run alone; built-in blocks
+    (start, if, loops, waits) claim nothing.
+    """
+    from app.services.function_discovery import function_discovery_service
+    from app.services.hardware_map import hardware_map_service
+
+    try:
+        hardware_map = hardware_map_service.load_map()
+    except Exception:
+        hardware_map = None
+    toolhead_boards: set[str] = set()
+    if hardware_map is not None:
+        toolhead_boards = {connector.id for connector in hardware_map.connectors}
+        toolhead_boards |= {
+            group.usb_board_id for group in hardware_map.groups if group.connector_id and group.usb_board_id
+        }
+
+    cache: dict[str, frozenset[str]] = {}
+
+    def hardware_for(node: PlanNode) -> frozenset[str]:
+        if node.kind == "compound":
+            return frozenset({ALL_HARDWARE})
+        if node.block_id in cache:
+            return cache[node.block_id]
+        try:
+            manifest = function_discovery_service.get_function(node.block_id).manifest
+        except Exception:
+            cache[node.block_id] = frozenset()  # a built-in block
+            return cache[node.block_id]
+        resources: set[str] = set()
+        devices = hardware_map_service._resolved_manifest_devices(hardware_map, manifest) if hardware_map else []
+        for device in devices:
+            if not device.board_id:
+                continue
+            if device.board_id in toolhead_boards:
+                resources.add("toolhead")
+            if device.board_id == "raspberry-pi":
+                resources.add(f"pi:{device.id}")
+            else:
+                resources.add(f"board:{device.board_id}")
+        if node.block_id in _TOOLHEAD_BLOCKS:
+            resources.add("toolhead")
+        if not resources:
+            resources.add(ALL_HARDWARE)
+        cache[node.block_id] = frozenset(resources)
+        return cache[node.block_id]
+
+    return hardware_for
 
 
 def _resolve_loop_items(node: PlanNode, context: dict) -> list:
@@ -95,7 +160,7 @@ class RunSessionService:
         self, workflow: dict, start_node_ids: list[str] | None = None
     ) -> tuple[RunSession, ExecutionPlan]:
         plan = compile_plan(workflow, start_node_ids)
-        runner = PlanRunner(plan, resolve_loop_items=_resolve_loop_items)
+        runner = PlanRunner(plan, resolve_loop_items=_resolve_loop_items, hardware_for=_hardware_resolver())
         run_id = uuid.uuid4().hex
         session = RunSession(run_id=run_id, plan=plan, runner=runner, journal=RunJournal(run_id))
 
