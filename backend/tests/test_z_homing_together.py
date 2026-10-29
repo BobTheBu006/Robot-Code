@@ -305,5 +305,14 @@ class MoveZWatchesSwitchesTests(SimulatedBoardCase):
         self.assertTrue(service._left_calibrated)
 
 
+
+class ZSpeedLimitTests(unittest.TestCase):
+    def test_z_moves_and_calibration_refuse_more_than_300_rpm(self) -> None:
+        from pydantic import ValidationError
+        for model in (GantryZMoveRequest, GantryZCalibrationRequest):
+            self.assertEqual(model(speed_rpm=300).speed_rpm, 300)
+            with self.assertRaises(ValidationError):
+                model(speed_rpm=600)
+
 if __name__ == "__main__":
     unittest.main()

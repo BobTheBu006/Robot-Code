@@ -415,12 +415,17 @@ class GantryCircleXYResponse(BaseModel):
     configured_limits: dict[str, int | str]
 
 
+# The Z motors do not run reliably above this: homing both sides together
+# stalled a bed at 600 rpm and worked every time at 300.
+Z_MAX_RPM = 300
+
+
 class GantryZMoveRequest(BaseModel):
     tool_port: str | None = None
     z_left_cm: float = Field(default=0.0)
     z_right_cm: float = Field(default=0.0)
     speed_profile: GantrySpeedProfile = "normal"
-    speed_rpm: int = Field(default=240, gt=0)
+    speed_rpm: int = Field(default=240, gt=0, le=Z_MAX_RPM)
     trapezoidal_speed: bool = Field(default=True)
     acceleration_rpm_per_s: int = Field(default=600, gt=0)
     on_the_fly_calibration: bool = Field(default=True)
@@ -510,7 +515,7 @@ class GantryZCalibrationRequest(BaseModel):
     # too-low estimate makes homing give up part way down the axis.
     steps_per_cm_estimate: float = Field(default=2000.0, gt=0)
     calibration_speed_profile: GantryCalibrationSpeedProfile = "safe"
-    speed_rpm: int = Field(default=100, gt=0)
+    speed_rpm: int = Field(default=100, gt=0, le=Z_MAX_RPM)
     trapezoidal_speed: bool = Field(default=True)
     acceleration_rpm_per_s: int = Field(default=300, gt=0)
     z_left_step_pin: int = Field(default=32, ge=0)

@@ -51,13 +51,13 @@
       "key": "speed_rpm",
       "label": "Speed (RPM)",
       "type": "number",
-      "description": "Motor speed for this move.",
+      "description": "Motor speed for this move. At most 300 rpm.",
       "required": true,
       "default": 240.0,
       "placeholder": null,
       "advanced": false,
-      "min": null,
-      "max": null,
+      "min": 1,
+      "max": 300,
       "options": []
     },
     {

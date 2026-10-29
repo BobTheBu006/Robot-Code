@@ -90,13 +90,13 @@
       "key": "speed_rpm",
       "label": "Calibration Speed (RPM)",
       "type": "number",
-      "description": "Motor speed used while homing both Z axes.",
+      "description": "Motor speed used while homing both Z axes. At most 300 rpm.",
       "required": true,
       "default": 100.0,
       "placeholder": null,
       "advanced": false,
-      "min": null,
-      "max": null,
+      "min": 1,
+      "max": 300,
       "options": []
     },
     {

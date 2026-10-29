@@ -308,13 +308,13 @@
       "key": "z_speed_rpm",
       "label": "Z Speed (RPM)",
       "type": "number",
-      "description": "Z platform speed.",
+      "description": "Z platform speed. At most 300 rpm.",
       "required": false,
       "default": 240.0,
       "placeholder": null,
       "advanced": true,
       "min": 1,
-      "max": null,
+      "max": 300,
       "options": []
     },
     {
