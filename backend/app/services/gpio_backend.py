@@ -99,11 +99,24 @@ _lgpio_backend: LgpioBackend | None = None
 
 
 def reset_gpio_backend_cache() -> None:
-    global _lgpio_backend
+    global _lgpio_backend, _rpi_gpio
     _lgpio_backend = None
+    _rpi_gpio = None
+
+
+# The RPi.GPIO module, once it has been probed. Probing ends in a full
+# cleanup(), which releases every pin any service has set up; doing it on
+# every load un-configured the access door and the Z limit switches whenever
+# another block loaded the backend ("You must setup() the GPIO channel
+# first"), so it happens once per process.
+_rpi_gpio: Any | None = None
 
 
 def _load_rpi_gpio() -> tuple[Any | None, str | None]:
+    global _rpi_gpio
+    if _rpi_gpio is not None:
+        return _rpi_gpio, None
+
     try:
         gpio = importlib.import_module("RPi.GPIO")
     except Exception as exc:
@@ -129,6 +142,7 @@ def _load_rpi_gpio() -> tuple[Any | None, str | None]:
     except Exception as exc:
         return None, str(exc)
 
+    _rpi_gpio = gpio
     return gpio, None
 
 

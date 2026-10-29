@@ -130,14 +130,24 @@ class AccessDoorSensor:
 
         try:
             level = gpio.input(pin)
-        except Exception as exc:
-            return AccessDoorState(
-                is_open=None,
-                pin=pin,
-                detected=False,
-                override_active=override,
-                reason=f"Could not read the access door on GPIO {pin}: {exc}",
-            )
+        except Exception:
+            # Something else released the pin (a GPIO cleanup elsewhere).
+            # Set it up again and read once more before calling it unreadable.
+            with self._lock:
+                self._gpio = None
+                gpio = self._ensure_pin()
+            try:
+                if gpio is None:
+                    raise RuntimeError("no GPIO backend")
+                level = gpio.input(pin)
+            except Exception as exc:
+                return AccessDoorState(
+                    is_open=None,
+                    pin=pin,
+                    detected=False,
+                    override_active=override,
+                    reason=f"Could not read the access door on GPIO {pin}: {exc}",
+                )
 
         closed = (level == gpio.LOW) if self._door_closed_is_low() else (level == gpio.HIGH)
         is_open = not closed
