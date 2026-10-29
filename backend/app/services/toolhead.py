@@ -294,7 +294,12 @@ class ToolheadService:
         # to slow it without slowing the whole approach.
         rack_speed = int(rack_approach_speed_rpm or 0) or approach_speed_rpm
 
-        if verify_x_home and waypoints:
+        # The detour to the Y home position only serves the re-home probe,
+        # which exists on the Pi-driven gantry alone. On the ESP32 gantry the
+        # probe is skipped, so the detour was a pointless trip to (x+2, ~0)
+        # followed by a long Y move; go straight to the first waypoint there.
+        can_rehome = context is not None and xy_hardware_is_on_raspberry_pi(context)
+        if verify_x_home and waypoints and can_rehome:
             clearance_x = waypoints[0][0]
             moves.append(
                 self._goto(base_inputs, clearance_x, Y_HOME_APPROACH_CM, approach_speed_rpm, context=context)

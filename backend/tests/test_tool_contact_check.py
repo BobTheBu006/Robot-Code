@@ -133,6 +133,15 @@ class SequenceTests(unittest.TestCase):
             self._run([True], retries=2)
         self.assertNotIn(("check", True), self.events)
 
+    def test_no_detour_to_the_y_home_position_on_the_esp32_gantry(self) -> None:
+        # Re-homing is Pi-only; without it the pick-up goes straight to the
+        # tool's clearance position instead of (x+2, ~0) first.
+        waypoints = self.service.pickup_waypoints(POSITION, DIP, LIFT, CLEAR)
+        with mock.patch.object(toolhead_module, "xy_hardware_is_on_raspberry_pi", lambda context: False):
+            self.service.run_sequence({}, waypoints, approach_speed_rpm=400, context={}, verify_x_home=True)
+        self.assertEqual(self._moves()[0], CLEARANCE)
+        self.assertEqual(self._moves(), waypoints)
+
     def test_no_check_means_the_old_sequence(self) -> None:
         waypoints = self.service.pickup_waypoints(POSITION, DIP, LIFT, CLEAR)
         self.service.run_sequence({}, waypoints, approach_speed_rpm=400)
