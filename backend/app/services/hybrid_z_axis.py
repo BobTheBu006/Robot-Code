@@ -732,6 +732,23 @@ class HybridZAxisService:
             "trusted - run Calibrate Z Axis before moving it again."
         )
 
+    def _assert_not_into_pressed_switch(self, gpio: Any, pins: _ZPinPlan, delta_left: int, delta_right: int) -> None:
+        """Refuse only a move *into* a pressed switch. Zero sits on the min
+        switch's trip point, so a bed at 0 cm has its min switch pressed;
+        refusing every move while any switch was pressed stopped the bed from
+        ever leaving the bottom."""
+        blocked = []
+        for side, delta, min_pin, max_pin in (
+            ("left", delta_left, pins.left_min_limit_pin, pins.left_max_limit_pin),
+            ("right", delta_right, pins.right_min_limit_pin, pins.right_max_limit_pin),
+        ):
+            if delta < 0 and self._switch_pressed(gpio, min_pin):
+                blocked.append(f"{side} is on its min switch and the move goes down")
+            if delta > 0 and self._switch_pressed(gpio, max_pin):
+                blocked.append(f"{side} is on its max switch and the move goes up")
+        if blocked:
+            raise HybridZAxisError("Z move refused: " + "; ".join(blocked) + ".")
+
     def _assert_limits_clear(self, gpio: Any, pins: _ZPinPlan) -> None:
         active = [name for name, pin in (
             ("left_min", pins.left_min_limit_pin), ("left_max", pins.left_max_limit_pin),
@@ -1050,14 +1067,14 @@ class HybridZAxisService:
         with self._hold_power(context, port), self._lock:
             self._setup_limit_gpio(gpio, pins)
             try:
-                self._assert_limits_clear(gpio, pins)
-                serial_port = self._open_serial(port, baud_rate)
-                self._send_pins(serial_port, pins)
-
                 target_left_steps = round(request.z_left_cm * self._steps_per_cm)
                 target_right_steps = round(request.z_right_cm * self._steps_per_cm)
                 delta_left = target_left_steps - self._left_steps
                 delta_right = target_right_steps - self._right_steps
+                self._assert_not_into_pressed_switch(gpio, pins, delta_left, delta_right)
+
+                serial_port = self._open_serial(port, baud_rate)
+                self._send_pins(serial_port, pins)
 
                 self._assert_sides_calibrated(delta_left, delta_right)
 
