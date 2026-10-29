@@ -542,6 +542,35 @@ void readEncoderSnapshotSteps(long &stepsA, long &stepsB) {
   portEXIT_CRITICAL(&encoderSnapshotMux);
 }
 
+// The AS5600 runs its angle through a filter before RAW ANGLE, and its
+// default (16x) lags the shaft by about 2.2 ms. That lag grows with speed:
+// at 600 rpm motor B turns ~16 steps per ms, so the reading trailed by ~35
+// steps (~90 counts) and tripped the 80-count follow limit on moves that had
+// not slipped at all (2026-10-29 - the resync at rest found 3 steps). The
+// fastest setting (2x, ~0.29 ms) cuts that to a few steps for slightly more
+// noise. CONF is volatile, so it is written on every setup.
+const uint8_t AS5600_REG_CONF_HIGH = 0x07;   // WD (bit 5), FTH (4:2), SF (1:0)
+const uint8_t AS5600_CONF_SF_MASK = 0x03;
+const uint8_t AS5600_CONF_FTH_MASK = 0x1C;
+const uint8_t AS5600_CONF_SF_2X = 0x03;      // slow filter 2x; FTH 000 = slow filter only
+
+bool setAs5600FastFilter(TwoWire &bus) {
+  bus.beginTransmission(AS5600_ADDRESS);
+  bus.write(AS5600_REG_CONF_HIGH);
+  if (bus.endTransmission(false) != 0 || bus.requestFrom(AS5600_ADDRESS, (uint8_t)1) != 1) {
+    return false;
+  }
+  uint8_t conf = bus.read();
+  uint8_t wanted = (conf & ~(AS5600_CONF_SF_MASK | AS5600_CONF_FTH_MASK)) | AS5600_CONF_SF_2X;
+  if (wanted == conf) {
+    return true;
+  }
+  bus.beginTransmission(AS5600_ADDRESS);
+  bus.write(AS5600_REG_CONF_HIGH);
+  bus.write(wanted);
+  return bus.endTransmission() == 0;
+}
+
 void configureEncoderChannel(EncoderChannel &channel, TwoWire &bus, int sdaPin, int sclPin) {
   if (channel.bus != nullptr && (channel.sdaPin != sdaPin || channel.sclPin != sclPin)) {
     channel.bus->end();
@@ -558,6 +587,11 @@ void configureEncoderChannel(EncoderChannel &channel, TwoWire &bus, int sdaPin, 
   if (bus.begin(sdaPin, sclPin, AS5600_I2C_HZ)) {
     bus.setTimeOut(AS5600_I2C_TIMEOUT_MS);
     channel.bus = &bus;
+    if (!setAs5600FastFilter(bus)) {
+      // Still usable - only slower to follow - so say so and carry on.
+      Serial.print("WARN ENCODER FILTER NOT SET SDA ");
+      Serial.println(sdaPin);
+    }
   }
 }
 
