@@ -845,6 +845,8 @@ long followBaseStepsA = 0;
 long followBaseStepsB = 0;
 long followBaseCountsA = 0;
 long followBaseCountsB = 0;
+long followBaseCartesianX = 0;
+long followBaseCartesianY = 0;
 
 void beginFollowTracking() {
   xyFollowErrorTripped = false;
@@ -857,11 +859,62 @@ void beginFollowTracking() {
   xyPid.primed = false;
   followBaseStepsA = xAxis.currentSteps;
   followBaseStepsB = yAxis.currentSteps;
+  followBaseCartesianX = currentXSteps;
+  followBaseCartesianY = currentYSteps;
   // The motors are standing still here, so the latest snapshot from the
   // reader task is the start position.
   bool okA = false;
   bool okB = false;
   readEncoderSnapshot(followBaseCountsA, followBaseCountsB, okA, okB);
+}
+
+// How long a stopped carriage gets to come to rest before the encoders are
+// trusted as its position: an abrupt stop from speed can carry it on a few
+// steps, and the reader task needs a fresh snapshot after that.
+const unsigned long RESYNC_SETTLE_MS = 150;
+
+// After a move ends early - E-Stop/STOP, a limit switch, a following error -
+// the step counters say where the motors were *told* to go, not where they
+// went: stopping hard from speed can make a motor slip, and a follow error
+// means it already did. The encoders saw what really happened since the move
+// began, so the position is rebuilt from them. Without this every E-Stop
+// cost a little calibration, and a later move to the rack aimed at the wrong
+// place (2026-10-29: a drop tripped ERR FOLLOW ERROR after a few E-Stops).
+void resyncPositionFromEncoders(const char *reason) {
+  if (!encodersConfigured) {
+    return;
+  }
+  delay(RESYNC_SETTLE_MS);
+  long countsA = 0;
+  long countsB = 0;
+  bool okA = false;
+  bool okB = false;
+  readEncoderSnapshot(countsA, countsB, okA, okB);
+  if (!okA || !okB || encoderA.faulted || encoderB.faulted) {
+    Serial.print("WARN XY POSITION NOT RESYNCED ");
+    Serial.print(reason);
+    Serial.println(" ENCODER READ FAULT");
+    return;
+  }
+
+  float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
+  long movedA = lroundf((float)(countsA - followBaseCountsA) / countsPerStep);
+  long movedB = lroundf((float)(countsB - followBaseCountsB) / countsPerStep);
+  long correctionA = (followBaseStepsA + movedA) - xAxis.currentSteps;
+  long correctionB = (followBaseStepsB + movedB) - yAxis.currentSteps;
+
+  xAxis.currentSteps = followBaseStepsA + movedA;
+  yAxis.currentSteps = followBaseStepsB + movedB;
+  // CoreXY: A = X + Y and B = X - Y, so X = (A + B) / 2 and Y = (A - B) / 2.
+  currentXSteps = followBaseCartesianX + (movedA + movedB) / 2;
+  currentYSteps = followBaseCartesianY + (movedA - movedB) / 2;
+
+  Serial.print("XY POSITION RESYNCED ");
+  Serial.print(reason);
+  Serial.print(" CORRECTION STEPS ");
+  Serial.print(correctionA);
+  Serial.print(" ");
+  Serial.println(correctionB);
 }
 
 // One control-loop tick: read both encoders, update following-error stats,
@@ -907,16 +960,18 @@ bool applyPidCorrectionTick(
 
   float errorA = (float)commandedA - measuredA;
   float errorB = (float)commandedB - measuredB;
-  xyLastFollowErrorA = errorA;
-  xyLastFollowErrorB = errorB;
-  xyPeakFollowErrorA = max(xyPeakFollowErrorA, fabsf(errorA));
-  xyPeakFollowErrorB = max(xyPeakFollowErrorB, fabsf(errorB));
 
   // A motor's own error in counts, for the fault threshold - which is
   // specified in encoder counts, not steps, since that is the sensor's native
-  // unit and what an operator tunes against.
+  // unit and what an operator tunes against. Reported in counts too, so the
+  // number in "ERR FOLLOW ERROR XY" compares directly with the limit (it was
+  // printed in steps: 59.5 tripped an 80 limit because it meant 152 counts).
   float errorCountsA = errorA * countsPerStep;
   float errorCountsB = errorB * countsPerStep;
+  xyLastFollowErrorA = errorCountsA;
+  xyLastFollowErrorB = errorCountsB;
+  xyPeakFollowErrorA = max(xyPeakFollowErrorA, fabsf(errorCountsA));
+  xyPeakFollowErrorB = max(xyPeakFollowErrorB, fabsf(errorCountsB));
   if (fabsf(errorCountsA) > xyFollowLimitCounts || fabsf(errorCountsB) > xyFollowLimitCounts) {
     xyFollowErrorTripped = true;
     return false;
@@ -1028,6 +1083,7 @@ bool runCoreXYCartesianMove(
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
       stopRequested = true;
+      resyncPositionFromEncoders("STOP");
       return false;
     }
 
@@ -1072,6 +1128,7 @@ bool runCoreXYCartesianMove(
       }
 
       if (xBlocked || yBlocked) {
+        resyncPositionFromEncoders("LIMIT");
         return false;
       }
     }
@@ -1127,6 +1184,7 @@ bool runCoreXYCartesianMove(
     // end: it runs dozens of times per move even at modest step counts.
     if (encodersConfigured && (iteration % PID_CHECK_EVERY_N_ITERATIONS) == 0) {
       if (!applyPidCorrectionTick(xAxis.currentSteps, yAxis.currentSteps, accumulatorA, accumulatorB, totalIterations)) {
+        resyncPositionFromEncoders("FOLLOW ERROR");
         return false;
       }
     }
@@ -2653,11 +2711,12 @@ bool moveGantryXYTo(
 
   for (long iteration = 0; iteration < totalIterations; iteration++) {
     if (consumeStopCommandIfPresent()) {
-      // Position was tracked incrementally, so it is already current.
       // consumeStopCommandIfPresent() has already acknowledged with "OK STOP";
       // printing it again would leave a second copy in the serial buffer, which
       // the host reads as the reply to whatever command it sends next and treats
-      // as that command having been cancelled.
+      // as that command having been cancelled. The position the steps imply is
+      // replaced by what the encoders saw - a hard stop can slip a motor.
+      resyncPositionFromEncoders("STOP");
       saveXCalibrationState();
       return false;
     }
@@ -2671,6 +2730,7 @@ bool moveGantryXYTo(
         || (xSign < 0 && !rackMove && isLimitActive(xAxis.minLimitPin))
         || (ySign > 0 && isLimitActive(yAxis.maxLimitPin))
         || (ySign < 0 && isLimitActive(yAxis.minLimitPin))) {
+      resyncPositionFromEncoders("LIMIT");
       saveXCalibrationState();
       Serial.println("ERR ESTOP XY LIMIT");
       return false;
@@ -2723,6 +2783,7 @@ bool moveGantryXYTo(
     // what the Move XY block sends, so this is where it has to run.
     if (encodersConfigured && (iteration % PID_CHECK_EVERY_N_ITERATIONS) == 0) {
       if (!applyPidCorrectionTick(xAxis.currentSteps, yAxis.currentSteps, accumulatorA, accumulatorB, totalIterations)) {
+        resyncPositionFromEncoders("FOLLOW ERROR");
         saveXCalibrationState();
         Serial.print("ERR FOLLOW ERROR XY ");
         Serial.print(xyLastFollowErrorA, 2);
