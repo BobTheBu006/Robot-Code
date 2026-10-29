@@ -3,7 +3,7 @@
   "id": "calibrate_z",
   "display_name": "Calibrate Z Axis",
   "category": "Robot Actions",
-  "description": "Homes both Z motors independently: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. The actual measured travel becomes the calibrated range for later Move Z Axis calls.",
+  "description": "Homes the Z motors: each side drives down to its min limit switch (sets 0), then up to its max limit switch, using the entered track length as the expected travel. With 'both', the two sides home at the same time and each motor is stopped by its own switch (needs the Z board firmware with stop sources; older firmware homes one side after the other). The measured travel becomes the calibrated range for later Move Z Axis calls.",
   "version": "0.4.0",
   "inputs": [
     {

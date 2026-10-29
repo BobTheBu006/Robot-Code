@@ -66,7 +66,10 @@ park (on drop) removes the overlays and reattaches I2C.
 
 The Z axis is deliberately **split**: motors on the ESP32, limit switches on
 the Pi (`hybrid_z_axis.py`). The Pi watches the switch and sends `STOP` over
-serial the instant it trips.
+serial the instant it trips. The stop names its source: `STOP Z_LEFT_MIN` (etc.) holds only
+that motor and the other carries on, plain `STOP` stops everything. That
+lets Calibrate Z home both sides at once; the Pi checks `FEATURES?` first,
+because older firmware ignores a sourced stop mid-move.
 
 ## The rules that matter
 
@@ -90,7 +93,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-439 tests, stdlib `unittest`, no pytest.
+444 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 

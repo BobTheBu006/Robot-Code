@@ -28,6 +28,16 @@ AxisChannel yAxis = {18, 19, 23, 25, 0, DEFAULT_Y_WORKSPACE_CM};
 AxisChannel zLeftAxis = {32, 33, 12, 13, 0, DEFAULT_Z_WORKSPACE_CM};
 AxisChannel zRightAxis = {32, 33, 12, 13, 0, DEFAULT_Z_WORKSPACE_CM};
 
+// What caused a STOP (see parseStopCommand). Declared up here, above every
+// function, because Arduino inserts its generated prototypes before the first
+// function and they name this type.
+enum StopSource {
+  STOP_SOURCE_NONE,
+  STOP_SOURCE_ALL,
+  STOP_SOURCE_Z_LEFT,
+  STOP_SOURCE_Z_RIGHT,
+};
+
 long currentXSteps = 0;
 long currentYSteps = 0;
 float xStepsPerCm = DEFAULT_XY_STEPS_PER_CM;
@@ -136,20 +146,49 @@ bool isLimitActive(int pin) {
   return pin >= 0 && digitalRead(pin) == LOW;
 }
 
-bool consumeStopCommandIfPresent() {
+// "STOP" or "STOP <source>", the source naming what caused the stop. A Z
+// limit switch (Z_LEFT_MIN, Z_LEFT_MAX, Z_RIGHT_MIN, Z_RIGHT_MAX) holds only
+// that Z motor, so the other can carry on to its own switch. Anything else -
+// ESTOP, CANCEL, an unknown source or no source - stops everything.
+StopSource parseStopCommand(String command) {
+  command.trim();
+  command.toUpperCase();
+  if (command == "STOP") {
+    return STOP_SOURCE_ALL;
+  }
+  if (!command.startsWith("STOP ")) {
+    return STOP_SOURCE_NONE;
+  }
+  String source = command.substring(5);
+  source.trim();
+  if (source == "Z_LEFT_MIN" || source == "Z_LEFT_MAX") {
+    return STOP_SOURCE_Z_LEFT;
+  }
+  if (source == "Z_RIGHT_MIN" || source == "Z_RIGHT_MAX") {
+    return STOP_SOURCE_Z_RIGHT;
+  }
+  return STOP_SOURCE_ALL;
+}
+
+StopSource consumeStopSourceIfPresent() {
   if (!Serial.available()) {
-    return false;
+    return STOP_SOURCE_NONE;
   }
 
   String pending = Serial.readStringUntil('\n');
   pending.trim();
   pending.toUpperCase();
-  if (pending == "STOP") {
-    Serial.println("OK STOP");
-    return true;
+  StopSource source = parseStopCommand(pending);
+  if (source != STOP_SOURCE_NONE) {
+    Serial.print("OK ");
+    Serial.println(pending);
   }
+  return source;
+}
 
-  return false;
+// Loops that cannot hold a single motor treat every stop as a full stop.
+bool consumeStopCommandIfPresent() {
+  return consumeStopSourceIfPresent() != STOP_SOURCE_NONE;
 }
 
 bool axisLimitActive(const AxisChannel &axis, bool positiveDirection, int limitMode) {
@@ -235,6 +274,10 @@ bool runDualAxisMove(
 
   long accumulatorFirst = 0;
   long accumulatorSecond = 0;
+  // Held by a per-motor stop from the host (its Z limit switch tripped):
+  // that motor stops stepping, the other continues the same move.
+  bool firstHeld = false;
+  bool secondHeld = false;
   firstBlocked = false;
   secondBlocked = false;
   stopRequested = false;
@@ -248,9 +291,22 @@ bool runDualAxisMove(
   bool secondMaxWasActive = useLimitChecks && stopOnAnyNewLimit && limitMode == 4 && isLimitActive(secondAxis.maxLimitPin);
 
   for (long iteration = 0; iteration < totalIterations; iteration++) {
-    if (consumeStopCommandIfPresent()) {
-      stopRequested = true;
-      return false;
+    StopSource stopSource = consumeStopSourceIfPresent();
+    if (stopSource != STOP_SOURCE_NONE) {
+      AxisChannel *heldAxis = stopSource == STOP_SOURCE_Z_LEFT
+        ? &zLeftAxis
+        : stopSource == STOP_SOURCE_Z_RIGHT ? &zRightAxis : nullptr;
+      if (heldAxis != nullptr && heldAxis == &firstAxis) {
+        firstHeld = true;
+      } else if (heldAxis != nullptr && heldAxis == &secondAxis) {
+        secondHeld = true;
+      } else {
+        stopRequested = true;
+        return false;
+      }
+    }
+    if ((firstHeld || absFirst == 0) && (secondHeld || absSecond == 0)) {
+      break;
     }
 
     if (useLimitChecks && stopOnAnyNewLimit) {
@@ -288,7 +344,7 @@ bool runDualAxisMove(
     bool stepSecond = false;
 
     accumulatorFirst += absFirst;
-    if (!firstBlocked && absFirst > 0 && accumulatorFirst >= totalIterations) {
+    if (!firstBlocked && !firstHeld && absFirst > 0 && accumulatorFirst >= totalIterations) {
       accumulatorFirst -= totalIterations;
       if (useLimitChecks && axisLimitActive(firstAxis, firstPositive, limitMode)) {
         firstBlocked = true;
@@ -298,7 +354,7 @@ bool runDualAxisMove(
     }
 
     accumulatorSecond += absSecond;
-    if (!secondBlocked && absSecond > 0 && accumulatorSecond >= totalIterations) {
+    if (!secondBlocked && !secondHeld && absSecond > 0 && accumulatorSecond >= totalIterations) {
       accumulatorSecond -= totalIterations;
       if (useLimitChecks && axisLimitActive(secondAxis, secondPositive, limitMode)) {
         secondBlocked = true;
@@ -1811,8 +1867,15 @@ void loop() {
   else if (cmd == "PING") {
     Serial.println("PONG");
   }
-  else if (cmd == "STOP") {
-    Serial.println("OK STOP");
+  // A stop arriving just after a move finished is acknowledged, not unknown.
+  // FEATURES? lets the host check for stop sources before relying on them:
+  // older firmware ignores "STOP <source>" mid-move.
+  else if (parseStopCommand(cmd) != STOP_SOURCE_NONE) {
+    Serial.print("OK ");
+    Serial.println(cmd);
+  }
+  else if (cmd == "FEATURES?") {
+    Serial.println("OK FEATURES STOP_SOURCE");
   }
   else if (handleSetXYPinsCommand(cmd)) {
   }
