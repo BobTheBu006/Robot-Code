@@ -170,20 +170,36 @@ StopSource parseStopCommand(String command) {
   return STOP_SOURCE_ALL;
 }
 
-StopSource consumeStopSourceIfPresent() {
-  if (!Serial.available()) {
-    return STOP_SOURCE_NONE;
-  }
+// Characters of a line that has not finished arriving. Step loops call
+// consumeStopSourceIfPresent between steps, and it must never wait there:
+// blocking until "STOP Z_LEFT_MIN" had fully arrived (~1.4 ms at 115200
+// baud) starved the motor still moving of steps, then restarted it at full
+// speed with no ramp - at 600 rpm that stalled it. Only bytes already
+// received are taken; a line is acted on once its newline is in.
+String pendingSerialLine = "";
 
-  String pending = Serial.readStringUntil('\n');
-  pending.trim();
-  pending.toUpperCase();
-  StopSource source = parseStopCommand(pending);
-  if (source != STOP_SOURCE_NONE) {
-    Serial.print("OK ");
-    Serial.println(pending);
+StopSource consumeStopSourceIfPresent() {
+  while (Serial.available()) {
+    char received = (char)Serial.read();
+    if (received != '\n') {
+      if (pendingSerialLine.length() < 64) {
+        pendingSerialLine += received;
+      }
+      continue;
+    }
+
+    String line = pendingSerialLine;
+    pendingSerialLine = "";
+    line.trim();
+    line.toUpperCase();
+    StopSource source = parseStopCommand(line);
+    if (source != STOP_SOURCE_NONE) {
+      Serial.print("OK ");
+      Serial.println(line);
+      return source;
+    }
   }
-  return source;
+  return STOP_SOURCE_NONE;
 }
 
 // Loops that cannot hold a single motor treat every stop as a full stop.
@@ -1851,11 +1867,17 @@ void setup() {
 }
 
 void loop() {
-  if (!Serial.available()) {
+  if (!Serial.available() && pendingSerialLine.length() == 0) {
     return;
   }
 
-  String cmd = Serial.readStringUntil('\n');
+  // A line a step loop had started to receive when its move ended is
+  // finished here, so its first characters are not lost.
+  String cmd = pendingSerialLine;
+  pendingSerialLine = "";
+  if (!cmd.endsWith("\n")) {
+    cmd += Serial.readStringUntil('\n');
+  }
   cmd.trim();
   if (cmd.length() == 0) {
     return;
