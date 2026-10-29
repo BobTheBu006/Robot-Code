@@ -471,6 +471,16 @@ XYPidState xyPid;
 // above the normal running lag of ~2 full steps (~41 counts).
 float xyFollowLimitCounts = 80.0f;
 
+// While moving, the encoder reading trails the shaft by a few milliseconds
+// (sensor filter, read and publish time), so the apparent error grows with
+// speed: ~100 counts at 600 rpm on moves that, checked at rest, were within
+// 2-3 steps (2026-10-29). The in-motion limit therefore allows this much
+// lag on top of xyFollowLimitCounts; it still catches a crash or a jam.
+// Exact slip detection happens at rest, at the end of each move (see
+// verifyArrivalFromEncoders).
+const float XY_ENCODER_LATENCY_S = 0.006f;
+volatile float xyActiveStepsPerSecond = 0.0f;
+
 // Motor steps per revolution as the encoder sees them. Kept apart from
 // stepsPerRevolution, which also drives the RPM maths: measured on the
 // machine (2026-10-27) the TB6600s make 1600 steps/rev - 256 encoder counts
@@ -895,6 +905,7 @@ void beginFollowTracking() {
   followBaseStepsB = yAxis.currentSteps;
   followBaseCartesianX = currentXSteps;
   followBaseCartesianY = currentYSteps;
+  xyActiveStepsPerSecond = 0.0f;
   // The motors are standing still here, so the latest snapshot from the
   // reader task is the start position.
   bool okA = false;
@@ -925,11 +936,15 @@ struct ResyncPause {
 // began, so the position is rebuilt from them. Without this every E-Stop
 // cost a little calibration, and a later move to the rack aimed at the wrong
 // place (2026-10-29: a drop tripped ERR FOLLOW ERROR after a few E-Stops).
-void resyncPositionFromEncoders(const char *reason) {
+// Rebuild the position from the encoders if it is off by more than
+// `toleranceSteps` on either motor. Returns true when the position was
+// already within the tolerance (or cannot be checked), false when it had to
+// be corrected.
+bool correctPositionFromEncoders(const char *reason, unsigned long settleMs, long toleranceSteps) {
   if (!encodersConfigured || !resyncOnEarlyExit) {
-    return;
+    return true;
   }
-  delay(RESYNC_SETTLE_MS);
+  delay(settleMs);
   long countsA = 0;
   long countsB = 0;
   bool okA = false;
@@ -939,7 +954,7 @@ void resyncPositionFromEncoders(const char *reason) {
     Serial.print("WARN XY POSITION NOT RESYNCED ");
     Serial.print(reason);
     Serial.println(" ENCODER READ FAULT");
-    return;
+    return true;
   }
 
   float countsPerStep = (float)ENCODER_COUNTS_PER_REV / (float)encoderStepsPerRevolution;
@@ -947,6 +962,9 @@ void resyncPositionFromEncoders(const char *reason) {
   long movedB = lroundf((float)(countsB - followBaseCountsB) / countsPerStep);
   long correctionA = (followBaseStepsA + movedA) - xAxis.currentSteps;
   long correctionB = (followBaseStepsB + movedB) - yAxis.currentSteps;
+  if (labs(correctionA) <= toleranceSteps && labs(correctionB) <= toleranceSteps) {
+    return true;
+  }
 
   xAxis.currentSteps = followBaseStepsA + movedA;
   yAxis.currentSteps = followBaseStepsB + movedB;
@@ -965,6 +983,22 @@ void resyncPositionFromEncoders(const char *reason) {
   Serial.print(correctionA);
   Serial.print(" ");
   Serial.println(correctionB);
+  return false;
+}
+
+void resyncPositionFromEncoders(const char *reason) {
+  correctPositionFromEncoders(reason, RESYNC_SETTLE_MS, 0);
+}
+
+// At the end of a move that ran to completion: at rest the encoders are
+// exact, so a motor more than one full step from where its steps say it is
+// lost steps on the way. The position is corrected, and the move must not
+// count as arrived - a tool change would dip into the wrong place.
+const unsigned long ARRIVAL_SETTLE_MS = 20;
+const long ARRIVAL_TOLERANCE_STEPS = 8;   // one full step at 1600 steps/rev
+
+bool verifyArrivalFromEncoders() {
+  return correctPositionFromEncoders("MISSED TARGET", ARRIVAL_SETTLE_MS, ARRIVAL_TOLERANCE_STEPS);
 }
 
 // One control-loop tick: read both encoders, update following-error stats,
@@ -1022,7 +1056,8 @@ bool applyPidCorrectionTick(
   xyLastFollowErrorB = errorCountsB;
   xyPeakFollowErrorA = max(xyPeakFollowErrorA, fabsf(errorCountsA));
   xyPeakFollowErrorB = max(xyPeakFollowErrorB, fabsf(errorCountsB));
-  if (fabsf(errorCountsA) > xyFollowLimitCounts || fabsf(errorCountsB) > xyFollowLimitCounts) {
+  float allowedCounts = xyFollowLimitCounts + xyActiveStepsPerSecond * XY_ENCODER_LATENCY_S * countsPerStep;
+  if (fabsf(errorCountsA) > allowedCounts || fabsf(errorCountsB) > allowedCounts) {
     xyFollowErrorTripped = true;
     return false;
   }
@@ -1248,6 +1283,7 @@ bool runCoreXYCartesianMove(
         accelerationRpmPerSecond
       );
       unsigned long intervalMicros = stepIntervalMicrosForRPM(activeRpm);
+      xyActiveStepsPerSecond = 1000000.0f / (float)intervalMicros;
       unsigned long lowTimeMicros = intervalMicros > (unsigned long)STEP_PULSE_WIDTH_US
         ? intervalMicros - (unsigned long)STEP_PULSE_WIDTH_US
         : (unsigned long)STEP_PULSE_WIDTH_US;
@@ -1376,6 +1412,10 @@ bool moveXYTo(float targetXCm, float targetYCm, int rpm, bool trapezoidalSpeed, 
   if (moved) {
     currentXSteps = targetXSteps;
     currentYSteps = targetYSteps;
+    if (!verifyArrivalFromEncoders()) {
+      Serial.println("ERR XY MISSED TARGET");
+      return false;
+    }
   }
 
   Serial.print("COREXY MOTOR POSITION STEPS ");
@@ -2847,6 +2887,7 @@ bool moveGantryXYTo(
     if (stepA || stepB) {
       int activeRpm = rpmForTrapezoidIteration(iteration, totalIterations, rpm, trapezoidalSpeed, accelerationRpmPerSecond);
       unsigned long intervalMicros = stepIntervalMicrosForRPM(activeRpm);
+      xyActiveStepsPerSecond = 1000000.0f / (float)intervalMicros;
       unsigned long lowTimeMicros = intervalMicros > (unsigned long)STEP_PULSE_WIDTH_US
         ? intervalMicros - (unsigned long)STEP_PULSE_WIDTH_US
         : (unsigned long)STEP_PULSE_WIDTH_US;
@@ -2856,6 +2897,10 @@ bool moveGantryXYTo(
 
   currentXSteps = targetXSteps;
   currentYSteps = targetYSteps;
+  if (!verifyArrivalFromEncoders()) {
+    Serial.println("ERR XY MISSED TARGET");
+    return false;
+  }
   saveXCalibrationState();
 
   Serial.print("XY POSITION CM ");
