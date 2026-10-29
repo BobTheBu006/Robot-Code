@@ -1114,6 +1114,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [pendingConfirmations, setPendingConfirmations] = useState<UncertainFact[]>([]);
   // The hand-teach dialog (Teach Tool / Deepwell Positions). Open while such
   // a block runs; the block waits on the promise held in teachResolverRef.
+  // Typed coordinates in the teach dialog; null shows the live position.
+  const [teachDraft, setTeachDraft] = useState<{ x: string; y: string } | null>(null);
+  const [teachMoving, setTeachMoving] = useState(false);
+  // Read by the position poll, which must not talk to the board mid-move.
+  const teachMovingRef = useRef(false);
   const [teach, setTeach] = useState<{
     title: string;
     // "{target}" is replaced by the current target's label.
@@ -2699,7 +2704,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     let cancelled = false;
     const poll = window.setInterval(async () => {
       const pending = teachResolverRef.current;
-      if (!pending) {
+      if (!pending || teachMovingRef.current) {
         return;
       }
       try {
@@ -2720,6 +2725,43 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       window.clearInterval(poll);
     };
   }, [teach !== null, teach?.finishing]);
+
+  useEffect(() => {
+    if (teach === null) {
+      setTeachDraft(null);
+    }
+  }, [teach === null]);
+
+  // Enter in the teach dialog's X/Y fields: drive there, then keep teaching.
+  async function teachGoto() {
+    const pending = teachResolverRef.current;
+    if (!pending || !teach || teachMovingRef.current) {
+      return;
+    }
+    // An emptied field must not read as 0 - that drives toward the rack.
+    const typed = (value: string | undefined, live: number | null | undefined) =>
+      value === undefined ? live ?? NaN : value.trim() === "" ? NaN : Number(value);
+    const x = typed(teachDraft?.x, teach.position?.x_cm);
+    const y = typed(teachDraft?.y, teach.position?.y_cm);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      setTeach((current) => (current ? { ...current, error: "Enter X and Y as numbers in cm." } : current));
+      return;
+    }
+    teachMovingRef.current = true;
+    setTeachMoving(true);
+    try {
+      const position = await xyTeach("goto", { ...pending.params, goto_x_cm: x, goto_y_cm: y });
+      setTeach((current) => (current ? { ...current, position, error: null } : current));
+      setTeachDraft(null);
+    } catch (error) {
+      setTeach((current) => (current
+        ? { ...current, error: error instanceof Error ? error.message : String(error) }
+        : current));
+    } finally {
+      teachMovingRef.current = false;
+      setTeachMoving(false);
+    }
+  }
 
   async function runSingleNode(
     node: WorkflowFlowNode,
@@ -4119,11 +4161,43 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
               </p>
               <div className="teach-dialog__position">
                 <span>Current position</span>
-                <strong>
-                  {teach.position?.x_cm != null && teach.position?.y_cm != null
-                    ? `X ${teach.position.x_cm.toFixed(2)} cm · Y ${teach.position.y_cm.toFixed(2)} cm`
-                    : "-"}
-                </strong>
+                <div className="teach-dialog__coords">
+                  {(["x", "y"] as const).map((axis) => {
+                    const live = axis === "x" ? teach.position?.x_cm : teach.position?.y_cm;
+                    return (
+                      <label key={axis}>
+                        {axis.toUpperCase()}
+                        <input
+                          disabled={teach.finishing || teachMoving}
+                          inputMode="decimal"
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setTeachDraft((current) => ({
+                              x: current?.x ?? (teach.position?.x_cm != null ? teach.position.x_cm.toFixed(2) : ""),
+                              y: current?.y ?? (teach.position?.y_cm != null ? teach.position.y_cm.toFixed(2) : ""),
+                              [axis]: value,
+                            }));
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void teachGoto();
+                            } else if (event.key === "Escape") {
+                              setTeachDraft(null);
+                            }
+                          }}
+                          step="0.01"
+                          type="number"
+                          value={teachDraft ? teachDraft[axis] : live != null ? live.toFixed(2) : ""}
+                        />
+                        cm
+                      </label>
+                    );
+                  })}
+                </div>
+                {teachMoving
+                  ? <small>Moving there… the motors switch off again when it arrives.</small>
+                  : <small>Type a position and press Enter to drive there; Esc shows the live position again.</small>}
                 {teach.position && !teach.position.encoders_ok ? <em>encoder reading not valid</em> : null}
               </div>
               <label className="teach-dialog__slot">

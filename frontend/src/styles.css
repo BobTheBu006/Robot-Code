@@ -3387,6 +3387,34 @@ button.workflow-editor__connector {
   font-variant-numeric: tabular-nums;
 }
 
+.teach-dialog__coords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.teach-dialog__coords label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.teach-dialog__coords input {
+  width: 7.5em;
+  padding: 4px 8px;
+  border: 1px solid rgba(23, 50, 42, 0.25);
+  border-radius: 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.teach-dialog__position small {
+  color: #55766b;
+  font-size: 0.78rem;
+}
+
 .teach-dialog__position em {
   color: #a1302a;
   font-size: 0.85rem;

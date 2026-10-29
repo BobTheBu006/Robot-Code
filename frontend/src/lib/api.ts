@@ -253,8 +253,9 @@ export interface TeachPosition {
 }
 
 // Hand-teach of the tool rack: start switches the XY motors off, position
-// reads where the encoders say the carriage was pushed, end adopts it.
-export function xyTeach(action: "start" | "position" | "end", inputs: Record<string, unknown>): Promise<TeachPosition> {
+// reads where the encoders say the carriage was pushed, end adopts it, and
+// goto drives to inputs.goto_x_cm / goto_y_cm and resumes teaching there.
+export function xyTeach(action: "start" | "position" | "end" | "goto", inputs: Record<string, unknown>): Promise<TeachPosition> {
   return request<TeachPosition>(`/api/robot/xy-teach/${action}`, {
     method: "POST",
     body: JSON.stringify(inputs),
