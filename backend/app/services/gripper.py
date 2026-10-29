@@ -79,6 +79,10 @@ def _sudo(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["sudo", "-n", *args], capture_output=True, text=True, timeout=10)
 
 
+# The Pi 5 pin function that hands a GPIO to the PIO block.
+PIO_PIN_FUNCTION = "a7"
+
+
 class PioPwmServos:
     """Hardware-timed servo pulses via one `pwm-pio` overlay per GPIO."""
 
@@ -90,6 +94,8 @@ class PioPwmServos:
         self._i2c_device = i2c_device
         self._channels: dict[int, str] = {}
         self._i2c_detached = False
+        # Pins routed to the PIO during the current move; see begin_move.
+        self._routed: set[int] = set()
 
     def _chip_for(self, gpio: int) -> str | None:
         if not os.path.isdir(self._sysfs):
@@ -140,6 +146,20 @@ class PioPwmServos:
         with open(os.path.join(channel, name), "w", encoding="ascii") as handle:
             handle.write(str(value))
 
+    def begin_move(self) -> None:
+        """Called before each move: the pins get routed to the PIO again on
+        their first pulse. The overlay outlives a backend restart, and on
+        start-up the connector drives idle GPIO 2/3 LOW as plain outputs -
+        so the PWM ran on, right widths and all, with nothing reaching the
+        servos, and every Gripper block reported success while the claws
+        stayed put (2026-10-29)."""
+        self._routed.clear()
+
+    def _route(self, gpio: int) -> None:
+        if gpio not in self._routed:
+            self._check(self._run("pinctrl", "set", str(gpio), PIO_PIN_FUNCTION), f"Routing GPIO {gpio} to the PIO")
+            self._routed.add(gpio)
+
     def pulse(self, gpio: int, width_us: int) -> None:
         channel = self._channels.get(gpio)
         if channel is None:
@@ -147,9 +167,11 @@ class PioPwmServos:
             self._channels[gpio] = channel
             self._write(channel, "duty_cycle", width_us * 1000)
             self._write(channel, "enable", 1)
+            self._route(gpio)
             return
         self._write(channel, "duty_cycle", width_us * 1000)
         self._write(channel, "enable", 1)
+        self._route(gpio)
 
     def stop(self) -> None:
         for channel in self._channels.values():
@@ -166,6 +188,7 @@ class PioPwmServos:
         for index in reversed(indexes):
             self._run("dtoverlay", "-r", index)
         self._channels.clear()
+        self._routed.clear()
         if self._i2c_detached:
             self._run("sh", "-c", f"echo {self._i2c_device} > {self._i2c_driver}/bind")
             self._i2c_detached = False
@@ -189,6 +212,10 @@ class _FallbackServos:
             self._driver = _LgpioServos()
             self.kind = "lgpio"
             self._driver.pulse(gpio, width_us)
+
+    def begin_move(self) -> None:
+        if hasattr(self._driver, "begin_move"):
+            self._driver.begin_move()
 
     def stop(self) -> None:
         self._driver.stop()
@@ -246,6 +273,8 @@ class GripperService:
             raise ValueError(f"Unknown gripper action '{target}'; use open or close.")
         with self._lock:
             driver = self._servos()
+            if hasattr(driver, "begin_move"):
+                driver.begin_move()
             starts = {}
             for servo in servos:
                 if servo.gpio not in self._angles:

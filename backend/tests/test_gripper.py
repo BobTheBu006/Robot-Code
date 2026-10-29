@@ -251,6 +251,19 @@ class HardwarePwmTests(unittest.TestCase):
         self.assertEqual(len(self.system.commands), before, "a ramp must not spawn a process per step")
         self.assertEqual((self.system.channel(3) / "duty_cycle").read_text(), "800000")
 
+    def test_every_move_routes_the_pins_back_to_the_pio(self) -> None:
+        # A backend restart leaves the overlay loaded while the connector
+        # drives GPIO 2/3 LOW as outputs: the PWM ran with nothing on the pins.
+        self.servos.begin_move()
+        self.servos.pulse(2, 2500)
+        self.servos.pulse(2, 2400)
+        routes = [c for c in self.system.commands if c[:1] == ("pinctrl",)]
+        self.assertEqual(routes, [("pinctrl", "set", "2", "a7")], "once per pin per move")
+        self.servos.begin_move()
+        self.servos.pulse(2, 1000)
+        routes = [c for c in self.system.commands if c[:1] == ("pinctrl",)]
+        self.assertEqual(len(routes), 2, "routed again on the next move")
+
     def test_teardown_removes_the_overlays_and_gives_the_pins_back_to_i2c(self) -> None:
         self.servos.pulse(2, 2500)
         self.servos.pulse(3, 500)
