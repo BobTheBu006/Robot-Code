@@ -176,26 +176,36 @@ StopSource parseStopCommand(String command) {
 // baud) starved the motor still moving of steps, then restarted it at full
 // speed with no ramp - at 600 rpm that stalled it. Only bytes already
 // received are taken; a line is acted on once its newline is in.
-String pendingSerialLine = "";
+// A fixed buffer, not a String: appending to a String allocates on every
+// character, and that work landed between steps of a motor at full speed.
+const size_t PENDING_LINE_CAPACITY = 64;
+char pendingSerialLine[PENDING_LINE_CAPACITY + 1];
+size_t pendingSerialLength = 0;
 
 StopSource consumeStopSourceIfPresent() {
   while (Serial.available()) {
     char received = (char)Serial.read();
     if (received != '\n') {
-      if (pendingSerialLine.length() < 64) {
-        pendingSerialLine += received;
+      if (pendingSerialLength < PENDING_LINE_CAPACITY) {
+        pendingSerialLine[pendingSerialLength++] = received;
       }
       continue;
     }
 
-    String line = pendingSerialLine;
-    pendingSerialLine = "";
+    pendingSerialLine[pendingSerialLength] = '\0';
+    String line(pendingSerialLine);
+    pendingSerialLength = 0;
     line.trim();
     line.toUpperCase();
     StopSource source = parseStopCommand(line);
-    if (source != STOP_SOURCE_NONE) {
+    if (source == STOP_SOURCE_ALL) {
+      // This ends the move, so the reply costs the motors nothing. A stop
+      // that holds one motor is not acknowledged: the other is still
+      // running, and the final "OK STEP Z" says what each motor did.
       Serial.print("OK ");
       Serial.println(line);
+    }
+    if (source != STOP_SOURCE_NONE) {
       return source;
     }
   }
@@ -294,6 +304,11 @@ bool runDualAxisMove(
   // that motor stops stepping, the other continues the same move.
   bool firstHeld = false;
   bool secondHeld = false;
+  // Each step fires at its own time slot rather than a fixed delay after the
+  // previous one, so work done between steps - reading a stop from the host
+  // while the other motor keeps running - is absorbed inside the slot
+  // instead of stretching it. A stretched step at 600 rpm stalled the motor.
+  unsigned long nextStepDueMicros = micros();
   firstBlocked = false;
   secondBlocked = false;
   stopRequested = false;
@@ -386,6 +401,11 @@ bool runDualAxisMove(
       return false;
     }
 
+    if (stepFirst || stepSecond) {
+      while ((long)(micros() - nextStepDueMicros) < 0) {
+      }
+    }
+
     if (stepFirst) {
       digitalWrite(firstAxis.stepPin, HIGH);
     }
@@ -415,10 +435,17 @@ bool runDualAxisMove(
         accelerationRpmPerSecond
       );
       unsigned long intervalMicros = stepIntervalMicrosForRPM(activeRpm);
-      unsigned long lowTimeMicros = intervalMicros > (unsigned long)STEP_PULSE_WIDTH_US
-        ? intervalMicros - (unsigned long)STEP_PULSE_WIDTH_US
-        : (unsigned long)STEP_PULSE_WIDTH_US;
-      delayMicroseconds(lowTimeMicros);
+      nextStepDueMicros += intervalMicros;
+      // More than a whole period behind (a long hold-up): carry on from now
+      // at the normal cadence rather than firing the missed steps in a burst.
+      if ((long)(micros() - nextStepDueMicros) > (long)intervalMicros) {
+        nextStepDueMicros = micros();
+      }
+      // The step pulse must still be low for its minimum width.
+      long untilDue = (long)(nextStepDueMicros - micros());
+      if (untilDue < (long)STEP_PULSE_WIDTH_US) {
+        nextStepDueMicros = micros() + STEP_PULSE_WIDTH_US;
+      }
     }
   }
 
@@ -1867,17 +1894,16 @@ void setup() {
 }
 
 void loop() {
-  if (!Serial.available() && pendingSerialLine.length() == 0) {
+  if (!Serial.available() && pendingSerialLength == 0) {
     return;
   }
 
   // A line a step loop had started to receive when its move ended is
   // finished here, so its first characters are not lost.
-  String cmd = pendingSerialLine;
-  pendingSerialLine = "";
-  if (!cmd.endsWith("\n")) {
-    cmd += Serial.readStringUntil('\n');
-  }
+  pendingSerialLine[pendingSerialLength] = '\0';
+  String cmd(pendingSerialLine);
+  pendingSerialLength = 0;
+  cmd += Serial.readStringUntil('\n');
   cmd.trim();
   if (cmd.length() == 0) {
     return;
