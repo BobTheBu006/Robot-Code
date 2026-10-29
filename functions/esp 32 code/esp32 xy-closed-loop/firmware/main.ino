@@ -2795,6 +2795,12 @@ bool moveGantryXYTo(
 
   beginFollowTracking();
   bool rackMove = targetXCm < 0.0f;
+  // A switch must read pressed for this long, unbroken, before it stops the
+  // move: at 600 rpm a single noisy read on a switch line stopped a tool
+  // change in open space (2026-10-29). 1.5 ms is under 0.1 cm of travel.
+  const unsigned long LIMIT_CONFIRM_US = 1500;
+  unsigned long limitActiveSince = 0;
+  bool limitActive = false;
   long accumulatorA = 0;
   long accumulatorB = 0;
   long accumulatorX = 0;
@@ -2817,13 +2823,26 @@ bool moveGantryXYTo(
     // X-min trigger point (X = -buffer); the owner confirmed the switch takes
     // that overtravel, and a target below 0 is only ever the rack (the range
     // check above floors it at -2 cm). Encoder monitoring still catches a jam.
-    if ((xSign > 0 && isLimitActive(xAxis.maxLimitPin))
-        || (xSign < 0 && !rackMove && isLimitActive(xAxis.minLimitPin))
-        || (ySign > 0 && isLimitActive(yAxis.maxLimitPin))
-        || (ySign < 0 && isLimitActive(yAxis.minLimitPin))) {
+    const char *pressedLimit = nullptr;
+    if (xSign > 0 && isLimitActive(xAxis.maxLimitPin)) {
+      pressedLimit = "X_MAX";
+    } else if (xSign < 0 && !rackMove && isLimitActive(xAxis.minLimitPin)) {
+      pressedLimit = "X_MIN";
+    } else if (ySign > 0 && isLimitActive(yAxis.maxLimitPin)) {
+      pressedLimit = "Y_MAX";
+    } else if (ySign < 0 && isLimitActive(yAxis.minLimitPin)) {
+      pressedLimit = "Y_MIN";
+    }
+    if (pressedLimit == nullptr) {
+      limitActive = false;
+    } else if (!limitActive) {
+      limitActive = true;
+      limitActiveSince = micros();
+    } else if (micros() - limitActiveSince >= LIMIT_CONFIRM_US) {
       resyncPositionFromEncoders("LIMIT");
       saveXCalibrationState();
-      Serial.println("ERR ESTOP XY LIMIT");
+      Serial.print("ERR ESTOP XY LIMIT ");
+      Serial.println(pressedLimit);
       return false;
     }
 
