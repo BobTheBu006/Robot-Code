@@ -732,22 +732,34 @@ class HybridZAxisService:
             "trusted - run Calibrate Z Axis before moving it again."
         )
 
-    def _assert_not_into_pressed_switch(self, gpio: Any, pins: _ZPinPlan, delta_left: int, delta_right: int) -> None:
-        """Refuse only a move *into* a pressed switch. Zero sits on the min
-        switch's trip point, so a bed at 0 cm has its min switch pressed;
-        refusing every move while any switch was pressed stopped the bed from
-        ever leaving the bottom."""
+    def _deltas_respecting_switches(
+        self, gpio: Any, pins: _ZPinPlan, delta_left: int, delta_right: int,
+        target_left_cm: float, target_right_cm: float,
+    ) -> tuple[int, int]:
+        """A pressed switch only matters for a move *into* it. Zero sits on
+        the min switch's trip point, so a bed at (or a hair above) 0 cm has
+        its min switch pressed: asked to go to the bottom, it is already
+        there and is left alone. A move down to anywhere clearly above the
+        switch, or up into a pressed max switch, is refused - the recorded
+        position cannot be right."""
+        adjusted = {"left": delta_left, "right": delta_right}
+        targets = {"left": target_left_cm, "right": target_right_cm}
         blocked = []
-        for side, delta, min_pin, max_pin in (
-            ("left", delta_left, pins.left_min_limit_pin, pins.left_max_limit_pin),
-            ("right", delta_right, pins.right_min_limit_pin, pins.right_max_limit_pin),
+        for side, min_pin, max_pin in (
+            ("left", pins.left_min_limit_pin, pins.left_max_limit_pin),
+            ("right", pins.right_min_limit_pin, pins.right_max_limit_pin),
         ):
+            delta = adjusted[side]
             if delta < 0 and self._switch_pressed(gpio, min_pin):
-                blocked.append(f"{side} is on its min switch and the move goes down")
+                if targets[side] <= MIN_SWITCH_ARRIVAL_CM:
+                    adjusted[side] = 0
+                else:
+                    blocked.append(f"{side} is on its min switch and the move goes down to {targets[side]:g} cm")
             if delta > 0 and self._switch_pressed(gpio, max_pin):
                 blocked.append(f"{side} is on its max switch and the move goes up")
         if blocked:
             raise HybridZAxisError("Z move refused: " + "; ".join(blocked) + ".")
+        return adjusted["left"], adjusted["right"]
 
     def _assert_limits_clear(self, gpio: Any, pins: _ZPinPlan) -> None:
         active = [name for name, pin in (
@@ -1071,7 +1083,9 @@ class HybridZAxisService:
                 target_right_steps = round(request.z_right_cm * self._steps_per_cm)
                 delta_left = target_left_steps - self._left_steps
                 delta_right = target_right_steps - self._right_steps
-                self._assert_not_into_pressed_switch(gpio, pins, delta_left, delta_right)
+                delta_left, delta_right = self._deltas_respecting_switches(
+                    gpio, pins, delta_left, delta_right, request.z_left_cm, request.z_right_cm,
+                )
 
                 serial_port = self._open_serial(port, baud_rate)
                 self._send_pins(serial_port, pins)

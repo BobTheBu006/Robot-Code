@@ -305,12 +305,22 @@ class MoveZWatchesSwitchesTests(SimulatedBoardCase):
         self._move(service, 2.0, 2.0)
         self.assertEqual((board.pos["left"], board.pos["right"]), (2000, 2000))
 
+    def test_a_bed_on_its_min_switch_asked_for_zero_stays_put(self) -> None:
+        # The left sits on its switch but is recorded a hair above zero
+        # (69 steps on the machine); "left 0, right 3" must just move the right.
+        board = FakeZBoard({"left": 0, "right": 1000}, {"left": 5000, "right": 5000})
+        service = self._calibrated(board)
+        service._left_steps = 69
+        self._move(service, 0.0, 3.0)
+        self.assertEqual((board.pos["left"], board.pos["right"]), (0, 3000))
+        self.assertTrue(any(command.startswith("STEP Z 0 2000") for command in board.log), board.log)
+
     def test_a_move_down_into_a_pressed_min_switch_is_refused(self) -> None:
         board = FakeZBoard({"left": 0, "right": 1000}, {"left": 5000, "right": 5000})
         service = self._calibrated(board)
         service._left_steps = 500  # believes it is above the switch
         with self.assertRaisesRegex(HybridZAxisError, "left is on its min switch and the move goes down"):
-            self._move(service, 0.1, 2.0)
+            self._move(service, 0.3, 2.0)
         self.assertFalse([command for command in board.log if command.startswith("STEP")])
 
     def test_arriving_at_the_bottom_is_not_a_fault(self) -> None:
