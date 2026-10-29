@@ -85,7 +85,9 @@ def _plan(inputs: dict) -> list[tuple[str, str, dict]]:
     target_x, target_y = _setting(inputs, "target_x_cm"), _setting(inputs, "target_y_cm")
     target_z = _setting(inputs, "target_z_cm")
     grab_z = _setting(inputs, f"{obj}_grab_z_cm")
-    open_deg, grip_deg = _setting(inputs, f"{obj}_open_deg"), _setting(inputs, f"{obj}_grip_deg")
+    # Per servo, like the Gripper block: the two claws are not symmetric.
+    open_left, open_right = _setting(inputs, f"{obj}_open_left_deg"), _setting(inputs, f"{obj}_open_right_deg")
+    grip_left, grip_right = _setting(inputs, f"{obj}_grip_left_deg"), _setting(inputs, f"{obj}_grip_right_deg")
     travel_left, travel_right = _setting(inputs, "travel_z_left_cm"), _setting(inputs, "travel_z_right_cm")
     xy_speed, z_speed = _setting(inputs, "xy_speed_rpm"), _setting(inputs, "z_speed_rpm")
 
@@ -100,9 +102,12 @@ def _plan(inputs: dict) -> list[tuple[str, str, dict]]:
         raise DeepwellHandlingError(
             f"Target Z ({target_z:g} cm) must be above the left Z travel height ({travel_left:g} cm)."
         )
-    if open_deg <= grip_deg:
+    # The Gripper block's convention: the left claw opens toward higher
+    # angles, the right toward lower ones.
+    if open_left <= grip_left or open_right >= grip_right:
         raise DeepwellHandlingError(
-            f"The {name} claw open angle ({open_deg:g}) must be wider than the grip angle ({grip_deg:g}); + opens."
+            f"The {name} claws must open wider than they grip: left open {open_left:g} must be above left grip "
+            f"{grip_left:g}, right open {open_right:g} below right grip {grip_right:g}."
         )
 
     def xy(x: float, y: float) -> dict:
@@ -111,10 +116,8 @@ def _plan(inputs: dict) -> list[tuple[str, str, dict]]:
     def z(left: float, right: float) -> dict:
         return {"z_left_cm": left, "z_right_cm": right, "speed_rpm": z_speed}
 
-    # Left servo takes +angle, right -angle: the Gripper block's own
-    # convention (open +30/-30, closed -90/+90).
-    claws_open = {"action": "open", "left_open_deg": open_deg, "right_open_deg": -open_deg}
-    claws_grip = {"action": "close", "left_closed_deg": grip_deg, "right_closed_deg": -grip_deg}
+    claws_open = {"action": "open", "left_open_deg": open_left, "right_open_deg": open_right}
+    claws_grip = {"action": "close", "left_closed_deg": grip_left, "right_closed_deg": grip_right}
 
     source = (f"well {well}", (well_x, well_y), lambda up: z(travel_left, up), grab_z)
     target = ("the target", (target_x, target_y), lambda up: z(up, travel_right), target_z)
@@ -129,10 +132,10 @@ def _plan(inputs: dict) -> list[tuple[str, str, dict]]:
 
     return [
         ("Both Z platforms to travel height", "move_z", z(travel_left, travel_right)),
-        (f"Open the claws to {open_deg:g} deg", "gripper", claws_open),
+        (f"Open the claws to {open_left:g}/{open_right:g} deg", "gripper", claws_open),
         (f"Move over {start[0]}", "move_gantry_xy", xy(*start[1])),
         lift(start, True),
-        (f"Grip the {name} at {grip_deg:g} deg", "gripper", claws_grip),
+        (f"Grip the {name} at {grip_left:g}/{grip_right:g} deg", "gripper", claws_grip),
         lift(start, False),
         (f"Carry the {name} to {end[0]}", "move_gantry_xy", xy(*end[1])),
         lift(end, True),

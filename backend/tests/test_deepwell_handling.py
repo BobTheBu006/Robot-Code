@@ -16,8 +16,10 @@ handler = importlib.import_module("app.functions.deepwell_handling.handler")
 
 SETTINGS = {
     "well": "B3", "target_x_cm": 60.0, "target_y_cm": 30.0, "target_z_cm": 8.0,
-    "lid_open_deg": 20.0, "lid_grip_deg": -10.0, "lid_grab_z_cm": 12.0,
-    "plate_open_deg": 40.0, "plate_grip_deg": 0.0, "plate_grab_z_cm": 10.0,
+    "lid_open_left_deg": 20.0, "lid_open_right_deg": -20.0, "lid_grip_left_deg": -10.0, "lid_grip_right_deg": 10.0,
+    "lid_grab_z_cm": 12.0,
+    "plate_open_left_deg": 40.0, "plate_open_right_deg": -40.0, "plate_grip_left_deg": 0.0, "plate_grip_right_deg": 5.0,
+    "plate_grab_z_cm": 10.0,
     "travel_z_left_cm": 1.0, "travel_z_right_cm": 2.0,
 }
 
@@ -93,7 +95,7 @@ class DeepwellHandlingTests(unittest.TestCase):
         summary = self._summary()
         self.assertEqual(summary[1], ("open", 40.0, -40.0))
         self.assertEqual(summary[3], ("z", 1.0, 10.0))
-        self.assertEqual(summary[4], ("close", 0.0, -0.0))
+        self.assertEqual(summary[4], ("close", 0.0, 5.0))
 
     def test_sub_blocks_get_their_own_defaults_for_everything_else(self) -> None:
         self._execute("take_lid")
@@ -152,6 +154,20 @@ class DeepwellHandlingTests(unittest.TestCase):
         with mock.patch.object(handler.safety_controller, "raise_if_blocked", side_effect=RuntimeError("E-Stop")):
             with self.assertRaisesRegex(handler.DeepwellHandlingError, "E-Stop"):
                 self._execute("take_lid")
+        self.assertEqual(self.calls, [])
+
+
+    def test_asymmetric_claws_are_sent_as_set(self) -> None:
+        # The Gripper block on the machine: open -54/+60, closed -61/+67.
+        self._execute("take_lid", lid_open_left_deg=-54.0, lid_open_right_deg=60.0,
+                      lid_grip_left_deg=-61.0, lid_grip_right_deg=67.0)
+        summary = self._summary()
+        self.assertEqual(summary[1], ("open", -54.0, 60.0))
+        self.assertEqual(summary[4], ("close", -61.0, 67.0))
+
+    def test_claws_that_would_close_further_to_open_are_refused(self) -> None:
+        with self.assertRaisesRegex(handler.DeepwellHandlingError, "open wider than they grip"):
+            self._execute("take_lid", lid_open_left_deg=-70.0, lid_grip_left_deg=-61.0)
         self.assertEqual(self.calls, [])
 
 
