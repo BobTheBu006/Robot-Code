@@ -1088,12 +1088,14 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // rather than reported as an error, because an error tells an operator they
   // are stuck while a question tells them how to get moving.
   const [pendingConfirmations, setPendingConfirmations] = useState<UncertainFact[]>([]);
-  // The Teach Tool Positions dialog. Open while that block runs; the block
-  // waits on the promise held in teachResolverRef.
+  // The hand-teach dialog (Teach Tool / Deepwell Positions). Open while such
+  // a block runs; the block waits on the promise held in teachResolverRef.
   const [teach, setTeach] = useState<{
-    slot: number;
-    firstSlot: number;
-    lastSlot: number;
+    title: string;
+    // "{target}" is replaced by the current target's label.
+    instruction: string;
+    targets: Array<{ id: string; label: string }>;
+    index: number;
     position: TeachPosition | null;
     saved: Record<string, { x_cm: number; y_cm: number }>;
     error: string | null;
@@ -2463,24 +2465,49 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     );
   }
 
-  async function runTeachDialog(
-    params: Record<string, unknown>,
-    signal?: AbortSignal,
-  ): Promise<Record<string, { x_cm: number; y_cm: number }>> {
+  function teachSetupFor(blockId: string, params: Record<string, unknown>) {
+    if (blockId === "teach_deepwell_positions") {
+      const wells = ["A", "B", "C", "D"].flatMap((column) => [1, 2, 3, 4, 5, 6].map((row) => `${column}${row}`));
+      const corners = params.mode !== "individual";
+      return {
+        title: corners ? "Teach the deepwell grid (3 corners)" : "Teach individual deepwells",
+        instruction: "The XY motors are off. Push the gripper by hand so it is centred over well {target}, then press Save.",
+        targets: (corners ? ["A1", "A6", "D1"] : wells).map((id) => ({
+          id,
+          label: corners ? `${id} (corner)` : id,
+        })),
+      };
+    }
     const clampSlot = (value: unknown, fallback: number) => {
       const number = Math.round(Number(value));
       return Number.isFinite(number) ? Math.min(6, Math.max(1, number)) : fallback;
     };
     const firstSlot = clampSlot(params.first_slot, 1);
     const lastSlot = Math.max(firstSlot, clampSlot(params.last_slot, 6));
+    return {
+      title: "Teach tool positions",
+      instruction: "The XY motors are off. Push the carriage by hand to where it picks up the tool in {target}, then press Save.",
+      targets: Array.from({ length: lastSlot - firstSlot + 1 }, (_, i) => ({
+        id: String(firstSlot + i),
+        label: `slot ${firstSlot + i}`,
+      })),
+    };
+  }
+
+  async function runTeachDialog(
+    blockId: string,
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<Record<string, { x_cm: number; y_cm: number }>> {
+    const setup = teachSetupFor(blockId, params);
     // Throws (and so fails the block) when teaching cannot start, e.g. an
     // uncalibrated gantry or encoders that are not enabled.
     const start = await xyTeach("start", params);
     teachSavedRef.current = {};
-    setTeach({ slot: firstSlot, firstSlot, lastSlot, position: start, saved: {}, error: null, finishing: false });
+    setTeach({ ...setup, index: 0, position: start, saved: {}, error: null, finishing: false });
     return new Promise((resolve, reject) => {
       teachResolverRef.current = { resolve, reject, params };
-      signal?.addEventListener("abort", () => void finishTeach(false, "The run was stopped; no tool positions were saved."));
+      signal?.addEventListener("abort", () => void finishTeach(false, "The run was stopped; nothing was saved."));
     });
   }
 
@@ -2505,7 +2532,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     } else if (save) {
       pending.resolve({ ...teachSavedRef.current });
     } else {
-      pending.reject(new Error(reason ?? "Teaching cancelled; no tool positions were saved."));
+      pending.reject(new Error(reason ?? "Teaching cancelled; nothing was saved."));
     }
   }
 
@@ -2519,10 +2546,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       }
       const saved = {
         ...current.saved,
-        [String(current.slot)]: { x_cm: current.position.x_cm, y_cm: current.position.y_cm },
+        [current.targets[current.index].id]: { x_cm: current.position.x_cm, y_cm: current.position.y_cm },
       };
       teachSavedRef.current = saved;
-      return { ...current, saved, error: null, slot: Math.min(current.lastSlot, current.slot + 1) };
+      return { ...current, saved, error: null, index: Math.min(current.targets.length - 1, current.index + 1) };
     });
   }
 
@@ -2607,9 +2634,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       return runBuiltInBlockTest(node.data.block, hardwareResolvedParameters, inputData);
     }
 
-    if (node.data.block.id === "teach_tool_positions") {
+    if (node.data.block.id === "teach_tool_positions" || node.data.block.id === "teach_deepwell_positions") {
       // Interactive: the dialog collects the positions, the block saves them.
-      const positions = await runTeachDialog(hardwareResolvedParameters as Record<string, unknown>, signal);
+      const positions = await runTeachDialog(
+        node.data.block.id,
+        hardwareResolvedParameters as Record<string, unknown>,
+        signal,
+      );
       return testFunction(
         node.data.block.id,
         { ...hardwareResolvedParameters, positions: JSON.stringify(positions) },
@@ -3859,10 +3890,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         {teach ? (
           <div className="workflow-confirm__backdrop" role="presentation">
             <div className="workflow-confirm teach-dialog" role="dialog" aria-modal="true" aria-labelledby="teach-title">
-              <h2 className="workflow-confirm__title" id="teach-title">Teach tool positions</h2>
+              <h2 className="workflow-confirm__title" id="teach-title">{teach.title}</h2>
               <p className="workflow-confirm__lead">
-                The XY motors are off. Push the carriage by hand to where it picks up the tool in
-                slot {teach.slot}, then press Save.
+                {teach.instruction.replace("{target}", teach.targets[teach.index].label)}
               </p>
               <div className="teach-dialog__position">
                 <span>Current position</span>
@@ -3874,31 +3904,33 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                 {teach.position && !teach.position.encoders_ok ? <em>encoder reading not valid</em> : null}
               </div>
               <label className="teach-dialog__slot">
-                <span>Slot</span>
+                <span>Target</span>
                 <select
                   disabled={teach.finishing}
                   onChange={(event) => {
-                    const slot = Number(event.target.value);
-                    setTeach((current) => (current ? { ...current, slot } : current));
+                    const index = Number(event.target.value);
+                    setTeach((current) => (current ? { ...current, index } : current));
                   }}
-                  value={teach.slot}
+                  value={teach.index}
                 >
-                  {Array.from({ length: teach.lastSlot - teach.firstSlot + 1 }, (_, i) => teach.firstSlot + i).map((slot) => (
-                    <option key={slot} value={slot}>
-                      Slot {slot}{teach.saved[String(slot)] ? " ✓" : ""}
+                  {teach.targets.map((target, index) => (
+                    <option key={target.id} value={index}>
+                      {target.label}{teach.saved[target.id] ? " ✓" : ""}
                     </option>
                   ))}
                 </select>
               </label>
               <ul className="teach-dialog__saved">
-                {Object.entries(teach.saved).sort(([a], [b]) => Number(a) - Number(b)).map(([slot, position]) => (
-                  <li key={slot}>Slot {slot}: X {position.x_cm.toFixed(2)} · Y {position.y_cm.toFixed(2)}</li>
+                {teach.targets.filter((target) => teach.saved[target.id]).map((target) => (
+                  <li key={target.id}>
+                    {target.label}: X {teach.saved[target.id].x_cm.toFixed(2)} · Y {teach.saved[target.id].y_cm.toFixed(2)}
+                  </li>
                 ))}
               </ul>
               {teach.error ? <p className="workflow-confirm__reason">{teach.error}</p> : null}
               <div className="workflow-confirm__answers">
                 <button className="workflow-confirm__answer" disabled={teach.finishing} onClick={saveTeachSlot} type="button">
-                  Save slot {teach.slot}
+                  Save {teach.targets[teach.index].label}
                 </button>
                 <button
                   className="workflow-confirm__answer"

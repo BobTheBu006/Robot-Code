@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "id": "teach_deepwell_positions",
+  "display_name": "Teach Deepwell Positions",
+  "category": "Robot Actions",
+  "description": "Records where the 24 deepwells (columns A-D along X, rows 1-6 along Y) sit, by hand. While this block runs the XY motors are off and a dialog opens: push the gripper over the well, press Save, go to the next. '3 corners' teaches A1, A6 and D1 and computes the whole grid from them (replacing any individual wells taught before); 'Individual wells' pins chosen wells to exactly where you put them. The gantry adopts the pushed-to position at the end, so its calibration survives.",
+  "version": "1.0.0",
+  "inputs": [
+    {
+      "key": "tool_port",
+      "label": "Selected ESP32",
+      "type": "file/path",
+      "description": "Connected ESP32 board that drives the CoreXY gantry.",
+      "required": true,
+      "default": "/dev/ttyUSB0",
+      "placeholder": "/dev/ttyUSB0",
+      "advanced": false,
+      "options": []
+    },
+    {
+      "key": "mode",
+      "label": "Teach",
+      "type": "select",
+      "description": "3 corners builds the grid; individual wells override single wells.",
+      "required": true,
+      "default": "corners",
+      "placeholder": null,
+      "advanced": false,
+      "min": null,
+      "max": null,
+      "options": [
+        {
+          "label": "3 corners (A1, A6, D1)",
+          "value": "corners"
+        },
+        {
+          "label": "Individual wells",
+          "value": "individual"
+        }
+      ]
+    },
+    {
+      "key": "positions",
+      "label": "Taught Positions",
+      "type": "string",
+      "description": "Filled in by the teach dialog; leave empty.",
+      "required": false,
+      "default": "",
+      "placeholder": null,
+      "advanced": true,
+      "min": null,
+      "max": null,
+      "options": [],
+      "hidden": true
+    }
+  ],
+  "advanced_inputs": [
+    {
+      "key": "x_step_pin",
+      "label": "CoreXY A Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO step pin for the CoreXY A driver.",
+      "required": false,
+      "default": 25,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_dir_pin",
+      "label": "CoreXY A Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO direction pin for the CoreXY A driver.",
+      "required": false,
+      "default": 26,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_step_pin",
+      "label": "CoreXY B Step Pin",
+      "type": "number",
+      "description": "Runtime GPIO step pin for the CoreXY B driver.",
+      "required": false,
+      "default": 27,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_dir_pin",
+      "label": "CoreXY B Dir Pin",
+      "type": "number",
+      "description": "Runtime GPIO direction pin for the CoreXY B driver.",
+      "required": false,
+      "default": 14,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_min_limit_pin",
+      "label": "X Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the X minimum/home limit switch.",
+      "required": false,
+      "default": 16,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "x_max_limit_pin",
+      "label": "X Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the X maximum limit switch.",
+      "required": false,
+      "default": 17,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_min_limit_pin",
+      "label": "Y Min Limit Pin",
+      "type": "number",
+      "description": "GPIO pin for the Y minimum limit switch.",
+      "required": false,
+      "default": 4,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "y_max_limit_pin",
+      "label": "Y Max Limit Pin",
+      "type": "number",
+      "description": "GPIO pin reserved for a Y maximum limit switch. This machine has no Y-max switch wired; the pin is held inactive by its pull-up and never blocks a move. The usable Y range is bounded by the Y track length and the 5 mm buffers instead. Optional: -1 means no Y-max limit switch is wired.",
+      "required": false,
+      "default": -1.0,
+      "placeholder": null,
+      "advanced": true,
+      "options": []
+    },
+    {
+      "key": "gantry_enable_pin",
+      "label": "Shared Driver Enable Pin",
+      "type": "number",
+      "description": "Shared XY enable GPIO, resolved from the Hardware Map.",
+      "required": false,
+      "default": 13,
+      "advanced": true,
+      "min": -1,
+      "options": []
+    }
+  ],
+  "outputs": [
+    {
+      "key": "next",
+      "label": "Next",
+      "type": "flow",
+      "description": "Continue once the positions are saved."
+    }
+  ],
+  "hardware_devices": [
+    {
+      "id": "x-axis-motor",
+      "name": "CoreXY A Motor",
+      "kind": "stepper_motor",
+      "board_id": "xy-closed-loop",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-dir",
+          "signal": "direction",
+          "gpio": "26",
+          "function_input_key": "x_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "x-step",
+          "signal": "step",
+          "gpio": "25",
+          "function_input_key": "x_step_pin",
+          "notes": null
+        },
+        {
+          "id": "x-axis-motor-enable",
+          "signal": "enable",
+          "gpio": "13",
+          "function_input_key": "gantry_enable_pin",
+          "notes": "Shared active-low TB6600 enable."
+        }
+      ],
+      "basic_block_id": "basic-stepper-x-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "y-axis-motor",
+      "name": "CoreXY B Motor",
+      "kind": "stepper_motor",
+      "board_id": "xy-closed-loop",
+      "sensor_kind": null,
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-dir",
+          "signal": "direction",
+          "gpio": "14",
+          "function_input_key": "y_dir_pin",
+          "notes": null
+        },
+        {
+          "id": "y-step",
+          "signal": "step",
+          "gpio": "27",
+          "function_input_key": "y_step_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-stepper-y-axis-motor",
+      "notes": null
+    },
+    {
+      "id": "x-min-limit-switch",
+      "name": "X Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "xy-closed-loop",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-min-limit",
+          "signal": "signal",
+          "gpio": "16",
+          "function_input_key": "x_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-min-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "x-max-limit-switch",
+      "name": "X Max Limit Switch",
+      "kind": "sensor",
+      "board_id": "xy-closed-loop",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "x-max-limit",
+          "signal": "signal",
+          "gpio": "17",
+          "function_input_key": "x_max_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-x-max-limit-switch",
+      "notes": null
+    },
+    {
+      "id": "y-min-limit-switch",
+      "name": "Y Min Limit Switch",
+      "kind": "sensor",
+      "board_id": "xy-closed-loop",
+      "sensor_kind": "position_limit_switch",
+      "rotation_min_deg": null,
+      "rotation_max_deg": null,
+      "calibration_ml_per_200_steps": null,
+      "pins": [
+        {
+          "id": "y-min-limit",
+          "signal": "signal",
+          "gpio": "4",
+          "function_input_key": "y_min_limit_pin",
+          "notes": null
+        }
+      ],
+      "basic_block_id": "basic-sensor-y-min-limit-switch",
+      "notes": null
+    }
+  ]
+}
