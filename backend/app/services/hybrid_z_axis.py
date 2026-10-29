@@ -45,6 +45,12 @@ SLOW_HOMING_RPM = 10.0
 # the switch by design. Within this distance of the bottom, the min switch
 # tripping means "arrived", not "something is wrong".
 MIN_SWITCH_ARRIVAL_CM = 0.2
+# A limit switch counts as pressed only when this many reads in a row say so.
+# Watching both Z switches while both motors run, one noisy read on the left
+# max wire held the left motor short of its switch while the right drove into
+# its end; a real press holds for far longer than these reads take.
+SWITCH_CONFIRM_READS = 4
+SWITCH_CONFIRM_INTERVAL_S = 0.0005
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -448,6 +454,28 @@ class HybridZAxisService:
                 continue
         return left_delta, right_delta
 
+    def _switch_pressed(self, gpio: Any, pin: int) -> bool:
+        """A debounced read: pressed only if every one of a few quick reads
+        says so. An unpressed switch costs a single read."""
+        for attempt in range(SWITCH_CONFIRM_READS):
+            if not self._limit_active(gpio, pin):
+                return False
+            if attempt + 1 < SWITCH_CONFIRM_READS:
+                time.sleep(SWITCH_CONFIRM_INTERVAL_S)
+        return True
+
+    def _homing_log(self, message: str) -> None:
+        """Append one line to logs/z-homing.log: what each seek asked for,
+        which switch tripped, which stop went out, what the board replied.
+        The record to read when homing misbehaves on the machine."""
+        try:
+            path = Path(os.getenv("ROBOT_Z_HOMING_LOG") or Path(__file__).resolve().parents[3] / "logs" / "z-homing.log")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000) % 1000:03d} {message}\n")
+        except OSError:
+            pass
+
     def _supports_stop_sources(self, serial_port) -> bool:
         """Whether the board understands "STOP <source>" (firmware with
         FEATURES?). Older firmware ignores a sourced stop mid-move, which
@@ -507,7 +535,7 @@ class HybridZAxisService:
 
             if not stop_sent:
                 for side, end in watched.items():
-                    if side in held or not self._limit_active(gpio, switch_pins[(side, end)]):
+                    if side in held or not self._switch_pressed(gpio, switch_pins[(side, end)]):
                         continue
                     held.add(side)
                     tripped.append((side, end))
@@ -557,19 +585,21 @@ class HybridZAxisService:
         result: dict[str, tuple[int, bool]] = {}
         moving = []
         for side, pin in limit_pins.items():
-            if self._limit_active(gpio, pin):
+            if self._switch_pressed(gpio, pin):
                 result[side] = (0, True)
+                self._homing_log(f"seek {end}: {side} already on its switch (GPIO {pin}), not moved")
             else:
                 moving.append(side)
         if not moving or max_steps <= 0:
             for side in moving:
-                result[side] = (0, self._limit_active(gpio, limit_pins[side]))
+                result[side] = (0, self._switch_pressed(gpio, limit_pins[side]))
             return result
 
         signed = direction * max_steps
         left = signed if "left" in moving else 0
         right = signed if "right" in moving else 0
         command = f"STEP Z {left} {right} {int(rpm)} {1 if trapezoidal else 0} {int(acceleration_rpm_per_s)}"
+        self._homing_log(f"seek {end}: {command} watching " + ", ".join(f"{side} GPIO {limit_pins[side]}" for side in moving))
 
         serial_port.reset_input_buffer()
         serial_port.reset_output_buffer()
@@ -578,6 +608,7 @@ class HybridZAxisService:
 
         steps_per_second = max(1.0, rpm * steps_per_rotation / 60.0)
         deadline = time.monotonic() + (max_steps / steps_per_second) * 2.0 + 10.0
+        started = time.monotonic()
         held: set[str] = set()
         stop_sent = False
         buffer = b""
@@ -592,15 +623,20 @@ class HybridZAxisService:
 
             if not stop_sent:
                 for side in moving:
-                    if side in held or not self._limit_active(gpio, limit_pins[side]):
+                    if side in held or not self._switch_pressed(gpio, limit_pins[side]):
                         continue
                     held.add(side)
                     if len(held) == len(moving):
-                        serial_port.write(b"STOP\n")
+                        stop = "STOP"
                         stop_sent = True
                     else:
-                        serial_port.write(f"STOP Z_{side.upper()}_{end}\n".encode("utf-8"))
+                        stop = f"STOP Z_{side.upper()}_{end}"
+                    serial_port.write((stop + "\n").encode("utf-8"))
                     serial_port.flush()
+                    self._homing_log(
+                        f"seek {end}: {side} switch GPIO {limit_pins[side]} pressed after "
+                        f"{time.monotonic() - started:.2f}s -> sent {stop}"
+                    )
 
             waiting = serial_port.in_waiting
             if waiting:
@@ -617,7 +653,11 @@ class HybridZAxisService:
                         self._right_steps += travelled_right
                         for side in moving:
                             travelled = abs(travelled_left if side == "left" else travelled_right)
-                            result[side] = (travelled, self._limit_active(gpio, limit_pins[side]))
+                            result[side] = (travelled, self._switch_pressed(gpio, limit_pins[side]))
+                        self._homing_log(
+                            f"seek {end}: board replied '{line}'; switches now "
+                            + ", ".join(f"{side} {'pressed' if result[side][1] else 'NOT pressed'}" for side in moving)
+                        )
                         return result
 
         raise HybridZAxisError(

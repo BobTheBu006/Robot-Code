@@ -133,6 +133,7 @@ class SimulatedBoardCase(unittest.TestCase):
         service = HybridZAxisService()
         patches = [
             mock.patch.object(service, "_save_state"),  # never touch the real z-gantry-state.json
+            mock.patch.object(service, "_homing_log"),  # keep the machine's homing log clean
             mock.patch.object(service, "_hold_power", lambda *_args: contextlib.nullcontext()),
             mock.patch.object(service, "_resolve_port", lambda *_args: "/dev/fake"),
             mock.patch.object(service, "_open_serial", lambda *_args: board),
@@ -145,6 +146,28 @@ class SimulatedBoardCase(unittest.TestCase):
             patch.start()
             self.addCleanup(patch.stop)
         return service
+
+
+class NoisySwitchTests(SimulatedBoardCase):
+    def test_a_single_noisy_read_does_not_hold_a_motor(self) -> None:
+        # The left max wire glitches once while both motors run.
+        board = FakeZBoard({"left": 1000, "right": 1000}, {"left": 5000, "right": 4000})
+        service = self._service(board)
+        glitches = {"left": 1}
+
+        def limit_active(_gpio, pin):
+            side, end = PINS[pin]
+            if side == "left" and end == "max" and glitches["left"] and board.move:
+                glitches["left"] -= 1
+                return True
+            return board.pressed(side, end)
+
+        with mock.patch.object(service, "_limit_active", limit_active):
+            result = service._seek_switches(board, None, {"left": 13, "right": 15}, 1, 10000, 100, True, 300, 800)
+        self.assertEqual(glitches["left"], 0, "the glitch was seen")
+        self.assertTrue(result["left"][1])
+        self.assertGreaterEqual(board.pos["left"], 5000, "left went on to its real switch")
+        self.assertEqual(board.log[1], "STOP Z_RIGHT_MAX", "only the right was held early")
 
 
 class HomingTogetherTests(SimulatedBoardCase):
