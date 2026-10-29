@@ -9,25 +9,9 @@ from app.services.toolhead import (
     toolhead_service,
     toolhead_state_store,
 )
-from app.services.workspace_defaults import TOOLHEAD_DEFAULT_KEYS, workspace_defaults_service
+from app.services.workspace_defaults import workspace_defaults_service
 
 _GANTRY_KEYS = set(GantryGotoXYRequest.model_fields) - {"x_cm", "y_cm", "speed_rpm"}
-
-# Advanced settings that describe the rack and the tool-change motion. Hardware
-# pins are excluded: the Hardware Map owns those.
-_TOOLHEAD_DEFAULT_KEYS = TOOLHEAD_DEFAULT_KEYS
-
-
-def _supplied_toolhead_defaults(inputs: dict) -> dict:
-    """Only the settings actually passed in, so an omitted field never resets a
-    measurement tuned on the machine."""
-    return {
-        key: float(value)
-        for key, value in inputs.items()
-        if key in _TOOLHEAD_DEFAULT_KEYS and value is not None
-    }
-
-
 
 
 def _connect_tool(toolhead_index: int, *, reverify: bool):
@@ -135,11 +119,6 @@ def execute(context: dict, inputs: dict) -> dict:
 
     connector_results = _connect_tool(target.index, reverify=True)
 
-    # Persist only after the sequence succeeds, so a position that the guard
-    # rejected is never adopted as the new default.
-    position_changes = workspace_defaults_service.apply_toolhead_defaults(
-        _supplied_toolhead_defaults(inputs)
-    )
 
     if auto_dropped_index is None:
         message = f"Picked up toolhead {target.index} at X {target.x_cm:g}, Y {target.y_cm:g}."
@@ -163,7 +142,6 @@ def execute(context: dict, inputs: dict) -> dict:
         "engage_speed_rpm": ENGAGE_RPM,
         "drop_moves": drop_moves,
         "pickup_moves": pickup_moves,
-        "toolhead_position_defaults_updated": position_changes,
         "mode": context.get("mode"),
     }
 

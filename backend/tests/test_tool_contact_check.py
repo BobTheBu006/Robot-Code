@@ -220,6 +220,7 @@ class _FakeToolhead:
     def pickup(self, *, position, **kwargs):
         self.calls.append(f"pickup {position.index}")
         self.pickup_kwargs = kwargs
+        self.pickup_position = position
         return []
 
     def drop(self, *, position, **_kwargs):
@@ -296,8 +297,11 @@ class PickupBlockTests(unittest.TestCase):
 
         module.execute({}, {"toolhead_index": 1, "tool_1_x_cm": 0.0, "tool_1_y_cm": 2.5})
 
-        self.assertEqual(defaults.applied[-1]["tool_1_y_cm"], 2.525, "the taught value, not the block's stale 2.5")
-        self.assertEqual(defaults.applied[-1]["tool_1_x_cm"], -0.145)
+        self.assertEqual(toolhead.pickup_position.y_cm, 2.525, "the taught value, not the block's stale 2.5")
+        self.assertEqual(toolhead.pickup_position.x_cm, -0.145)
+        # Running a block never writes defaults back; only an edit saved in
+        # the workflow does.
+        self.assertEqual(defaults.applied, [])
 
     def test_an_impossible_check_is_refused_before_anything_moves(self) -> None:
         group = HardwareGroupMapping(id="uart-tool", name="UART Tool", connector_id="pogo-connector",

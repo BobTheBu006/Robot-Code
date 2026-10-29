@@ -68,9 +68,9 @@ def save_default_workflow(request: WorkflowSaveRequest) -> WorkflowSaveResponse:
     except WorkflowStorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Values edited on any tool block become the shared defaults as soon as the
-    # workflow is saved, so a newly placed block starts from them.
-    workspace_defaults_service.adopt_toolhead_defaults_from_workflow(request.workflow)
+    # Values edited on a tool or Calibrate XY block become the defaults as soon
+    # as the workflow is saved, so a newly placed block starts from them.
+    workspace_defaults_service.adopt_toolhead_defaults_from_workflow(request.workflow, previous)
     workspace_defaults_service.adopt_calibrate_defaults_from_workflow(request.workflow, previous)
     return response
 

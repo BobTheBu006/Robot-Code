@@ -323,7 +323,7 @@
       "type": "number",
       "description": "How far clear of the rack the head sits before and after collecting a tool.",
       "required": true,
-      "default": 2.0,
+      "default": 10.0,
       "placeholder": null,
       "advanced": true,
       "min": 0.0,

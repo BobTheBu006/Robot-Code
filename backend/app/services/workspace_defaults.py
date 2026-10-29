@@ -303,74 +303,105 @@ class WorkspaceDefaultsService:
                 positions[index] = (float(x_cm), float(y_cm))
         return positions
 
-    def adopt_toolhead_defaults_from_workflow(self, workflow: dict) -> list[str]:
-        """Adopt tool-block settings the moment a workflow is saved.
+    def _manifest_defaults(self, function_id: str) -> dict[str, object]:
+        manifest_path = self._app_functions_dir / function_id / "manifest.json"
+        if not manifest_path.exists():
+            return {}
+        manifest = self._read_json(manifest_path)
+        return {
+            definition.get("key"): definition.get("default")
+            for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]
+        }
 
-        Editing a value on any Pick Up / Drop Toolhead block and saving the
-        workflow makes it the new default for future blocks immediately - the
-        user should not have to run the block first for a measured rack
-        position to stick."""
-        collected: dict[str, float] = {}
+    def toolhead_adoptable_keys(self) -> frozenset[str]:
+        """Every advanced setting on the tool blocks except hardware pins,
+        which the Hardware Map owns and resolves on every run."""
+        keys: set[str] = set()
+        for function_id in _TOOLHEAD_FUNCTION_IDS:
+            manifest_path = self._app_functions_dir / function_id / "manifest.json"
+            if manifest_path.exists():
+                keys.update(
+                    definition["key"]
+                    for definition in self._read_json(manifest_path).get("advanced_inputs", [])
+                    if "pin" not in definition.get("key", "")
+                )
+        return frozenset(keys)
 
-        def walk(node: object) -> None:
-            if isinstance(node, dict):
-                block = node.get("data", {}).get("block") if isinstance(node.get("data"), dict) else None
-                if isinstance(block, dict) and block.get("id") in _TOOLHEAD_FUNCTION_IDS:
-                    parameters = node["data"].get("parameters")
-                    if isinstance(parameters, dict):
-                        for key, value in parameters.items():
-                            # Slot positions are owned by Teach Tool Positions.
-                            # A placed block's copy goes stale, and adopting it
-                            # here silently undid a teach on the next save.
-                            if key in SLOT_POSITION_KEYS:
-                                continue
-                            if key in TOOLHEAD_DEFAULT_KEYS and isinstance(value, (int, float)):
-                                collected[key] = float(value)
-                for value in node.values():
-                    walk(value)
-            elif isinstance(node, list):
-                for item in node:
-                    walk(item)
+    def _edited_values(
+        self,
+        workflow: dict,
+        previous: dict | None,
+        function_ids: tuple[str, ...],
+        keys: frozenset[str],
+        defaults: dict[str, object],
+        *,
+        need_previous: frozenset[str] = frozenset(),
+    ) -> dict[str, float | bool]:
+        """Values edited since the previous save.
 
-        walk(workflow)
-        if not collected:
+        A block's value counts as edited when it differs from the same block's
+        value in the previous save, or - for a block that is new - from the
+        current default. An untouched older block still holds whatever it was
+        placed with; adopting that (last block wins) quietly undid edits made
+        on another block. Keys in `need_previous` are only adopted against a
+        previous save, never against the default."""
+        before: dict[str, dict] = {}
+        for function_id in function_ids:
+            before.update(_block_parameters(previous or {}, function_id))
+        edited: dict[str, float | bool] = {}
+        for function_id in function_ids:
+            for node_id, parameters in _block_parameters(workflow, function_id).items():
+                for key in keys:
+                    if key not in parameters:
+                        continue
+                    value = parameters[key]
+                    if isinstance(value, bool):
+                        pass
+                    elif isinstance(value, (int, float)):
+                        value = round(float(value), 3)
+                    else:
+                        continue
+                    if node_id in before:
+                        reference = before[node_id].get(key)
+                    elif key in need_previous:
+                        continue
+                    else:
+                        reference = defaults.get(key)
+                    if value != reference:
+                        edited[key] = value
+        return edited
+
+    def adopt_toolhead_defaults_from_workflow(self, workflow: dict, previous: dict | None = None) -> list[str]:
+        """Make an edited Pick Up / Drop Toolhead advanced setting the new
+        default of both blocks the moment the workflow is saved.
+
+        Slot positions are only adopted when edited against a previous save:
+        a placed block's copy goes stale after a teach, and adopting it
+        against the default silently undid the teach."""
+        edited = self._edited_values(
+            workflow, previous, _TOOLHEAD_FUNCTION_IDS, self.toolhead_adoptable_keys(),
+            self._manifest_defaults("pickup_toolhead"), need_previous=SLOT_POSITION_KEYS,
+        )
+        if not edited:
             return []
-        return self.apply_toolhead_defaults(collected)
+        return self.apply_toolhead_defaults(edited)
 
     def adopt_calibrate_defaults_from_workflow(self, workflow: dict, previous: dict | None) -> list[str]:
-        """Make an edited Calibrate XY setting the block's new default.
-
-        Only a value that changed since the previous save of the same block
-        (or that a newly placed block carries) is adopted. An untouched old
-        block still holds the value it was placed with, and adopting that
-        would quietly undo the edit made on another block."""
-        before = _block_parameters(previous or {}, "calibrate_xy")
+        """Make an edited Calibrate XY setting the block's new default."""
         manifest_path = self._app_functions_dir / "calibrate_xy" / "manifest.json"
         if not manifest_path.exists():
             return []
-        manifest = self._read_json(manifest_path)
-        definitions = {
-            definition.get("key"): definition
-            for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]
-            if definition.get("key") in CALIBRATE_XY_ADOPTED_KEYS
-        }
-        wanted: dict[str, float] = {}
-        for node_id, parameters in _block_parameters(workflow, "calibrate_xy").items():
-            for key in CALIBRATE_XY_ADOPTED_KEYS:
-                value = parameters.get(key)
-                if not isinstance(value, (int, float)) or isinstance(value, bool):
-                    continue
-                reference = before[node_id].get(key) if node_id in before else definitions.get(key, {}).get("default")
-                if value != reference:
-                    wanted[key] = round(float(value), 3)
-
+        wanted = self._edited_values(
+            workflow, previous, ("calibrate_xy",), CALIBRATE_XY_ADOPTED_KEYS, self._manifest_defaults("calibrate_xy"),
+        )
         changed: list[str] = []
         with self._lock:
-            for key, value in wanted.items():
-                definition = definitions.get(key)
-                if definition is not None and definition.get("default") != value:
-                    definition["default"] = value
-                    changed.append(f"calibrate_xy.{key} default -> {value}")
+            manifest = self._read_json(manifest_path)
+            for definition in [*manifest.get("inputs", []), *manifest.get("advanced_inputs", [])]:
+                key = definition.get("key")
+                if key in wanted and definition.get("default") != wanted[key]:
+                    definition["default"] = wanted[key]
+                    changed.append(f"calibrate_xy.{key} default -> {wanted[key]}")
             if changed:
                 self._write_json_atomic(manifest_path, manifest)
         return changed
@@ -408,7 +439,10 @@ class WorkspaceDefaultsService:
         """
         with self._lock:
             changed: list[str] = []
-            wanted = {key: round(float(value), 3) for key, value in values.items()}
+            wanted = {
+                key: value if isinstance(value, bool) else round(float(value), 3)
+                for key, value in values.items()
+            }
 
             for function_id in _TOOLHEAD_FUNCTION_IDS:
                 manifest_path = self._app_functions_dir / function_id / "manifest.json"
