@@ -1775,6 +1775,11 @@ button.workflow-editor__connector {
   cursor: pointer;
 }
 
+.workflow-palette__item--highlighted {
+  border-color: rgba(23, 99, 59, 0.55);
+  box-shadow: 0 0 0 2px rgba(23, 99, 59, 0.18);
+}
+
 .workflow-palette__item--selectable:hover {
   border-color: rgba(239, 139, 44, 0.5);
   box-shadow: 0 10px 22px rgba(239, 139, 44, 0.16);
@@ -2335,15 +2340,16 @@ button.workflow-editor__connector {
   line-height: 1;
   cursor: pointer;
   opacity: 0;
-  pointer-events: none;
   transform: translateY(-50%);
   transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
 }
 
+/* Clickable even while invisible: reaching it means crossing the gap beside
+   the block, and with pointer-events off it vanished before the click. */
 .workflow-node:hover .workflow-node__quick-add,
-.workflow-node--selected .workflow-node__quick-add {
+.workflow-node--selected .workflow-node__quick-add,
+.workflow-node__quick-add:hover {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .workflow-node__quick-add:hover {

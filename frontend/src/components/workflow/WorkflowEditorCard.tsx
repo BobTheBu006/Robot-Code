@@ -1174,6 +1174,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveResetTimeoutRef = useRef<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Deleted blocks and connections, newest last, for Ctrl+Z.
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const deletionHistoryRef = useRef<{ nodes: WorkflowFlowNode[]; edges: Edge[] }[]>([]);
   const hasUnsavedChangesRef = useRef(false);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
   const savedWorkflowSnapshotRef = useRef<string | null>(null);
@@ -1548,12 +1551,50 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     );
   }
 
+  function rememberDeletion(deletedNodes: WorkflowFlowNode[], deletedEdges: Edge[]) {
+    if (deletedNodes.length === 0 && deletedEdges.length === 0) {
+      return;
+    }
+    deletionHistoryRef.current = [...deletionHistoryRef.current.slice(-49), { nodes: deletedNodes, edges: deletedEdges }];
+  }
+
+  function handleUndoDeletion(): boolean {
+    const last = deletionHistoryRef.current.pop();
+    if (!last) {
+      return false;
+    }
+    const restoredNodeIds = new Set([...nodes.map((node) => node.id), ...last.nodes.map((node) => node.id)]);
+    setNodes((currentNodes) => {
+      const present = new Set(currentNodes.map((node) => node.id));
+      return [...currentNodes, ...last.nodes.filter((node) => !present.has(node.id)).map((node) => ({ ...node, selected: false }))];
+    });
+    setEdges((currentEdges) => {
+      const present = new Set(currentEdges.map((edge) => edge.id));
+      // A connection comes back only if both of its ends exist again.
+      return [
+        ...currentEdges,
+        ...last.edges.filter(
+          (edge) => !present.has(edge.id) && restoredNodeIds.has(edge.source) && restoredNodeIds.has(edge.target),
+        ),
+      ];
+    });
+    setSelectedNodeId(last.nodes.length === 1 ? last.nodes[0].id : null);
+    setActiveEdgeId(null);
+    setContextMenu(null);
+    return true;
+  }
+
   function handleDeleteEdge(edgeId: string) {
+    rememberDeletion([], edges.filter((edge) => edge.id === edgeId));
     setEdges((existingEdges) => existingEdges.filter((edge) => edge.id !== edgeId));
     setActiveEdgeId((currentEdgeId) => (currentEdgeId === edgeId ? null : currentEdgeId));
   }
 
   function handleDeleteNode(nodeId: string) {
+    rememberDeletion(
+      nodes.filter((node) => node.id === nodeId),
+      edges.filter((edge) => edge.source === nodeId || edge.target === nodeId),
+    );
     testAbortControllersRef.current[nodeId]?.abort();
     delete testAbortControllersRef.current[nodeId];
     setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId));
@@ -1580,6 +1621,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       return false;
     }
 
+    rememberDeletion(
+      nodes.filter((node) => selectedIds.has(node.id)),
+      edges.filter((edge) => selectedIds.has(edge.source) || selectedIds.has(edge.target)),
+    );
     for (const nodeId of selectedIds) {
       testAbortControllersRef.current[nodeId]?.abort();
       delete testAbortControllersRef.current[nodeId];
@@ -1661,6 +1706,30 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
   useEffect(() => {
     function handleWorkflowKeyDown(event: KeyboardEvent) {
+      // Escape closes whatever is on top, also from a field inside the block
+      // page - except the name field, where it means "cancel the rename" -
+      // and never while the teach dialog is open.
+      if (event.key === "Escape") {
+        const target = event.target as HTMLElement | null;
+        if (teach || target?.closest?.(".workflow-overlay__name-input")) {
+          return;
+        }
+        if (openedNodeId) {
+          setOpenedNodeId(null);
+        } else if (workflowDrawer === "blocks") {
+          setWorkflowDrawer(null);
+          setQuickAddSource(null);
+        } else if (contextMenu) {
+          setContextMenu(null);
+        } else if (activeEdgeId) {
+          setActiveEdgeId(null);
+        } else {
+          return;
+        }
+        event.preventDefault();
+        return;
+      }
+
       if (isEditableKeyboardTarget(event.target)) {
         return;
       }
@@ -1674,6 +1743,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       if (event.key === "Delete" || event.key === "Backspace") {
         if (handleDeleteSelectedNodes()) {
           event.preventDefault();
+        } else if (activeEdgeId) {
+          handleDeleteEdge(activeEdgeId);
+          event.preventDefault();
         }
         return;
       }
@@ -1683,7 +1755,11 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       }
 
       const key = event.key.toLowerCase();
-      if (key === "c" && handleCopySelectedNodes()) {
+      if (key === "z" && !event.shiftKey && !editingCompoundNodeId) {
+        if (handleUndoDeletion()) {
+          event.preventDefault();
+        }
+      } else if (key === "c" && handleCopySelectedNodes()) {
         event.preventDefault();
       } else if (key === "v" && handlePasteClipboard()) {
         event.preventDefault();
@@ -1694,7 +1770,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
     window.addEventListener("keydown", handleWorkflowKeyDown);
     return () => window.removeEventListener("keydown", handleWorkflowKeyDown);
-  }, [nodes, edges, selectedNodeId, editingCompoundNodeId]);
+  }, [nodes, edges, selectedNodeId, editingCompoundNodeId, openedNodeId, workflowDrawer, contextMenu, activeEdgeId, teach]);
 
   function handleRenameNode(nodeId: string, displayName: string) {
     const node = nodeLookup.get(nodeId);
@@ -1958,6 +2034,25 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     });
 
     setSelectedNodeId(nextNode.id);
+  }
+
+  // Enter in the block search with no connection to attach to: add the block
+  // in the middle of the visible canvas.
+  function handleAddBlockAtCenter(block: WorkflowBlockDefinition) {
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    const center = reactFlow.screenToFlowPosition({
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+    });
+    const nextNode = createWorkflowNode(block, { x: center.x - 105, y: center.y - 38 });
+    setNodes((currentNodes) => [...currentNodes, nextNode]);
+    setSelectedNodeId(nextNode.id);
+    setOpenedNodeId(null);
+    setActiveEdgeId(null);
+    setWorkflowDrawer(null);
   }
 
   function handleQuickAddSelectBlock(block: WorkflowBlockDefinition) {
@@ -4029,7 +4124,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
               <span>Est. total {formatDurationShort(nodes.reduce((total, node) => total + estimateNodeDuration(node), 0))}</span>
             </div>
 
-            <div className="workflow-editor__canvas">
+            <div className="workflow-editor__canvas" ref={canvasRef}>
               <ReactFlow
                 edges={renderedEdges}
                 edgeTypes={edgeTypes}
@@ -4061,6 +4156,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                 }}
                 onNodeContextMenu={(event, node) => openWorkflowContextMenu(event, node.id)}
                 onNodesChange={onNodesChange}
+                deleteKeyCode={null}
                 onPaneClick={() => {
                   setSelectedNodeId(null);
                   setOpenedNodeId(null);
@@ -4184,6 +4280,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
                   discoveryErrors={discoveryErrors.map((error) => `${error.folder_name}: ${error.message}`)}
                   onDeleteCustomBlock={(block) => void handleDeleteCustomBlock(block)}
                   onSelectBlock={quickAddSource ? handleQuickAddSelectBlock : undefined}
+                  onPickBlock={quickAddSource ? handleQuickAddSelectBlock : handleAddBlockAtCenter}
                 />
               </aside>
             ) : null}

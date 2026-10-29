@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -29,13 +31,43 @@ export function WorkflowEdge({
   const onInsert = typeof data?.onInsert === "function" ? data.onInsert as (edgeId: string) => void : null;
   const isActive = Boolean(data?.isActive);
 
+  // Hovering the connection shows its buttons; leaving hides them after a
+  // short grace period, long enough to move the pointer onto them.
+  const [isHovered, setIsHovered] = useState(false);
+  const hideTimerRef = useRef<number | null>(null);
+  function showActions() {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setIsHovered(true);
+  }
+  function hideActionsSoon() {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+    }
+    hideTimerRef.current = window.setTimeout(() => {
+      hideTimerRef.current = null;
+      setIsHovered(false);
+    }, 300);
+  }
+  useEffect(() => () => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+    }
+  }, []);
+
   return (
     <>
-      <BaseEdge id={id} interactionWidth={24} markerEnd={markerEnd} path={edgePath} />
-      {isActive && (onDelete || onInsert) ? (
+      <g onMouseEnter={showActions} onMouseLeave={hideActionsSoon}>
+        <BaseEdge id={id} interactionWidth={24} markerEnd={markerEnd} path={edgePath} />
+      </g>
+      {(isActive || isHovered) && (onDelete || onInsert) ? (
         <EdgeLabelRenderer>
           <div
             className="workflow-edge__actions nodrag nopan"
+            onMouseEnter={showActions}
+            onMouseLeave={hideActionsSoon}
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}

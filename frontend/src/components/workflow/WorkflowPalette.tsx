@@ -1,5 +1,5 @@
-import type { DragEvent } from "react";
-import { useEffect, useState } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { WORKFLOW_BLOCK_MIME } from "../../lib/workflow";
 import type { WorkflowBlockDefinition } from "../../types/workflow";
@@ -9,6 +9,8 @@ interface WorkflowPaletteProps {
   discoveryErrors: string[];
   onDeleteCustomBlock: (block: WorkflowBlockDefinition) => void;
   onSelectBlock?: (block: WorkflowBlockDefinition) => void;
+  // Enter on the highlighted search result. Falls back to onSelectBlock.
+  onPickBlock?: (block: WorkflowBlockDefinition) => void;
 }
 
 const LOGIC_BLOCK_IDS = new Set(["if", "if_else", "while", "for", "loop_over"]);
@@ -73,7 +75,7 @@ function blockMatchesSearch(block: WorkflowBlockDefinition, query: string): bool
   return query.split(/\s+/).every((term) => haystack.includes(term));
 }
 
-export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, onSelectBlock }: WorkflowPaletteProps) {
+export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, onSelectBlock, onPickBlock }: WorkflowPaletteProps) {
   const [hiddenBlockIds, setHiddenBlockIds] = useState<Set<string>>(() => new Set());
   const [showAllBlocks, setShowAllBlocks] = useState(false);
   const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
@@ -91,6 +93,48 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
     return groups;
   }, {});
   const groupedBlockEntries = getOrderedCategoryEntries(groupedBlocks);
+  // Up/Down walk the results in the order they are shown; Enter adds the
+  // highlighted one. A new query starts again from the first result.
+  const orderedBlocks = groupedBlockEntries.flatMap(([, categoryBlocks]) => categoryBlocks);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const highlightedBlockId = orderedBlocks[highlightedIndex]?.id ?? null;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const pickBlock = onPickBlock ?? onSelectBlock;
+
+  useEffect(() => {
+    setHighlightedIndex(normalizedQuery ? 0 : -1);
+  }, [normalizedQuery]);
+
+  useEffect(() => {
+    if (!highlightedBlockId) {
+      return;
+    }
+    scrollRef.current
+      ?.querySelector(".workflow-palette__item--highlighted")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [highlightedBlockId]);
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (orderedBlocks.length === 0) {
+        return;
+      }
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setHighlightedIndex((current) => {
+        if (current < 0) {
+          return step > 0 ? 0 : orderedBlocks.length - 1;
+        }
+        return (current + step + orderedBlocks.length) % orderedBlocks.length;
+      });
+    } else if (event.key === "Enter") {
+      const block = orderedBlocks[highlightedIndex];
+      if (block && pickBlock) {
+        event.preventDefault();
+        pickBlock(block);
+      }
+    }
+  }
 
   useEffect(() => {
     if (!draggingBlockId) {
@@ -163,6 +207,7 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
         <input
           autoFocus
           onChange={(event) => setSearchQuery(event.target.value)}
+          onKeyDown={handleSearchKeyDown}
           placeholder="Search blocks..."
           type="search"
           value={searchQuery}
@@ -171,7 +216,7 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
 
       {visibleBlocks.length > 0 ? (
         <>
-          <div className="workflow-palette__scroll">
+          <div className="workflow-palette__scroll" ref={scrollRef}>
             {groupedBlockEntries.map(([category, categoryBlocks]) => (
               <section className="workflow-palette__group" key={category}>
                 <h4>{category}</h4>
@@ -183,11 +228,12 @@ export function WorkflowPalette({ blocks, discoveryErrors, onDeleteCustomBlock, 
                     return (
                       <div className="workflow-palette__item-shell" key={block.id}>
                         <div
-                          className={`workflow-palette__item${blockIsHidden ? " workflow-palette__item--hidden" : ""}${onSelectBlock ? " workflow-palette__item--selectable" : ""}`}
+                          className={`workflow-palette__item${blockIsHidden ? " workflow-palette__item--hidden" : ""}${onSelectBlock ? " workflow-palette__item--selectable" : ""}${block.id === highlightedBlockId ? " workflow-palette__item--highlighted" : ""}`}
                           draggable
                           onClick={onSelectBlock ? () => onSelectBlock(block) : undefined}
                           onDragEnd={() => setDraggingBlockId(null)}
                           onDragStart={(event) => handleDragStart(event, block)}
+                          onMouseEnter={() => setHighlightedIndex(orderedBlocks.indexOf(block))}
                         >
                           <button
                             className={`workflow-palette__hide${blockIsHidden ? " workflow-palette__hide--unhide" : ""}`}
