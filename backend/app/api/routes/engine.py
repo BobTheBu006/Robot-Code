@@ -15,6 +15,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.safety import safety_controller
 from app.engine.journal import list_runs, read_run
 from app.engine.plan import compile_plan
 from app.engine.scheduler import NodeOutcome
@@ -51,6 +52,17 @@ def plan_workflow(graph: WorkflowGraph) -> dict:
 
 @router.post("/runs")
 def start_run(graph: WorkflowGraph) -> dict:
+    # A latched stop means nothing may start - not even a run whose first
+    # block would refuse anyway. Only an explicit rearm clears it.
+    if safety_controller.motion_blocked.is_set():
+        return {
+            "ok": False,
+            "run_id": None,
+            "problems": [],
+            "error": f"The machine is stopped. {safety_controller.blocked_reason()}",
+            "due": [],
+            "finished": True,
+        }
     session, plan = run_session_service.start(graph.model_dump(), graph.start_node_ids)
 
     if not plan.ok:

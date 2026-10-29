@@ -295,6 +295,9 @@ class SafetyWiringTests(unittest.TestCase):
                 "esp32-flash",
                 "gantry-serial",
                 "syringe-serial",
+                # Open workflow runs are ended on every stop, so nothing new
+                # is handed out to a browser still waiting on stopped blocks.
+                "workflow-runs",
             },
         )
 

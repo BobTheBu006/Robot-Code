@@ -157,8 +157,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Starting a new run clears any latched E-Stop so the control returns to
-    // its armed "E-STOP" state instead of staying on "RESUME".
+    // Starting a new run clears any latched E-Stop, so the "Stopped" note and
+    // the Resume button go away.
     const handleEmergencyReset = () => {
       setEmergencyStopState("idle");
       setEmergencyStopMessage(null);
@@ -186,14 +186,11 @@ function App() {
     }
   }
 
+  // The E-STOP button only ever stops. It used to turn into RESUME once the
+  // stop was sent, so a second press - a double click, or pressing again
+  // because the first seemed not to take - restarted the machine. Resuming is
+  // a separate button, away from this one, and asks first.
   async function handleEmergencyStop() {
-    if (emergencyStopState === "sent") {
-      window.dispatchEvent(new CustomEvent("robot-emergency-resume"));
-      setEmergencyStopState("idle");
-      setEmergencyStopMessage("Flow resumed");
-      return;
-    }
-
     window.dispatchEvent(new CustomEvent("robot-emergency-stop"));
     setEmergencyStopState("stopping");
     setEmergencyStopMessage("Stopping now");
@@ -206,6 +203,15 @@ function App() {
       setEmergencyStopState("error");
       setEmergencyStopMessage(error instanceof Error ? error.message : "Emergency stop request failed");
     }
+  }
+
+  function handleResumeRun() {
+    if (!window.confirm("Resume the stopped run? The machine will start moving again.")) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("robot-emergency-resume"));
+    setEmergencyStopState("idle");
+    setEmergencyStopMessage("Flow resumed");
   }
 
   function handleHardwareMapSaved() {
@@ -321,9 +327,16 @@ function App() {
               onClick={() => void handleEmergencyStop()}
               type="button"
             >
-              {emergencyStopState === "sent" ? "RESUME" : "E-STOP"}
+              E-STOP
             </button>
-            {emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
+            {emergencyStopState === "sent" ? (
+              <>
+                <span>Stopped</span>
+                <button className="emergency-resume" onClick={handleResumeRun} type="button">
+                  Resume run…
+                </button>
+              </>
+            ) : emergencyStopMessage ? <span>{emergencyStopMessage}</span> : null}
           </div>
         </div>
       </header>

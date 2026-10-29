@@ -208,6 +208,21 @@ class RunSessionService:
             )
         return session
 
+    def stop_all(self, reason: str) -> dict[str, object]:
+        """End every open run. Called on every safety stop, before any motor
+        is told to stop: a run left open would hand out its next blocks to a
+        browser that is still waiting on the stopped ones, and they would
+        start the moment anything re-armed the latch."""
+        with self._lock:
+            run_ids = list(self._sessions)
+        for run_id in run_ids:
+            session = self.get(run_id)
+            if session is None:
+                continue
+            with session.lock:
+                self.end(run_id, reason)
+        return {"ok": True, "message": f"Ended {len(run_ids)} open workflow run(s)."}
+
     def _journal_decisions(self, session: RunSession) -> None:
         """Record what the engine decided, whenever it may have decided it.
 
@@ -280,3 +295,16 @@ class RunSessionService:
 
 
 run_session_service = RunSessionService()
+
+
+def _register_with_safety() -> None:
+    from app.core.safety import PRIORITY_FLAG, CallableActor, safety_controller
+
+    safety_controller.register_actor(
+        CallableActor("workflow-runs", lambda: run_session_service.stop_all("Stopped by E-Stop.")),
+        priority=PRIORITY_FLAG,
+        description="Open workflow runs (ended so nothing new is handed out)",
+    )
+
+
+_register_with_safety()

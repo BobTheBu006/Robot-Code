@@ -1176,6 +1176,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Deleted blocks and connections, newest last, for Ctrl+Z.
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  // Bumped by every E-Stop and cancel. A run loop started before the bump
+  // never starts another block, even if something re-arms the latch while
+  // it is still waiting on the blocks it had running.
+  const stopGenerationRef = useRef(0);
+  // True from the moment a run starts until its loop has fully wound down -
+  // unlike workflowRunState.isRunning, which an E-Stop clears at once.
+  const runLoopActiveRef = useRef(false);
   const deletionHistoryRef = useRef<{ nodes: WorkflowFlowNode[]; edges: Edge[] }[]>([]);
   const hasUnsavedChangesRef = useRef(false);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
@@ -1367,6 +1374,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
 
   useEffect(() => {
     const handleEmergencyStop = () => {
+      stopGenerationRef.current += 1;
       flashAbortControllerRef.current?.abort();
       flashAbortControllerRef.current = null;
       Object.values(testAbortControllersRef.current).forEach((controller) => controller.abort());
@@ -2829,43 +2837,45 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     let failed: { nodeId: string; result: FunctionTestResponse } | null = null;
 
     try {
-      while (!innerStep.finished && innerStep.due.length > 0) {
-        let next: EngineRunStep = innerStep;
-        for (const due of innerStep.due) {
-          const innerNode = innerNodeLookup.get(due.node_id);
-          if (!innerNode) {
-            continue;
-          }
-
-          // The entry block receives whatever was passed into the compound;
-          // everything after it receives what the engine routed to it.
-          const innerInputData = due.node_id === compound.entryNodeId
-            ? inputData
-            : (due.input as Record<string, unknown> | null) ?? null;
-
-          const result = await runSingleNode(innerNode, innerInputData, compoundBlockResults, signal);
-          innerResults.set(due.node_id, result);
-          compoundBlockResults[due.node_id] = result.result ?? null;
-
-          next = await submitEngineNodeResult(innerRunId, {
-            node_id: due.node_id,
-            ok: result.ok,
-            result: (result.result as Record<string, unknown> | null) ?? null,
-            error: result.ok ? null : result.error ?? "The block reported failure.",
-          });
-
-          if (!result.ok) {
-            failed = { nodeId: due.node_id, result };
-            break;
-          }
-          if (next.finished) {
-            break;
-          }
+      // One block at a time (a compound claims all hardware), but every block
+      // any result makes due is queued - taking only the last result's list
+      // dropped blocks that became due earlier in the batch.
+      const pending = innerStep.finished ? [] : [...innerStep.due];
+      while (pending.length > 0) {
+        if (signal?.aborted) {
+          throw new DOMException("Stopped by E-Stop.", "AbortError");
         }
-        if (failed) {
+        const due = pending.shift() as EngineDueNode;
+        const innerNode = innerNodeLookup.get(due.node_id);
+        if (!innerNode) {
+          continue;
+        }
+
+        // The entry block receives whatever was passed into the compound;
+        // everything after it receives what the engine routed to it.
+        const innerInputData = due.node_id === compound.entryNodeId
+          ? inputData
+          : (due.input as Record<string, unknown> | null) ?? null;
+
+        const result = await runSingleNode(innerNode, innerInputData, compoundBlockResults, signal);
+        innerResults.set(due.node_id, result);
+        compoundBlockResults[due.node_id] = result.result ?? null;
+
+        const next = await submitEngineNodeResult(innerRunId, {
+          node_id: due.node_id,
+          ok: result.ok,
+          result: (result.result as Record<string, unknown> | null) ?? null,
+          error: result.ok ? null : result.error ?? "The block reported failure.",
+        });
+
+        if (!result.ok) {
+          failed = { nodeId: due.node_id, result };
           break;
         }
-        innerStep = next;
+        if (next.finished || !next.ok) {
+          break;
+        }
+        pending.push(...next.due);
       }
     } finally {
       await endEngineRun(innerRunId, "Compound finished.").catch(() => undefined);
@@ -3113,7 +3123,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   }
 
   async function handleRunTestForNode(nodeId: string) {
-    startNewActivity();
+    if (!startNewActivity()) {
+      return;
+    }
 
     try {
       const node = nodeLookup.get(nodeId);
@@ -3139,7 +3151,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // Runs a node that lives outside the main canvas (e.g. inside the compound
   // editor). It executes standalone, without resolving upstream inputs.
   async function handleRunDetachedNode(node: WorkflowFlowNode) {
-    startNewActivity();
+    if (!startNewActivity()) {
+      return;
+    }
 
     try {
       await prepareEsp32FirmwareForBlocks([{ blockId: node.id, block: node.data.block }]);
@@ -3661,7 +3675,12 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     }
   }
 
-  async function runWorkflowThroughEngine(resultsByNodeId: Map<string, FunctionTestResponse>) {
+  async function runWorkflowThroughEngine(
+    resultsByNodeId: Map<string, FunctionTestResponse>,
+    // The stop count when the run began - before any flashing - so an E-Stop
+    // pressed at any point of the run counts.
+    generation: number,
+  ) {
     // RESUME after an E-Stop replays the workflow with the results it already
     // has, and those blocks must not run a second time - re-running a move or
     // a dispense is a physical action, not a wasted call. Only blocks finished
@@ -3669,6 +3688,10 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     // completed one iteration still has to run the rest.
     const alreadyCompleted = new Set(resultsByNodeId.keys());
 
+    const stoppedSinceStart = () => stopGenerationRef.current !== generation;
+    if (stoppedSinceStart()) {
+      throw new DOMException("Stopped by E-Stop.", "AbortError");
+    }
     const graph = { nodes, edges };
     let step = await startEngineRun(graph);
 
@@ -3708,6 +3731,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       let stopping = step.finished || !step.ok;
 
       const launch = (due: EngineDueNode) => {
+        // An E-Stop since this run began: nothing more starts, whatever the
+        // engine or the latch says now.
+        if (stoppedSinceStart()) {
+          stopping = true;
+          firstError ??= new DOMException("Stopped by E-Stop.", "AbortError");
+          return;
+        }
         const work = alreadyCompleted.delete(due.node_id)
           ? reportCompletedNode(runId, due.node_id, resultsByNodeId)
           : executeAndReportNode(runId, due, resultsByNodeId);
@@ -3745,10 +3775,19 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         step.due.forEach(launch);
       }
 
+      if (stoppedSinceStart()) {
+        throw new DOMException("Stopped by E-Stop.", "AbortError");
+      }
       if (firstError !== null && step.ok && !step.finished) {
         throw firstError;
       }
     } finally {
+      // Close the engine run whenever it did not finish by itself. Clearing
+      // the id here used to stop the caller's cleanup from ending it, so a
+      // stopped run stayed open and kept handing out blocks.
+      if (!step.finished) {
+        await endEngineRun(runId, "Run ended by the editor.").catch(() => undefined);
+      }
       engineRunIdRef.current = null;
     }
 
@@ -3783,6 +3822,12 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       flashingBoardId: null,
     });
 
+    if (runLoopActiveRef.current) {
+      setFunctionsError("The previous run is still stopping. Wait until it has finished, then try again.");
+      return;
+    }
+    runLoopActiveRef.current = true;
+    const generation = stopGenerationRef.current;
     let runSessionStarted = false;
     try {
       // The backend decides whether a run may start: it refuses while the
@@ -3802,7 +3847,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         phase: "running",
         flashingBoardId: null,
       }));
-      await runWorkflowThroughEngine(resultsByNodeId);
+      await runWorkflowThroughEngine(resultsByNodeId, generation);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         setFunctionsError("Workflow stopped by E-Stop.");
@@ -3834,11 +3879,16 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
         currentNodeId: null,
         flashingBoardId: null,
       }));
+      runLoopActiveRef.current = false;
     }
   }
 
   async function resumeStoppedWorkflowRun() {
     if (workflowRunState.isRunning || workflowRunState.orderedNodeIds.length === 0) {
+      return;
+    }
+    if (runLoopActiveRef.current) {
+      setFunctionsError("The stopped run is still winding down. Resume once it has finished.");
       return;
     }
 
@@ -3853,7 +3903,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // Clearing orderedNodeIds is what makes the abandonment real: resume replays
   // that list, so without this, testing a block after an E-Stop would leave the
   // old run resumable and silently continue it later.
-  function startNewActivity() {
+  // Returns false, without re-arming anything, while a stopped run is still
+  // winding down: re-arming then would let its pending blocks move again.
+  function startNewActivity(): boolean {
+    if (runLoopActiveRef.current) {
+      setFunctionsError("The previous run is still stopping. Wait until it has finished, then try again.");
+      return false;
+    }
     window.dispatchEvent(new CustomEvent("robot-emergency-reset"));
     // Also clear the latch on the backend, which blocks Raspberry Pi GPIO
     // motion until it is explicitly rearmed.
@@ -3867,10 +3923,13 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
       completedNodeIds: [],
       currentNodeId: null,
     }));
+    return true;
   }
 
   async function handleRunAll() {
-    startNewActivity();
+    if (!startNewActivity()) {
+      return;
+    }
 
     const startNodeIds = nodes
       .filter((node) => node.data.block.id === "start")
@@ -3896,6 +3955,7 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   }
 
   async function handleCancelRun() {
+    stopGenerationRef.current += 1;
     // Abort the in-flight flash request and any running node tests locally...
     flashAbortControllerRef.current?.abort();
     flashAbortControllerRef.current = null;

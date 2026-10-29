@@ -267,6 +267,20 @@ body {
   outline: 4px solid rgba(209, 15, 15, 0.22);
 }
 
+/* Deliberately small and below the E-STOP: never where a repeated press of
+   the stop would land. */
+.emergency-resume {
+  padding: 4px 10px;
+  border: 1px solid rgba(23, 50, 42, 0.25);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17322a;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .app-header__estop span {
   max-width: 180px;
   padding: 5px 8px;
