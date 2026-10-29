@@ -69,7 +69,9 @@ the Pi (`hybrid_z_axis.py`). The Pi watches the switch and sends `STOP` over
 serial the instant it trips. The stop names its source: `STOP Z_LEFT_MIN` (etc.) holds only
 that motor and the other carries on, plain `STOP` stops everything. That
 lets Calibrate Z home both sides at once; the Pi checks `FEATURES?` first,
-because older firmware ignores a sourced stop mid-move.
+because older firmware ignores a sourced stop mid-move. Move Z watches the switch
+each moving side heads toward: a trip stops that motor and, unless the side
+was going to the bottom, fails the move and drops that side's calibration.
 
 ## The rules that matter
 
@@ -93,7 +95,7 @@ exercise the executed path against an injected fake backend.
 cd backend && ROBOT_GPIO_SIMULATE=1 ./.venv/bin/python -m unittest discover -s tests -t .
 ```
 
-444 tests, stdlib `unittest`, no pytest.
+457 tests, stdlib `unittest`, no pytest.
 
 ## The pogo connector (dynamic tools)
 
@@ -145,6 +147,15 @@ allowed grammar, deliberately **not** `eval`), `scheduler.py` walks the plan,
 handed the blocks that are due, runs them, reports back. Control flow —
 which branch, how many loop iterations, who waits for whom — is decided
 backend-side where it is tested.
+
+**Paths run side by side unless they share hardware.** A path is a straight
+run of blocks (each feeding exactly one block nothing else feeds). When its
+first block is due it claims the hardware of the whole path - an ESP32 board,
+a Pi device, `toolhead` - and a path needing claimed hardware waits until the
+holder's whole path is done. Hardware comes from the manifests via the
+Hardware Map (`run_sessions._hardware_resolver`); a function block with none
+listed claims everything and runs alone. The browser starts every due block
+at once and starts new ones as each result comes back.
 
 ## Gotchas that have cost real time
 
