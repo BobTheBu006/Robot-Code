@@ -398,22 +398,43 @@ function normalizeWorkflowNodes(nodesToNormalize: WorkflowFlowNode[]): WorkflowF
 // inputs arrive with their defaults, and values for inputs that still exist are
 // preserved. Compound blocks are skipped: they are defined inside the workflow
 // itself rather than by a manifest, so the saved copy *is* the source.
-// Rack slot positions are owned by Teach Tool Positions and shared by every
-// Pick Up / Drop block. A placed block's own copy goes stale, so it always
-// shows (and runs with) the catalog's current values instead.
-const SHARED_SLOT_POSITION_BLOCKS = new Set(["pickup_toolhead", "drop_toolhead"]);
+// Settings with one shared default, mirroring backend workspace_defaults.py:
+// an edit saved on any block becomes the default, and every placed block of
+// the group shows and runs with it. Rack slot positions are owned by Teach
+// Tool Positions and always follow the catalog; the other shared settings
+// follow it only while the workflow has no unsaved edits, so a catalog
+// refresh (after a run) cannot undo an edit that has not been saved yet.
 const SHARED_SLOT_POSITION_KEY = /^tool_[1-6]_[xy]_cm$/;
+const SHARED_DEFAULT_GROUPS: { blockIds: Set<string>; isShared: (block: WorkflowBlockDefinition, key: string) => boolean }[] = [
+  {
+    // Every advanced setting except pins, which the Hardware Map owns.
+    blockIds: new Set(["pickup_toolhead", "drop_toolhead"]),
+    isShared: (block, key) => !key.includes("pin") && (block.advancedInputs ?? []).some((input) => input.key === key),
+  },
+  {
+    blockIds: new Set(["calibrate_xy"]),
+    isShared: (_block, key) => key === "x_calibration_y_cm",
+  },
+];
 
-function withSharedSlotPositions(
+function sharedDefaultGroup(block: WorkflowBlockDefinition, key: string) {
+  return SHARED_DEFAULT_GROUPS.find((group) => group.blockIds.has(block.id) && group.isShared(block, key));
+}
+
+function withSharedDefaults(
   block: WorkflowBlockDefinition,
   parameters: Record<string, WorkflowParameterValue>,
+  includeEditable: boolean,
 ): Record<string, WorkflowParameterValue> {
-  if (!SHARED_SLOT_POSITION_BLOCKS.has(block.id)) {
-    return parameters;
-  }
   let next = parameters;
   for (const input of getAllBlockInputs(block)) {
-    if (SHARED_SLOT_POSITION_KEY.test(input.key) && input.default != null && parameters[input.key] !== input.default) {
+    if (!sharedDefaultGroup(block, input.key)) {
+      continue;
+    }
+    if (!includeEditable && !SHARED_SLOT_POSITION_KEY.test(input.key)) {
+      continue;
+    }
+    if (input.default != null && parameters[input.key] !== input.default) {
       next = next === parameters ? { ...parameters } : next;
       next[input.key] = input.default as WorkflowParameterValue;
     }
@@ -424,6 +445,7 @@ function withSharedSlotPositions(
 function refreshNodeBlockDefinitions(
   nodesToRefresh: WorkflowFlowNode[],
   catalog: WorkflowBlockDefinition[],
+  overlaySharedEdits = true,
 ): WorkflowFlowNode[] {
   if (catalog.length === 0) {
     return nodesToRefresh;
@@ -446,7 +468,7 @@ function refreshNodeBlockDefinitions(
       return node;
     }
     if (JSON.stringify(latest) === JSON.stringify(placed)) {
-      const shared = withSharedSlotPositions(latest, node.data.parameters ?? {});
+      const shared = withSharedDefaults(latest, node.data.parameters ?? {}, overlaySharedEdits);
       if (shared === (node.data.parameters ?? {})) {
         return node;
       }
@@ -460,7 +482,9 @@ function refreshNodeBlockDefinitions(
       data: {
         ...node.data,
         block: latest,
-        parameters: withSharedSlotPositions(latest, mergeParametersForBlock(latest, node.data.parameters ?? {})),
+        parameters: withSharedDefaults(
+          latest, mergeParametersForBlock(latest, node.data.parameters ?? {}), overlaySharedEdits,
+        ),
       },
     };
   });
@@ -1133,7 +1157,9 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   // This is what stops "I changed the block but my workflow still runs the old
   // one", which previously needed a delete and re-add to clear.
   useEffect(() => {
-    setNodes((currentNodes) => refreshNodeBlockDefinitions(currentNodes, availableBlocks));
+    setNodes((currentNodes) =>
+      refreshNodeBlockDefinitions(currentNodes, availableBlocks, !hasUnsavedChangesRef.current),
+    );
   }, [availableBlocks, setNodes]);
 
   const [editingCompoundNodeId, setEditingCompoundNodeId] = useState<string | null>(null);
@@ -1148,6 +1174,8 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveResetTimeoutRef = useRef<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const hasUnsavedChangesRef = useRef(false);
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
   const savedWorkflowSnapshotRef = useRef<string | null>(null);
   // The access door interlock. Replaces the old "Skip ESP32 flash" toggle:
   // flashing is now decided by asking each board whether its firmware is
@@ -2420,23 +2448,31 @@ function WorkflowEditorSurface({ hardwareMapRevision, headerSlot, isActive }: Wo
     value: WorkflowParameterValue,
   ) {
     const linkedUpdates = getLinkedAccelerationUpdate(nodeId, input, value);
-    setNodes((currentNodes) =>
-      currentNodes.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                parameters: {
-                  ...node.data.parameters,
-                  [input.key]: value,
-                  ...linkedUpdates,
-                },
+    setNodes((currentNodes) => {
+      // A shared setting changes on every placed block of its group at once;
+      // saving then makes it the default (backend workspace_defaults.py).
+      const edited = currentNodes.find((node) => node.id === nodeId);
+      const group = edited && edited.data.block.kind !== "compound" ? sharedDefaultGroup(edited.data.block, input.key) : undefined;
+      return currentNodes.map((node) => {
+        if (node.id === nodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              parameters: {
+                ...node.data.parameters,
+                [input.key]: value,
+                ...linkedUpdates,
               },
-            }
-          : node,
-      ),
-    );
+            },
+          };
+        }
+        if (group && group.blockIds.has(node.data.block.id) && group.isShared(node.data.block, input.key)) {
+          return { ...node, data: { ...node.data, parameters: { ...node.data.parameters, [input.key]: value } } };
+        }
+        return node;
+      });
+    });
   }
 
   function recordNodeDuration(nodeId: string, durationMs: number) {
